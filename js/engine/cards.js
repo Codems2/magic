@@ -63,7 +63,9 @@ export class CardInstance {
     this.enteredTurn = 0;
   }
 
-  get name() { return this.data.name; }
+  // Nombre para mostrar (español si está localizado). El motor y el intérprete
+  // de efectos usan siempre data.name/oracleText en inglés.
+  get name() { return this.data.nameEs ?? this.data.name; }
   get typeLine() { return this.data.typeLine || ''; }
   get oracleText() { return this.data.oracleText || ''; }
   get cmc() { return this.data.cmc || 0; }

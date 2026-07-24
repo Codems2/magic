@@ -18,17 +18,45 @@ function watchableBot(name, delay = 250) {
   return bot;
 }
 
-const loadDeck = (slug) => fetch(`data/precons/${slug}.json`).then((r) => r.json());
+// Localización española de las cartas (opcional: si falta, todo queda en inglés).
+const esPromise = fetch('data/es.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+
+function localizeCard(c, es) {
+  const t = es[c.name];
+  if (!t) return;
+  c.nameEs = t.n ?? null;
+  c.textEs = t.t ?? null;
+  c.typeEs = t.y ?? null;
+  if (t.i) c.image = t.i;
+  if (t.s) c.imageSmall = t.s;
+}
+
+async function loadDeck(slug) {
+  const [deck, es] = await Promise.all([
+    fetch(`data/precons/${slug}.json`).then((r) => r.json()),
+    esPromise,
+  ]);
+  for (const c of [...deck.commanders, ...deck.cards]) localizeCard(c, es);
+  return deck;
+}
 
 async function main() {
-  const index = await (await fetch('data/precons/index.json')).json();
+  const [index, es] = await Promise.all([
+    (await fetch('data/precons/index.json')).json(),
+    esPromise,
+  ]);
+  // Nombres de comandante e imagen en español en el selector, si existen.
+  for (const d of index) {
+    d.commandersEs = d.commanders.map((n) => es[n]?.n ?? n);
+    if (es[d.commanders[0]]?.i) d.image = es[d.commanders[0]].i;
+  }
   let selected = null;
 
   const list = $('deckList');
   const renderList = (filter = '') => {
     const q = filter.trim().toLowerCase();
     const shown = !q ? index : index.filter((d) =>
-      `${d.name} ${d.commanders.join(' ')} ${d.theme} ${d.setCode}`.toLowerCase().includes(q));
+      `${d.name} ${d.commanders.join(' ')} ${d.commandersEs.join(' ')} ${d.theme} ${d.setCode}`.toLowerCase().includes(q));
     $('deckCount').textContent = `${shown.length} de ${index.length} mazos`;
     list.innerHTML = '';
     for (const d of shown) {
@@ -39,7 +67,7 @@ async function main() {
         ${d.image ? `<img src="${d.image}" alt="${d.name}" loading="lazy">` : ''}
         <div class="dname">${d.name}</div>
         <div class="dtheme">${d.theme}</div>
-        <div class="dcmd">⭐ ${d.commanders.join(' + ')}</div>
+        <div class="dcmd">⭐ ${d.commandersEs.join(' + ')}</div>
         <div class="dset">${d.setCode} · ${d.releaseDate ?? ''}</div>`;
       div.onclick = () => {
         list.querySelectorAll('.deck-card').forEach((e) => e.classList.remove('selected'));

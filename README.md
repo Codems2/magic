@@ -37,10 +37,19 @@ con buscador por nombre, comandante, colores o colección en la pantalla
 inicial. Las imágenes se cargan en tiempo real desde Scryfall; sin conexión
 se muestra el texto de la carta.
 
-Para reimportar el catálogo completo:
+**Cartas en español**: `data/es.json` guarda, para cada carta del catálogo,
+su impresión española más reciente en Scryfall (nombre, tipo, texto e
+imagen impresos). El simulador la usa automáticamente para mostrar cartas,
+registro y vista previa; las cartas que nunca se imprimieron en español se
+muestran en inglés. Internamente el motor sigue interpretando el texto de
+oráculo en inglés (Scryfall solo lo mantiene en ese idioma), así que la
+localización no cambia las reglas.
+
+Para reimportar el catálogo completo y regenerar la localización:
 
 ```bash
-node scripts/fetch-precons.mjs
+node scripts/fetch-precons.mjs   # listas + datos de carta (inglés)
+node scripts/fetch-spanish.mjs   # impresiones españolas → data/es.json
 ```
 
 ## Reglas de Commander implementadas

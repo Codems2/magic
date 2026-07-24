@@ -243,7 +243,10 @@ export class UI {
 
   showPreview(card) {
     const pv = $('preview');
-    const text = `<div class="ptext"><b>${card.name}</b>  ${card.data.manaCost ?? ''}\n${card.typeLine}\n\n${card.oracleText}</div>`;
+    const typeLine = card.data.typeEs ?? card.typeLine;
+    const bodyText = card.data.textEs ?? card.oracleText;
+    const altName = card.data.nameEs && card.data.nameEs !== card.data.name ? `\n<small>(${card.data.name})</small>` : '';
+    const text = `<div class="ptext"><b>${card.name}</b>  ${card.data.manaCost ?? ''}${altName}\n${typeLine}\n\n${bodyText}</div>`;
     if (card.data.image) {
       pv.innerHTML = `<img src="${card.data.image}" alt="${card.name}">`;
       pv.querySelector('img').onerror = () => { pv.innerHTML = text; };
