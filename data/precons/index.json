@@ -1,0 +1,101 @@
+[
+ {
+  "slug": "spirit-squadron",
+  "name": "Spirit Squadron",
+  "theme": "Espíritus (Blanco-Azul)",
+  "commanders": [
+   "Millicent, Restless Revenant"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ]
+ },
+ {
+  "slug": "vampiric-bloodline",
+  "name": "Vampiric Bloodline",
+  "theme": "Vampiros (Negro-Rojo)",
+  "commanders": [
+   "Strefan, Maurer Progenitor"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ]
+ },
+ {
+  "slug": "fae-dominion",
+  "name": "Fae Dominion",
+  "theme": "Hadas (Azul-Negro)",
+  "commanders": [
+   "Tegwyll, Duke of Splendor"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ]
+ },
+ {
+  "slug": "virtue-and-valor",
+  "name": "Virtue and Valor",
+  "theme": "Encantamientos (Verde-Blanco)",
+  "commanders": [
+   "Ellivere of the Wild Court"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ]
+ },
+ {
+  "slug": "lands-wrath",
+  "name": "Land's Wrath",
+  "theme": "Tierras (Rojo-Verde-Blanco)",
+  "commanders": [
+   "Obuun, Mul Daya Ancestor"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "W"
+  ]
+ },
+ {
+  "slug": "sneak-attack",
+  "name": "Sneak Attack",
+  "theme": "Pícaros (Azul-Negro)",
+  "commanders": [
+   "Anowon, the Ruin Thief"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ]
+ },
+ {
+  "slug": "abzan-armor",
+  "name": "Abzan Armor",
+  "theme": "Contadores (Blanco-Negro-Verde)",
+  "commanders": [
+   "Felothar the Steadfast"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "W"
+  ]
+ },
+ {
+  "slug": "temur-roar",
+  "name": "Temur Roar",
+  "theme": "Criaturas grandes (Verde-Azul-Rojo)",
+  "commanders": [
+   "Eshki, Temur's Roar"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "U"
+  ]
+ }
+]
