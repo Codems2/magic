@@ -85,6 +85,7 @@ function parseSentence(s) {
   if ((m = s.match(/^distribute (\w+) \+1\/\+1 counters? among/)))
     return [{ op: 'distribute', n: parseNum(m[1]) }];
   if ((m = s.match(/^monstrosity (\w+)/))) return [{ op: 'counters', n: parseNum(m[1]), scope: 'self' }];
+  if ((m = s.match(/^you get ((?:\{e\})+)/))) return [{ op: 'energy', n: m[1].match(/\{e\}/g).length }];
 
   if (/^counter target .*spell/.test(s)) return [{ op: 'counterSpell' }];
 
@@ -201,6 +202,14 @@ export function parseEffectOps(text, unknown) {
     ops.push({ op: 'impulse', n: 1 });
     text = text.replace(m[0], '');
   }
+  if ((m = text.match(/you may pay ((?:\{e\})+)\.?\s*if you do, ([^.]+\.)/))) {
+    ops.push({ op: 'energyPay', n: m[1].match(/\{e\}/g).length, ops: parseEffectOps(m[2], unknown) });
+    text = text.replace(m[0], '');
+  }
+  if ((m = text.match(/flip a coin\.?\s*if you win the flip, ([^.]+\.)(?:\s*if you lose the flip, ([^.]+\.))?/))) {
+    ops.push({ op: 'coin', win: parseEffectOps(m[1], unknown), lose: m[2] ? parseEffectOps(m[2], unknown) : [] });
+    text = text.replace(m[0], '');
+  }
   const sentences = text.split(/(?<=\.)\s+|, then /i);
   for (const sentence of sentences) {
     const parsed = parseSentence(sentence);
@@ -230,7 +239,8 @@ export function buildScript(card) {
     statics: [], activated: [], attachPT: null, grantsKeywords: [],
     equipCost: null, unknown: [], combatHit: [], entersTapped: false, selfKeywords: [],
     entersCounters: 0, crew: null, allyEtb: [], allyDies: [], eachUpkeep: [], eachEnd: [],
-    convoke: false, cascade: false,
+    convoke: false, cascade: false, improvise: false, delve: false, rebound: false,
+    beginCombat: [], noMaxHand: false,
   };
   const name = card.name.split(' // ')[0];
   const shortName = name.split(',')[0];
@@ -289,6 +299,20 @@ export function buildScript(card) {
     if (/^convoke$/.test(l)) { script.convoke = true; continue; }
     if (/^cascade$/.test(l)) { script.cascade = true; continue; }
     if (/^ravenous$/.test(l)) { script.entersCounters = 'x'; continue; }
+    if (/^improvise$/.test(l)) { script.improvise = true; continue; }
+    if (/^delve$/.test(l)) { script.delve = true; continue; }
+    if (/^rebound$/.test(l)) { script.rebound = true; continue; }
+
+    // Inicio de combate en tu turno (con condiciones comunes).
+    if ((m = l.match(/^(?:lieutenant — )?at the beginning of combat on your turn, (.+)/))) {
+      let cond = null; let eff = m[1];
+      let c2;
+      if ((c2 = eff.match(/^if you've cast a noncreature spell this turn, (.+)/))) { cond = 'noncreature'; eff = c2[1]; }
+      else if ((c2 = eff.match(/^if you control your commander, (.+)/))) { cond = 'commander'; eff = c2[1]; }
+      const ops = parseEffectOps(eff, script.unknown);
+      if (ops.length) script.beginCombat.push({ cond, ops });
+      continue;
+    }
 
     // Disparos "aliados" (tribales): otra criatura tuya entra o muere.
     const normSub = (w) => {
@@ -429,6 +453,9 @@ export function opsValue(ops) {
       case 'populate': v += 1.5; break;
       case 'dig': v += op.take * 1.4; break;
       case 'digPlay': v += 3; break;
+      case 'energy': v += op.n * 0.5; break;
+      case 'energyPay': v += opsValue(op.ops) * 0.6; break;
+      case 'coin': v += opsValue(op.win) * 0.5; break;
       case 'impulse': v += 1.4; break;
       case 'monarch': v += 2.5; break;
       case 'discardHandEach': v += 2; break;

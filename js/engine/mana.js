@@ -34,6 +34,17 @@ export function convokeSources(player, game) {
 export function sourcesFor(player, game, card) {
   const out = manaSources(player, game);
   if (card?.script?.convoke) out.push(...convokeSources(player, game));
+  // Improvisar: artefactos sin girar pagan {1}.
+  if (card?.script?.improvise) {
+    const used = new Set(out.map((s) => s.perm));
+    for (const a of player.battlefield) {
+      if (a.isArtifact && !a.tapped && !used.has(a)) out.push({ perm: a, colors: ['C'], convoke: true });
+    }
+  }
+  // Delve: cartas del cementerio pagan {1} (se exilian).
+  if (card?.script?.delve) {
+    for (const c of player.graveyard) out.push({ card: c, colors: [], delve: true });
+  }
   return out;
 }
 
@@ -66,9 +77,8 @@ export function solvePayment(cost, sources, xValue = 0) {
   let genericNeeded = cost.generic + cost.x * xValue;
   // Para el genérico, gastar primero las fuentes más flexibles/incoloras.
   pool.sort((a, b) => {
-    const aC = (a.colors.includes('C') && a.colors.length === 1 ? -1 : a.colors.length) + (a.convoke ? 100 : 0);
-    const bC = (b.colors.includes('C') && b.colors.length === 1 ? -1 : b.colors.length) + (b.convoke ? 100 : 0);
-    return aC - bC;
+    const score = (s) => (s.delve ? -2 : 0) + (s.colors.includes('C') && s.colors.length === 1 ? -1 : s.colors.length) + (s.convoke ? 100 : 0);
+    return score(a) - score(b);
   });
   while (genericNeeded > 0) {
     if (!pool.length) return null;

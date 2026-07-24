@@ -22,6 +22,9 @@ export class Player {
     this.controller = controller;
     this.isBot = isBot;
     this.life = 40;
+    this.energy = 0;
+    this.poison = 0;
+    this.castNoncreatureThisTurn = false;
     this.library = [];
     this.hand = [];
     this.battlefield = [];
@@ -142,6 +145,7 @@ export class Game {
 
     this.log(`— Turno ${this.turn}: ${p.name} (${p.life} vidas) —`);
     p.landsPlayedThisTurn = 0;
+    p.castNoncreatureThisTurn = false;
 
     // Enderezar.
     this.phase = 'untap';
@@ -149,6 +153,23 @@ export class Game {
 
     // Mantenimiento.
     this.phase = 'upkeep';
+    // Rebotes pendientes de este jugador.
+    for (const item of [...(this.reboundQueue ?? [])]) {
+      if (item.player !== p) continue;
+      this.reboundQueue.splice(this.reboundQueue.indexOf(item), 1);
+      const c = item.card;
+      const ex = c.owner.exile;
+      if (ex.includes(c)) ex.splice(ex.indexOf(c), 1);
+      this.log(`Rebote: ${p.name} lanza ${c.name} gratis.`);
+      c.zone = 'stack';
+      let targets = [];
+      if (c.script.targets.length) {
+        targets = await this.pickTargetsFor(p, c, c.script.targets);
+        if (targets === null) { this.moveToGraveyard(c, null); continue; }
+      }
+      await this.resolveSpell(p, c, targets, 0);
+      if (this.over) return;
+    }
     for (const c of [...p.battlefield]) {
       if (c.script.upkeep.length) await this.resolveTriggered(c, c.script.upkeep, 'mantenimiento');
     }
@@ -319,6 +340,7 @@ export class Game {
 
     // Prowess: hechizos que no son de criatura animan a tus criaturas.
     if (!card.isCreature) {
+      p.castNoncreatureThisTurn = true;
       for (const c of p.creatures()) {
         if ((c.data.keywords || []).includes('Prowess')) {
           c.tempPT = [c.tempPT[0] + 1, c.tempPT[1] + 1];
@@ -405,14 +427,28 @@ export class Game {
       }
     } else {
       await this.resolveOps(card.script.castOps, { source: card, controller: p, targets: targets.slice(), xValue });
-      this.moveToGraveyard(card, null);
+      // Rebound: se exilia y se vuelve a lanzar gratis en tu próximo mantenimiento.
+      if (card.script.rebound && !card._rebounded) {
+        card._rebounded = true;
+        card.zone = 'exile';
+        card.owner.exile.push(card);
+        (this.reboundQueue ??= []).push({ card, player: p });
+        this.log(`${card.name} queda exiliado (rebote): se lanzará de nuevo gratis.`);
+      } else {
+        this.moveToGraveyard(card, null);
+      }
     }
     this.checkState();
   }
 
   paySources(payment) {
     for (const src of payment) {
-      if (src.perm.name === 'Treasure') this.removeFromBattlefield(src.perm, 'sacrificado');
+      if (src.delve) {
+        // Delve: la carta del cementerio se exilia para pagar.
+        const g = src.card.owner.graveyard;
+        const i = g.indexOf(src.card);
+        if (i !== -1) { g.splice(i, 1); src.card.zone = 'exile'; src.card.owner.exile.push(src.card); }
+      } else if (src.perm.name === 'Treasure') this.removeFromBattlefield(src.perm, 'sacrificado');
       else src.perm.tapped = true;
     }
   }
@@ -872,6 +908,25 @@ export class Game {
           this.log(`${p.name} puebla: copia de ${best.name}.`);
           break;
         }
+        case 'energy': {
+          p.energy += op.n;
+          this.log(`${p.name} obtiene ${op.n} de energía (⚡${p.energy}).`);
+          break;
+        }
+        case 'energyPay': {
+          if (p.energy >= op.n) {
+            p.energy -= op.n;
+            this.log(`${p.name} paga ${op.n} de energía (⚡${p.energy}).`);
+            await this.resolveOps(op.ops, ctx);
+          }
+          break;
+        }
+        case 'coin': {
+          const win = this.rng() < 0.5;
+          this.log(`${p.name} lanza una moneda: ${win ? 'gana' : 'pierde'}.`);
+          await this.resolveOps(win ? op.win : op.lose, ctx);
+          break;
+        }
         case 'counterSpell': break; // se maneja en responseWindow
         default: break;
       }
@@ -897,6 +952,13 @@ export class Game {
     if (n <= 0 || c.zone !== 'battlefield') return;
     if (c.hasKeyword('indestructible', this)) {
       if (source && source.isCreature === false) return;
+    }
+    // Infectar: el daño a criaturas son contadores -1/-1.
+    if (source && (source.data?.keywords || []).includes('Infect')) {
+      c.counters -= n;
+      if (source.isCreature && source.hasKeyword('lifelink', this)) source.controller.life += n;
+      this.checkState();
+      return;
     }
     c.damage += n;
     if (source && source.isCreature && source.hasKeyword('lifelink', this)) source.controller.life += n;
@@ -973,15 +1035,18 @@ export class Game {
       this.log(`${c.name} ${verb}: vuelve a la zona de mando.`);
       return;
     }
-    // Undying: vuelve al campo con un contador +1/+1 si no tenía.
-    if (verb === 'muere' && c.isCreature && c.counters === 0 && !c.isToken &&
-        (c.data.keywords || []).includes('Undying')) {
-      c.damage = 0;
-      c.cleanupEndOfTurn();
-      this.putOnBattlefield(c, c.owner);
-      c.counters = 1;
-      this.log(`${c.name} regresa con un contador +1/+1 (indomable).`);
-      return;
+    // Undying / Persist: vuelven al campo con un contador si no tenían.
+    if (verb === 'muere' && c.isCreature && c.counters === 0 && !c.isToken) {
+      const kws = c.data.keywords || [];
+      if (kws.includes('Undying') || kws.includes('Persist')) {
+        const undying = kws.includes('Undying');
+        c.damage = 0;
+        c.cleanupEndOfTurn();
+        this.putOnBattlefield(c, c.owner);
+        c.counters = undying ? 1 : -1;
+        this.log(`${c.name} regresa con un contador ${undying ? '+1/+1' : '-1/-1'}.`);
+        return;
+      }
     }
     if (c.isToken) { this.log(`La ficha ${c.name} ${verb}.`); return; }
     c.zone = 'graveyard';
@@ -1068,6 +1133,17 @@ export class Game {
   // ---- combate -----------------------------------------------------------
 
   async combatPhase(attackerP) {
+    // "Al comienzo del combate en tu turno" (con condiciones comunes).
+    for (const c of [...attackerP.battlefield]) {
+      for (const tr of c.script?.beginCombat || []) {
+        if (tr.cond === 'noncreature' && !attackerP.castNoncreatureThisTurn) continue;
+        if (tr.cond === 'commander' && !attackerP.battlefield.some((x) => x.isCommander)) continue;
+        this.log(`Se dispara ${c.name} (inicio de combate).`);
+        this.resolveOpsSync(tr.ops, { source: c, controller: attackerP, targets: [], xValue: 0 });
+      }
+    }
+    if (this.over) return;
+
     const decls = await attackerP.controller.declareAttackers(this);
     if (!decls || !decls.length) return;
 
@@ -1162,9 +1238,15 @@ export class Game {
     const def = atk.attacking;
     if (!def || !def.alive) return;
     let power = atk.power(this);
+    const infect = (atk.data.keywords || []).includes('Infect');
     if (!blkrs.length) {
-      def.life -= power;
-      this.log(`${atk.name} golpea a ${def.name} por ${power} (${def.life}).`);
+      if (infect) {
+        def.poison += power;
+        this.log(`${atk.name} infecta a ${def.name} (☠${def.poison}/10).`);
+      } else {
+        def.life -= power;
+        this.log(`${atk.name} golpea a ${def.name} por ${power} (${def.life}).`);
+      }
       if (atk.hasKeyword('lifelink', this)) atk.controller.life += power;
       if (atk.isCommander) {
         const dmg = (def.commanderDamage.get(atk.id) || 0) + power;
@@ -1185,8 +1267,13 @@ export class Game {
       this.damageCreature(b, assign, atk);
     }
     if (trample && power > 0) {
-      def.life -= power;
-      this.log(`${atk.name} arrolla a ${def.name} por ${power} (${def.life}).`);
+      if (infect) {
+        def.poison += power;
+        this.log(`${atk.name} infecta a ${def.name} (☠${def.poison}/10).`);
+      } else {
+        def.life -= power;
+        this.log(`${atk.name} arrolla a ${def.name} por ${power} (${def.life}).`);
+      }
       if (atk.hasKeyword('lifelink', this)) atk.controller.life += power;
       if (atk.isCommander) {
         const dmg = (def.commanderDamage.get(atk.id) || 0) + power;
@@ -1269,6 +1356,7 @@ export class Game {
     // Jugadores muertos.
     for (const q of this.players) {
       if (q.alive && q.life <= 0) this.eliminate(q, 'se queda sin vidas');
+      else if (q.alive && q.poison >= 10) this.eliminate(q, 'sucumbe al veneno');
     }
   }
 

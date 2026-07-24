@@ -169,7 +169,7 @@ export class UI {
         <div class="phead">
           <span class="pname">${g.monarch === p ? '👑 ' : ''}${p.name}</span>
           <span class="plife">❤ ${p.life}</span>
-          <span class="pmeta">✋ ${p.hand.length} · 📚 ${p.library.length}${cmdDmg ? ` · ⚔cmd ${cmdDmg}` : ''}</span>
+          <span class="pmeta">✋ ${p.hand.length} · 📚 ${p.library.length}${cmdDmg ? ` · ⚔cmd ${cmdDmg}` : ''}${p.energy ? ` · ⚡${p.energy}` : ''}${p.poison ? ` · ☠${p.poison}/10` : ''}</span>
         </div>`;
       const row = document.createElement('div');
       row.className = 'minirow';
@@ -223,7 +223,7 @@ export class UI {
     $('playerBar').innerHTML = `
       <span class="pname">${g.monarch === me ? '👑 ' : ''}${me.name}</span>
       <span class="plife">❤ ${me.life}</span>
-      <span class="pmeta">📚 Biblioteca: ${me.library.length} · 🪦 Cementerio: ${me.graveyard.length}${cmdDmg ? ` · ⚔ Daño de comandante: ${cmdDmg}` : ''}${me.lost ? ' · ☠ ELIMINADO (espectador)' : ''}</span>`;
+      <span class="pmeta">📚 Biblioteca: ${me.library.length} · 🪦 Cementerio: ${me.graveyard.length}${cmdDmg ? ` · ⚔ Daño de comandante: ${cmdDmg}` : ''}${me.energy ? ` · ⚡ Energía: ${me.energy}` : ''}${me.poison ? ` · ☠ Veneno: ${me.poison}/10` : ''}${me.lost ? ' · ☠ ELIMINADO (espectador)' : ''}</span>`;
   }
 
   renderHand() {
