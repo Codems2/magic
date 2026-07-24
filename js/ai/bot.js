@@ -38,6 +38,9 @@ export class BotController {
       if (s.tokenMod) v += 3;
       for (const tr of s.onCounters || []) v += opsValue(tr.ops) * 1.2;
       for (const ch of Object.values(s.saga || {})) v += opsValue(ch) * 0.8;
+      v += opsValue(s.onGainLife || []) * 1.2 + opsValue(s.onDraw || []) * 1.2 +
+           opsValue(s.onOppDraw || []) * 1.5;
+      for (const tr of s.onSac || []) v += opsValue(tr.ops) * 1.2;
       for (const ab of s.activated) v += opsValue(ab.ops) * 0.7;
       if (s.attachPT) v += (s.attachPT[0] + s.attachPT[1]) * 0.5;
     }

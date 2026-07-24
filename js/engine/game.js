@@ -403,7 +403,7 @@ export class Game {
         this.paySources(pay);
         const opps = this.opponentsOf(p);
         for (const q of opps) q.life -= 1;
-        p.life += opps.length;
+        this.gainLife(p, opps.length, true);
         this.log(`${p.name} extorsiona: cada oponente pierde 1 vida (+${opps.length} para ${p.name}).`);
         this.checkState();
         break;
@@ -790,6 +790,16 @@ export class Game {
           this.log(`👑 ${p.name} se convierte en el monarca.`);
           break;
         }
+        case 'wheel': {
+          for (const q of this.alivePlayers()) {
+            const had = q.hand.length;
+            for (const c of [...q.hand]) this.moveToGraveyard(c, null);
+            this.drawCards(q, op.n);
+            this.log(`${q.name} descarta ${had} y roba ${op.n}.`);
+            if (this.over) break;
+          }
+          break;
+        }
         case 'discardHandEach': {
           for (const q of this.alivePlayers()) {
             const n = q.hand.length;
@@ -801,7 +811,8 @@ export class Game {
         case 'damage': {
           const n = this.num(op, ctx);
           const kind = op.target?.kind;
-          if (kind === 'eachOpponent') for (const q of this.opponentsOf(p)) this.damagePlayer(q, n, ctx.source);
+          if (kind === 'ctxPlayer') { if (ctx.eventPlayer) this.damagePlayer(ctx.eventPlayer, n, ctx.source); }
+          else if (kind === 'eachOpponent') for (const q of this.opponentsOf(p)) this.damagePlayer(q, n, ctx.source);
           else if (kind === 'eachPlayer') for (const q of this.alivePlayers()) this.damagePlayer(q, n, ctx.source);
           else if (kind === 'eachCreature') {
             for (const q of this.alivePlayers()) for (const c of [...q.battlefield]) {
@@ -936,13 +947,13 @@ export class Game {
           const t = ctx._lastTarget;
           if (t instanceof CardInstance) {
             const n = op.stat === 'toughness' ? Math.max(0, t.toughness(this)) : t.power(this);
-            if (n) { p.life += n; this.log(`${p.name} gana ${n} vidas (${p.life}).`); }
+            if (n) this.gainLife(p, n);
           }
           break;
         }
         case 'gainLifeLostWay': {
           const n = ctx._lifeLost ?? 0;
-          if (n) { p.life += n; this.log(`${p.name} gana ${n} vidas (${p.life}).`); }
+          if (n) this.gainLife(p, n);
           break;
         }
         case 'sacSelfThen': {
@@ -1018,14 +1029,12 @@ export class Game {
         }
         case 'gainLife': {
           const n = this.num(op, ctx);
-          p.life += n;
-          this.log(`${p.name} gana ${n} vidas (${p.life}).`);
+          this.gainLife(p, n);
           break;
         }
         case 'gainLifePerOpp': {
           const n = op.n * this.opponentsOf(p).length;
-          p.life += n;
-          this.log(`${p.name} gana ${n} vidas (${p.life}).`);
+          this.gainLife(p, n);
           break;
         }
         case 'loseLife': {
@@ -1354,7 +1363,7 @@ export class Game {
         }
         case 'gainLifePer': {
           const n = op.n * this.countFor(p, op.what);
-          if (n > 0) { p.life += n; this.log(`${p.name} gana ${n} vidas (${p.life}).`); }
+          if (n > 0) this.gainLife(p, n);
           break;
         }
         case 'selfToHand': {
@@ -1441,7 +1450,7 @@ export class Game {
       // solo daño de combate cuenta; se controla en combate
     }
     if (source && source.isCreature && source.hasKeyword('lifelink', this)) {
-      source.controller.life += n;
+      this.gainLife(source.controller, n, true);
     }
     this.checkState();
   }
@@ -1454,12 +1463,12 @@ export class Game {
     // Infectar: el daño a criaturas son contadores -1/-1.
     if (source && (source.data?.keywords || []).includes('Infect')) {
       c.counters -= n;
-      if (source.isCreature && source.hasKeyword('lifelink', this)) source.controller.life += n;
+      if (source.isCreature && source.hasKeyword('lifelink', this)) this.gainLife(source.controller, n, true);
       this.checkState();
       return;
     }
     c.damage += n;
-    if (source && source.isCreature && source.hasKeyword('lifelink', this)) source.controller.life += n;
+    if (source && source.isCreature && source.hasKeyword('lifelink', this)) this.gainLife(source.controller, n, true);
     const lethal = source && (source.hasKeyword?.('deathtouch', this));
     if (c.damage >= c.toughness(this) || (lethal && n > 0)) {
       if (!c.hasKeyword('indestructible', this)) this.destroy(c, source, true);
@@ -1527,6 +1536,21 @@ export class Game {
     this.detachAll(c);
     const p = c.controller;
     p.battlefield.splice(p.battlefield.indexOf(c), 1);
+    // "Siempre que sacrifiques una criatura/artefacto/permanente...".
+    if (verb === 'sacrificado') {
+      this._sacDepth = (this._sacDepth || 0) + 1;
+      if (this._sacDepth <= 3) {
+        for (const perm of [...p.battlefield]) {
+          for (const tr of perm.script?.onSac ?? []) {
+            const match = tr.what === 'permanent' ||
+              (tr.what === 'creature' && c.isCreature) ||
+              (tr.what === 'artifact' && c.isArtifact);
+            if (match) this.resolveOpsSync(tr.ops, { source: perm, controller: p, targets: [], xValue: 0 });
+          }
+        }
+      }
+      this._sacDepth--;
+    }
     if (c.isCreature && (verb === 'muere' || verb === 'sacrificado')) this.fireAllyDies(c, p);
     if (c.isCommander) {
       c.zone = 'command'; c.damage = 0; c.owner.command.push(c);
@@ -1613,6 +1637,22 @@ export class Game {
     this._etbDepth--;
   }
 
+  // Punto único de ganancia de vida: dispara "siempre que ganes vida".
+  gainLife(q, n, silent = false) {
+    if (n <= 0 || !q.alive) return;
+    q.life += n;
+    if (!silent) this.log(`${q.name} gana ${n} vidas (${q.life}).`);
+    this._lifeDepth = (this._lifeDepth || 0) + 1;
+    if (this._lifeDepth <= 3) {
+      for (const perm of [...q.battlefield]) {
+        if (perm.script?.onGainLife?.length) {
+          this.resolveOpsSync(perm.script.onGainLife, { source: perm, controller: q, targets: [], xValue: 0 });
+        }
+      }
+    }
+    this._lifeDepth--;
+  }
+
   drawCards(p, n) {
     for (let i = 0; i < n; i++) {
       if (!p.library.length) {
@@ -1622,8 +1662,27 @@ export class Game {
       const c = p.library.shift();
       c.zone = 'hand';
       p.hand.push(c);
+      this.fireDrawTriggers(p);
     }
     if (n > 0) this.log(`${p.name} roba ${n} carta(s).`);
+  }
+
+  // "Siempre que robes / un oponente robe una carta".
+  fireDrawTriggers(drawer) {
+    this._drawDepth = (this._drawDepth || 0) + 1;
+    if (this._drawDepth <= 3) {
+      for (const q of this.alivePlayers()) {
+        for (const perm of [...q.battlefield]) {
+          if (q === drawer && perm.script?.onDraw?.length) {
+            this.resolveOpsSync(perm.script.onDraw, { source: perm, controller: q, targets: [], xValue: 0, eventPlayer: drawer });
+          }
+          if (q !== drawer && perm.script?.onOppDraw?.length) {
+            this.resolveOpsSync(perm.script.onOppDraw, { source: perm, controller: q, targets: [], xValue: 0, eventPlayer: drawer });
+          }
+        }
+      }
+    }
+    this._drawDepth--;
   }
 
   // ---- bonos estáticos (anthems) ----------------------------------------
@@ -1797,7 +1856,7 @@ export class Game {
           this.log(`${def.name} recibe ${atk.script.toxic} contador(es) de veneno (☠${def.poison}/10).`);
         }
       }
-      if (atk.hasKeyword('lifelink', this)) atk.controller.life += power;
+      if (atk.hasKeyword('lifelink', this)) this.gainLife(atk.controller, power, true);
       if (atk.isCommander) {
         const dmg = (def.commanderDamage.get(atk.id) || 0) + power;
         def.commanderDamage.set(atk.id, dmg);
@@ -1824,7 +1883,7 @@ export class Game {
         def.life -= power;
         this.log(`${atk.name} arrolla a ${def.name} por ${power} (${def.life}).`);
       }
-      if (atk.hasKeyword('lifelink', this)) atk.controller.life += power;
+      if (atk.hasKeyword('lifelink', this)) this.gainLife(atk.controller, power, true);
       if (atk.isCommander) {
         const dmg = (def.commanderDamage.get(atk.id) || 0) + power;
         def.commanderDamage.set(atk.id, dmg);

@@ -153,6 +153,7 @@ function parseSentence(s) {
   if ((m = s.match(/^(?:~|it) deals (a|one|two|three|four|five|six|x|\d+) damage to (.+?)(?: and | at |$)/))) {
     const n = m[1] === 'x' ? 'x' : parseNum(m[1]);
     const tgt = m[2];
+    if (/that player/.test(tgt)) return [{ op: 'damage', n, target: { kind: 'ctxPlayer' } }];
     if (/each opponent/.test(tgt)) return [{ op: 'damage', n, target: { kind: 'eachOpponent' } }];
     if (/each creature(?! you control)/.test(tgt)) return [{ op: 'damage', n, target: { kind: 'eachCreature' } }];
     if (/each player/.test(tgt)) return [{ op: 'damage', n, target: { kind: 'eachPlayer' } }];
@@ -304,6 +305,10 @@ export function parseEffectOps(text, unknown) {
     ops.push({ op: 'coin', win: parseEffectOps(m[1], unknown), lose: m[2] ? parseEffectOps(m[2], unknown) : [] });
     text = text.replace(m[0], '');
   }
+  if ((m = text.match(/each player discards (?:their|his or her) hand(?:,? then draws| and draws) (\w+) cards?/))) {
+    ops.push({ op: 'wheel', n: parseNum(m[1]) });
+    text = text.replace(m[0], '');
+  }
   // Aproximación residual: "mira las N primeras cartas" sin plantilla conocida → adivinar N.
   if ((m = text.match(/look at the top (\w+) cards of your library\.?/))) {
     ops.push({ op: 'scry', n: parseNum(m[1]) });
@@ -345,7 +350,7 @@ export function buildScript(card) {
     convoke: false, cascade: false, improvise: false, delve: false, rebound: false,
     beginCombat: [], noMaxHand: false, landfall: [], dynPT: null, vanishing: 0,
     counterMod: null, tokenMod: null, onCounters: [], entersCountersPer: null,
-    saga: {}, sagaMax: 0,
+    saga: {}, sagaMax: 0, onGainLife: [], onDraw: [], onOppDraw: [], onSac: [],
   };
   const name = card.name.split(' // ')[0];
   const shortName = name.split(',')[0];
@@ -531,6 +536,20 @@ export function buildScript(card) {
       script.eachEnd.push(...parseEffectOps(m[1], script.unknown)); continue;
     }
 
+    // Disparadas de vida, robo y sacrificio.
+    if ((m = l.match(/^whenever you gain life, (.+)/))) {
+      script.onGainLife.push(...parseEffectOps(m[1], script.unknown)); continue;
+    }
+    if ((m = l.match(/^whenever you draw a card, (.+)/))) {
+      script.onDraw.push(...parseEffectOps(m[1], script.unknown)); continue;
+    }
+    if ((m = l.match(/^whenever an opponent draws a card, (.+)/))) {
+      script.onOppDraw.push(...parseEffectOps(m[1], script.unknown)); continue;
+    }
+    if ((m = l.match(/^whenever you sacrifice a (creature|permanent|artifact)[^,]*, (.+)/))) {
+      script.onSac.push({ what: m[1], ops: parseEffectOps(m[2], script.unknown) }); continue;
+    }
+
     // Disparadas.
     if ((m = l.match(/^whenever ~ deals combat damage to a player, (.+)/))) {
       const entry = { scope: 'self', ops: [] };
@@ -703,6 +722,7 @@ export function opsValue(ops) {
       case 'tokensSacMana': v += 1; break;
       case 'bolster': v += op.n * 1.2; break;
       case 'doubleCounters': v += 3; break;
+      case 'wheel': v += 3; break;
       case 'impulse': v += 1.4; break;
       case 'monarch': v += 2.5; break;
       case 'discardHandEach': v += 2; break;
