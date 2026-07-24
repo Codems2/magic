@@ -130,9 +130,15 @@ export class HumanController {
   async chooseTarget(game, source, op, candidates) {
     const cards = candidates.filter((t) => !(t instanceof Player));
     const players = candidates.filter((t) => t instanceof Player);
+    const OP_LABELS = {
+      damage: 'daño', destroy: 'destruir', exile: 'exiliar', bounce: 'devolver a la mano',
+      pump: 'bonificación', counters: 'contador +1/+1', support: 'contador +1/+1 (apoyo)',
+      distribute: 'repartir contadores', tap: 'girar', loseLife: 'pérdida de vida',
+      mill: 'moler', discard: 'descarte', draw: 'robar',
+    };
     const res = await this.ui.pick({
       cards, players,
-      text: `Elige objetivo para ${source.name} (${op.op}).`,
+      text: `Elige objetivo para ${source.name} (${OP_LABELS[op.op] ?? op.op}).`,
       buttons: [{ label: 'Cancelar', value: null, warn: true }],
     });
     if (res.type === 'card') return res.card;

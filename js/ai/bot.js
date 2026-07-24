@@ -275,8 +275,9 @@ export class BotController {
     for (const perm of p.battlefield) {
       if (this._activatedThisTurn.has(perm.id)) continue;
       for (const ab of perm.script?.activated || []) {
-        if (ab.sac) continue; // conservador: no sacrificar por ahora
-        if (opsValue(ab.ops) < 1.5) continue;
+        // Solo sacrifica fichas utilitarias (Pista, Comida, Sangre...).
+        if (ab.sac && !(perm.isToken && !perm.isCreature)) continue;
+        if (opsValue(ab.ops) < (ab.sac ? 1 : 1.5)) continue;
         if (ab.tap && (perm.tapped || (perm.isCreature && perm.summoningSick))) continue;
         // No girar criaturas buenas antes de combate.
         if (ab.tap && perm.isCreature && this.cardValue(perm, game) > 3 && game.phase === 'main1') continue;
@@ -294,7 +295,7 @@ export class BotController {
 
   async chooseTarget(game, source, op, candidates) {
     const p = this.player;
-    const beneficial = ['pump', 'counters'].includes(op.op);
+    const beneficial = ['pump', 'counters', 'support', 'distribute'].includes(op.op);
     if (beneficial) {
       const own = candidates.filter((t) => !(t instanceof Player) && t.controller === p);
       if (own.length) return own.sort((a, b) => this.cardValue(b, game) - this.cardValue(a, game))[0];

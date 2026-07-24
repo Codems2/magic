@@ -648,6 +648,99 @@ export class Game {
           }
           break;
         }
+        case 'support': {
+          // Reparte contadores +1/+1 entre hasta N criaturas objetivo distintas.
+          const chosen = new Set();
+          for (let i = 0; i < op.n; i++) {
+            const candidates = this.legalTargets({ kind: 'creature' }, p)
+              .filter((c) => c !== ctx.source && !chosen.has(c));
+            if (!candidates.length) break;
+            const pick = await p.controller.chooseTarget(this, ctx.source, op, candidates);
+            if (!pick || pick instanceof Player) break;
+            chosen.add(pick);
+            pick.counters += 1;
+            this.log(`${pick.name} recibe un contador +1/+1.`);
+          }
+          break;
+        }
+        case 'distribute': {
+          for (let i = 0; i < op.n; i++) {
+            const candidates = this.legalTargets({ kind: 'creature', controller: 'you' }, p);
+            if (!candidates.length) break;
+            const pick = await p.controller.chooseTarget(this, ctx.source, op, candidates);
+            if (!pick || pick instanceof Player) break;
+            pick.counters += 1;
+            this.log(`${pick.name} recibe un contador +1/+1.`);
+          }
+          break;
+        }
+        case 'proliferate': {
+          let hits = 0;
+          for (const c of p.battlefield) {
+            if (c.counters > 0) { c.counters += 1; hits++; }
+          }
+          this.log(`${p.name} prolifera (${hits} permanente(s)).`);
+          break;
+        }
+        case 'tokenSpecial': {
+          const n = this.num(op, ctx);
+          const SPECS = {
+            Treasure: { text: '', producedMana: ['W', 'U', 'B', 'R', 'G'] },
+            Clue: { text: '{2}, sacrifice ~: draw a card.' },
+            Food: { text: '{2}, {t}, sacrifice ~: you gain 3 life.' },
+            Blood: { text: '{1}, {t}, sacrifice ~: draw a card.' },
+          };
+          const spec = SPECS[op.kind] ?? { text: '' };
+          for (let i = 0; i < n; i++) {
+            const tok = makeToken({ name: op.kind, pt: [0, 0], types: 'Artifact', producedMana: spec.producedMana ?? null }, p, this.turn);
+            tok.data.oracleText = spec.text;
+            tok.script = buildScript(tok.data);
+            p.battlefield.push(tok);
+          }
+          this.log(`${p.name} crea ${n} ficha(s) de ${op.kind}.`);
+          break;
+        }
+        case 'explore': {
+          if (!p.library.length) break;
+          const top = p.library[0];
+          if (top.isLand) {
+            p.library.shift();
+            top.zone = 'hand';
+            p.hand.push(top);
+            this.log(`${ctx.source.name} explora: ${top.name} va a la mano.`);
+          } else if (ctx.source.zone === 'battlefield') {
+            ctx.source.counters += 1;
+            this.log(`${ctx.source.name} explora: recibe un contador +1/+1.`);
+          }
+          break;
+        }
+        case 'amass': {
+          let army = p.creatures().find((c) => c.hasSubtype('Army'));
+          if (!army) {
+            army = makeToken({ name: 'Zombie Army', pt: [0, 0], colors: ['B'] }, p, this.turn);
+            army.data.typeLine = 'Token Creature — Zombie Army';
+            army.script = buildScript(army.data);
+            p.battlefield.push(army);
+            this.log(`${p.name} crea una ficha de Ejército zombie.`);
+          }
+          army.counters += op.n;
+          this.log(`Ejército: +${op.n} contadores (${army.power(this)}/${army.toughness(this)}).`);
+          break;
+        }
+        case 'populate': {
+          const tokens = p.creatures().filter((c) => c.isToken);
+          if (!tokens.length) break;
+          const best = tokens.sort((a, b) => b.power(this) - a.power(this))[0];
+          const copy = makeToken({
+            name: best.data.name, pt: best.basePT(),
+            colors: best.data.colors, keywords: best.data.keywords,
+          }, p, this.turn);
+          copy.data.typeLine = best.data.typeLine;
+          copy.script = buildScript(copy.data);
+          p.battlefield.push(copy);
+          this.log(`${p.name} puebla: copia de ${best.name}.`);
+          break;
+        }
         case 'counterSpell': break; // se maneja en responseWindow
         default: break;
       }
@@ -963,9 +1056,10 @@ export class Game {
     }
   }
 
-  // Versión síncrona para disparos de muerte simples (sin objetivos ni scry).
+  // Versión síncrona para disparos de muerte simples (sin decisiones interactivas).
   resolveOpsSync(ops, ctx) {
-    const safe = ops.filter((op) => !op.targeted && !op.target?.targeted && op.op !== 'scry' && op.op !== 'discard');
+    const interactive = new Set(['scry', 'discard', 'support', 'distribute']);
+    const safe = ops.filter((op) => !op.targeted && !op.target?.targeted && !interactive.has(op.op));
     if (safe.length) this.resolveOps(safe, ctx);
   }
 

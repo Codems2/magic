@@ -57,6 +57,20 @@ function parseSentence(s) {
   if (/^put target creature card from a graveyard onto the battlefield under your control/.test(s))
     return [{ op: 'reanimateAny' }];
 
+  // Acciones de palabra clave.
+  if ((m = s.match(/^support (\w+)/))) return [{ op: 'support', n: parseNum(m[1]) }];
+  if (/^proliferate/.test(s)) return [{ op: 'proliferate' }];
+  if (/^investigate/.test(s)) return [{ op: 'tokenSpecial', kind: 'Clue', n: 1 }];
+  if ((m = s.match(/^(?:~|it) explores?$/))) return [{ op: 'explore' }];
+  if ((m = s.match(/^amass (?:[a-z]+ )?(\w+)/))) return [{ op: 'amass', n: parseNum(m[1]) }];
+  if (/^populate/.test(s)) return [{ op: 'populate' }];
+  if ((m = s.match(/^create (a|an|one|two|three|x|\d+) (?:tapped )?(food|blood|clue|treasure) tokens?/)))
+    return [{ op: 'tokenSpecial', kind: m[2][0].toUpperCase() + m[2].slice(1), n: m[1] === 'x' ? 'x' : parseNum(m[1]) }];
+  if ((m = s.match(/^put (?:a|an|one|two|three|\w+) \+1\/\+1 counters? on each of up to (\w+) (?:other )?target creatures?/)))
+    return [{ op: 'support', n: parseNum(m[1]) }];
+  if ((m = s.match(/^distribute (\w+) \+1\/\+1 counters? among/)))
+    return [{ op: 'distribute', n: parseNum(m[1]) }];
+
   if (/^counter target .*spell/.test(s)) return [{ op: 'counterSpell' }];
 
   if ((m = s.match(/^(?:you )?draw (a|an|one|two|three|four|x|\d+) cards?/)))
@@ -327,6 +341,12 @@ export function opsValue(ops) {
       case 'bounce': v += 1.5; break;
       case 'regrow': case 'reanimate': v += 2; break;
       case 'reanimateAny': v += 3; break;
+      case 'support': case 'distribute': v += op.n * 1.2; break;
+      case 'proliferate': v += 1.5; break;
+      case 'tokenSpecial': v += (op.n === 'x' ? 2 : op.n) * (op.kind === 'Treasure' ? 1 : 0.8); break;
+      case 'explore': v += 1; break;
+      case 'amass': v += op.n * 1.2; break;
+      case 'populate': v += 1.5; break;
       case 'scry': v += op.n * 0.4; break;
       case 'mill': v += op.n * 0.3; break;
       case 'discard': v += op.n * (op.who === 'eachOpponent' ? 1.5 : 0.8); break;
