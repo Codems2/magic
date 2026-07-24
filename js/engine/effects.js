@@ -52,8 +52,12 @@ function kwList(text) {
 
 // Devuelve ops de una frase, o null si no la entiende.
 function parseSentence(s) {
-  s = s.trim().toLowerCase().replace(/\.$/, '').replace(/^you may /, '').replace(/^then /, '');
+  s = s.trim().toLowerCase().replace(/\.$/, '')
+    .replace(/^you may /, '').replace(/^then /, '').replace(/^when you do, /, '')
+    .replace(/^[a-z][a-z' ]{1,26} — /, ''); // palabras de habilidad ("aerospark — ...")
   if (!s) return [];
+  // Frases satélite ya cubiertas por la op principal de su plantilla.
+  if (/^return those creatures to their owners' hands$|^otherwise, put a \+1\/\+1 counter on ~$|^if an opponent controls more lands than you, put that card onto the battlefield tapped$|^if you don't put the card onto the battlefield, put it into your hand$/.test(s)) return [];
   // Ruido sin efecto en el simulador.
   // Ojo: "you may" ya está recortado, así que las reglas van sin ese prefijo.
   if (/^shuffle$|^(?:it|they) can't be regenerated$|^it's still a land$|^activate only|^exile ~$|^(?:it|they) gains? haste(?: until end of turn)?$|^untap up to \w+ lands?$|^regenerate ~$|^choose new targets|^put the rest on the bottom of your library|^shuffle your library$|^then shuffle$|^do this only once each turn$|^if you search your library this way, shuffle$|^(?:reveal|look at) the top card of your library$|^play with the top card of your library revealed$|^if that spell would be put into (?:a|your) graveyard(?: this turn)?, exile it instead$/.test(s)) return [];
@@ -166,6 +170,8 @@ function parseSentence(s) {
   if ((m = s.match(/^destroy all (creatures|artifacts|enchantments|nonland permanents)/)))
     return [{ op: 'wipe', what: m[1] }];
   if ((m = s.match(/^destroy each (creature)/))) return [{ op: 'wipe', what: 'creatures' }];
+  if ((m = s.match(/^destroy up to (?:one|\w+) target (.+)/)))
+    return [{ op: 'destroy', target: { ...targetSpec(m[1]), targeted: true }, optional: true }];
   if ((m = s.match(/^destroy target (.+)/))) return [{ op: 'destroy', target: { ...targetSpec(m[1]), targeted: true } }];
   if ((m = s.match(/^exile target (.+)/))) return [{ op: 'exile', target: { ...targetSpec(m[1]), targeted: true } }];
   if ((m = s.match(/^exile all (creatures)/))) return [{ op: 'wipe', what: 'creatures', exile: true }];
@@ -217,7 +223,7 @@ function parseSentence(s) {
   if ((m = s.match(/^target (player|opponent) loses (\w+) life/)))
     return [{ op: 'loseLife', n: parseNum(m[2]), who: 'target' }];
 
-  if ((m = s.match(/^put (a|an|one|two|three|four|x|\d+) ([+-]1)\/[+-]1 counters? on (~|it|this creature|target creature|each creature you control|each other creature you control|each creature|target creature an opponent controls)/))) {
+  if ((m = s.match(/^put (a|an|one|two|three|four|x|\d+) ([+-]1)\/[+-]1 counters? on (~|it|that creature|this creature|target creature|each creature you control|each other creature you control|each creature|target creature an opponent controls)/))) {
     let n = m[1] === 'x' ? 'x' : parseNum(m[1]);
     const negative = m[2] === '-1';
     if (negative && n !== 'x') n = -n;
@@ -232,6 +238,53 @@ function parseSentence(s) {
   if ((m = s.match(/^bolster (\w+)/))) return [{ op: 'bolster', n: parseNum(m[1]) }];
   if (/^double the number of \+1\/\+1 counters on (target|each) creature/.test(s))
     return [{ op: 'doubleCounters' }];
+  // Contadores de aturdir y escudo; mover contadores.
+  if (/^put a stun counter on (?:it|that creature)$/.test(s)) return [{ op: 'stun', scope: 'last' }];
+  if ((m = s.match(/^tap up to (?:one|\w+) target creatures?$/)))
+    return [{ op: 'tap', target: { kind: 'creature', controller: 'opponent' }, targeted: true, optional: true }];
+  if ((m = s.match(/^put a shield counter on each of up to (\w+) target creatures?/)))
+    return [{ op: 'shield', n: parseNum(m[1]) }];
+  if ((m = s.match(/^move (?:a|any number of) counters? from target (creature|permanent) (you control|an opponent controls) onto (?:a second |another )?target (creature|permanent)(?: you control)?/)))
+    return [
+      { op: 'moveFrom', target: { kind: m[1] === 'permanent' ? 'permanent' : 'creature', controller: m[2].includes('opponent') ? 'opponent' : 'you', withCounters: true }, targeted: true },
+      { op: 'moveTo', target: { kind: m[3] === 'permanent' ? 'permanent' : 'creature', controller: 'you' }, targeted: true },
+    ];
+  if (/^put its counters on target creature you control$/.test(s)) return [{ op: 'countersToBestFromSelf' }];
+  if (/^shuffle ~ into its owner's library$/.test(s)) return [{ op: 'selfToLibrary' }];
+  if (/^put a \+1\/\+1 counter on that creature if its power is less than ~'s power$/.test(s))
+    return [{ op: 'counterCompare' }];
+  if ((m = s.match(/^if you put a counter on a creature this turn, (.+)/)))
+    return [{ op: 'ifCountersPutThisTurn', ops: parseEffectOps(m[1], []) }];
+  if ((m = s.match(/^if a counter was put on ~ this turn, (.+)/)))
+    return [{ op: 'ifSelfCounterThisTurn', ops: parseEffectOps(m[1], []) }];
+  if (/^return it to the battlefield under its owner's control with a flying counter on it$/.test(s))
+    return [{ op: 'reviveEventFlying' }];
+  if (/^put a number of \+1\/\+1 counters equal to ~'s power on another target creature you control$/.test(s))
+    return [{ op: 'countersEqualPower' }];
+  if ((m = s.match(/^exile target (?:creature|artifact, enchantment, or tapped creature)( an opponent controls| defending player controls)?[^.]*? until (?:~|this saga) leaves the battlefield$/)))
+    return [{ op: 'exileUntilLeave', target: { kind: 'creature', controller: 'opponent', powerLess: /power less than ~'s power/.test(s) }, targeted: true }];
+  if (/^each opponent chooses a creature with the greatest mana value among creatures they control$/.test(s))
+    return [{ op: 'eachOppBounceBiggest' }];
+  if ((m = s.match(/^create x treasure tokens, where x is the number of opponents who control a creature with power (\d+) or greater$/)))
+    return [{ op: 'treasurePerOppBig', p: parseInt(m[1], 10) }];
+  if (/^search your library for a plains card and reveal it$/.test(s)) return [{ op: 'plainsSearch' }];
+  if ((m = s.match(/^search your library for an? ((?:[a-z]+,? )+(?:or [a-z]+ )?)card, put (?:it|that card) onto the battlefield( tapped)?/)))
+    return [{ op: 'rampTyped', subtypes: m[1].replace(/,| or /g, ' ').split(/\s+/).filter(Boolean), tapped: !!m[2] }];
+  if (/^draw a card for each creature you control with a \+1\/\+1 counter on it$/.test(s))
+    return [{ op: 'drawPerCounters' }];
+  if (/^those creatures gain (.+?) until end of turn$/.test(s)) {
+    const kws = kwList(s);
+    if (kws.length) return [{ op: 'pumpFiltered', filter: 'counters', keywords: kws }];
+    return null;
+  }
+  if (/^until end of turn, that creature can't be blocked(?: by creatures your opponents control)?$/.test(s))
+    return [{ op: 'pump', scope: 'last', pt: [0, 0], keywords: ['unblockable'] }];
+  if (/^move any number of \+1\/\+1 counters from ~ onto other creatures$/.test(s))
+    return [{ op: 'moveSelfCountersOut' }];
+  if (/^its controller may search their library for a basic land card, put that card onto the battlefield/.test(s))
+    return [{ op: 'basicForLastController' }];
+  if (/^the owner of target spell, nonland permanent, or card in a graveyard puts it on (?:their|his or her) choice of the top or bottom of their library$/.test(s))
+    return [{ op: 'tuck', target: { kind: 'nonland-permanent' }, targeted: true }];
 
   if ((m = s.match(/^scry (\w+)/))) return [{ op: 'scry', n: parseNum(m[1]) }];
   if ((m = s.match(/^(each opponent|target player|target opponent) mills? (\w+) cards?/)))
@@ -309,6 +362,20 @@ export function parseEffectOps(text, unknown) {
     ops.push({ op: 'wheel', n: parseNum(m[1]) });
     text = text.replace(m[0], '');
   }
+  if ((m = text.match(/choose target creature you control\.?\s*if damage would be dealt to that creature this turn, prevent that damage and put that many \+1\/\+1 counters on it[^.]*\./))) {
+    ops.push({ op: 'damageToCounters', target: { kind: 'creature', controller: 'you' }, targeted: true });
+    text = text.replace(m[0], '');
+  }
+  if ((m = text.match(/each player puts a vow counter on a creature they control and sacrifices the rest/))) {
+    ops.push({ op: 'sacAllButOne' });
+    text = text.replace(m[0], '');
+  }
+  if ((m = text.match(/reveal cards from the top of your library until you reveal a creature card\.?\s*put that card into your hand and the rest on the bottom[^.]*\.\s*(when you reveal a creature card this way, put x \+1\/\+1 counters on target creature you control[^.]*\.)?/))) {
+    ops.push({ op: 'revealUntilCreature', counters: !!m[1] });
+    text = text.replace(m[0], '');
+  }
+  // Conjunciones frecuentes: partirlas en frases separadas.
+  text = text.replace(/ and (proliferate|draw|scry|investigate|create|put|goad|tap|you gain)/g, '. $1');
   // Aproximación residual: "mira las N primeras cartas" sin plantilla conocida → adivinar N.
   if ((m = text.match(/look at the top (\w+) cards of your library\.?/))) {
     ops.push({ op: 'scry', n: parseNum(m[1]) });
@@ -338,7 +405,8 @@ const IGNORE_LINES = [
   // costes alternativos no simulados: la carta funciona con su coste normal
   /^foretell/, /^retrace$/, /^multikicker/, /^undaunted$/, /^morph/, /^megamorph/,
   /^disturb/, /^embalm/, /^eternalize/, /^escape—/, /^overload/, /^prototype/,
-  /^~ can't be countered$/, /^suspend/,
+  /^~ can't be countered\.?$/, /^suspend/,
+  /^~ enters with a charge counter on it for each time it was kicked/,
 ];
 
 export function buildScript(card) {
@@ -351,6 +419,8 @@ export function buildScript(card) {
     beginCombat: [], noMaxHand: false, landfall: [], dynPT: null, vanishing: 0,
     counterMod: null, tokenMod: null, onCounters: [], entersCountersPer: null,
     saga: {}, sagaMax: 0, onGainLife: [], onDraw: [], onOppDraw: [], onSac: [],
+    onYouAttack: [], onCast: [], allyEnterCounter: 0, allyDiesCounters: false,
+    onAttacked: [], tapUnless: null,
   };
   const name = card.name.split(' // ')[0];
   const shortName = name.split(',')[0];
@@ -371,7 +441,8 @@ export function buildScript(card) {
   let modalList = null; let modalNeed = 1; let modalTaken = 0;
 
   for (const line of text.split('\n')) {
-    const l = line.trim();
+    // Palabras de habilidad ("cheer —", "shooting star —") no cambian el efecto.
+    const l = line.trim().replace(/^[a-z' ]{2,28} — (?=whenever|when |at the|creatures|each|exile|if )/, '');
     if (!l) continue;
     if (IGNORE_LINES.some((re) => re.test(l))) continue;
     if (/^~ enters tapped\.?$/.test(l)) { script.entersTapped = true; continue; }
@@ -398,7 +469,7 @@ export function buildScript(card) {
       script.tokenMod = 'double'; continue;
     }
     // "Siempre que pongas uno o más contadores +1/+1 sobre una criatura...".
-    if ((mm = l.match(/^whenever (?:you put )?one or more (?:\+1\/\+1 )?counters? (?:are|is)? ?(?:put )?on (a creature you don't control|a creature you control|another target creature|a creature|~)(?: [a-z ]*?)?, (.+)/))) {
+    if ((mm = l.match(/^whenever (?:you put )?(?:a|an|one or more) (?:\+1\/\+1 )?counters? (?:are |is )?(?:put )?on (a creature you don't control|a creature you control|another target creature|a creature|~)(?: [a-z ]*?)?, (.+)/))) {
       const where = mm[1];
       const scope = where === '~' ? 'self'
         : where.includes("don't control") ? 'notYours'
@@ -536,6 +607,58 @@ export function buildScript(card) {
       script.eachEnd.push(...parseEffectOps(m[1], script.unknown)); continue;
     }
 
+    // Mazo de contadores (Tidus y compañía).
+    if ((m = l.match(/^whenever a creature you control with a \+1\/\+1 counter on it deals combat damage to a player, (.+)/))) {
+      script.combatHit.push({ scope: 'yours', needsCounters: true, ops: parseEffectOps(m[1], script.unknown) });
+      continue;
+    }
+    if (/^as ~ enters, remove all counters from any number of artifacts, creatures, and enchantments/.test(l)) {
+      script.sinEnter = true; continue;
+    }
+    if (/^~ enters with x \+1\/\+1 counters on it, where x is twice the number of counters removed this way/.test(l)) continue;
+    if ((m = l.match(/^you may have ~ enter as a copy of any creature on the battlefield(?:, except it enters with x additional \+1\/\+1 counters)?/))) {
+      script.cloneEnter = { xCounters: /except it enters/.test(l) }; continue;
+    }
+    if ((m = l.match(/^whenever one or more creatures you control with counters on them deals? combat damage to a player, (.+)/))) {
+      script.combatHit.push({ scope: 'yours', needsCounters: true, once: /only once each turn/.test(l), ops: parseEffectOps(m[1].replace(/\s*do this only once each turn\.?/, ''), script.unknown) });
+      continue;
+    }
+    if ((m = l.match(/^whenever you attack, creatures you control with counters on them gain (.+?) until end of turn/))) {
+      script.onYouAttack.push({ op: 'pumpFiltered', filter: 'counters', keywords: kwList(m[1]) });
+      continue;
+    }
+    if ((m = l.match(/^whenever (you|an opponent|a player) casts? (?:a |an )?((?:noncreature |creature |instant or sorcery )?)spell, (.+)/))) {
+      const who = m[1] === 'you' ? 'you' : m[1].includes('opponent') ? 'opponent' : 'any';
+      script.onCast.push({ who, filter: m[2].trim() || null, ops: parseEffectOps(m[3], script.unknown) });
+      continue;
+    }
+    if ((m = l.match(/^at the beginning of (your|each) end step, if you put a counter on a creature this turn, (.+)/))) {
+      (m[1] === 'each' ? script.eachEnd : script.endStep).push({ op: 'ifCountersPutThisTurn', ops: parseEffectOps(m[2], script.unknown) });
+      continue;
+    }
+    if ((m = l.match(/^at the beginning of your end step, if a counter was put on ~ this turn, (.+)/))) {
+      script.endStep.push({ op: 'ifSelfCounterThisTurn', ops: parseEffectOps(m[1], script.unknown) });
+      continue;
+    }
+    if (/^each other nontoken creature you control enters with an additional \+1\/\+1 counter on it/.test(l)) {
+      script.allyEnterCounter = (script.allyEnterCounter ?? 0) + 1; continue;
+    }
+    if (/^whenever another permanent you control is put into a graveyard from the battlefield, if it had one or more counters on it, (?:you may )?put that number of \+1\/\+1 counters on target creature/.test(l) ||
+        /^whenever a permanent you control leaves the battlefield, if it had counters on it, put those counters on target permanent you control/.test(l)) {
+      script.allyDiesCounters = true; continue;
+    }
+    // Tierras con condición de entrar giradas (checklands, snarls, battle lands).
+    if ((mm = l.match(/^~ enters tapped unless you control two or more basic lands/))) {
+      script.tapUnless = { basics: 2 }; continue;
+    }
+    if ((mm = l.match(/^~ enters tapped unless you control (?:a|an) ([a-z]+) or (?:a|an) ([a-z]+)/))) {
+      script.tapUnless = { subtypes: [mm[1], mm[2]] }; continue;
+    }
+    if ((mm = l.match(/^as ~ enters, you may reveal (?:a|an) ([a-z]+) or (?:a|an )?([a-z]+) card from your hand/))) {
+      script.tapUnless = { handTypes: [mm[1], mm[2]] }; continue;
+    }
+    if (/^if you don't, ~ enters tapped/.test(l)) continue;
+
     // Disparadas de vida, robo y sacrificio.
     if ((m = l.match(/^whenever you gain life, (.+)/))) {
       script.onGainLife.push(...parseEffectOps(m[1], script.unknown)); continue;
@@ -546,12 +669,20 @@ export function buildScript(card) {
     if ((m = l.match(/^whenever an opponent draws a card, (.+)/))) {
       script.onOppDraw.push(...parseEffectOps(m[1], script.unknown)); continue;
     }
-    if ((m = l.match(/^whenever you sacrifice a (creature|permanent|artifact)[^,]*, (.+)/))) {
+    if ((m = l.match(/^whenever you sacrifice an? ([a-z]+)[^,]*, (.+)/))) {
       script.onSac.push({ what: m[1], ops: parseEffectOps(m[2], script.unknown) }); continue;
+    }
+    if (/^whenever an opponent attacks you, choose target creature attacking you\.? put a stun counter on/.test(l)) {
+      script.onAttacked.push({ op: 'stunAttacker' }); continue;
+    }
+    if ((m = l.match(/^(?:each )?creatures? you control with (?:a )?\+1\/\+1 counters? on (?:it|them) (?:has|have) (.+?)(?:\.|$)/))) {
+      const kws = kwList(m[1]);
+      if (kws.length) { script.statics.push({ other: false, subtype: null, pt: [0, 0], keywords: kws, needsCounters: true }); continue; }
+      script.unknown.push(l); continue;
     }
 
     // Disparadas.
-    if ((m = l.match(/^whenever ~ deals combat damage to a player, (.+)/))) {
+    if ((m = l.match(/^whenever ~ deals combat damage to a player(?: or planeswalker)?, (.+)/))) {
       const entry = { scope: 'self', ops: [] };
       script.combatHit.push(entry);
       if (!maybeModal(m[1], entry.ops)) entry.ops.push(...parseEffectOps(m[1], script.unknown));
@@ -628,7 +759,7 @@ export function buildScript(card) {
     }
 
     // Activadas "coste: efecto" (ignorando habilidades de maná).
-    if ((m = l.match(/^([^:."]{1,50}): (.+)/)) && (m[1].includes('{') || m[1].includes('sacrifice') || m[1].includes('remove'))) {
+    if ((m = l.match(/^([^:."]{1,70}): (.+)/)) && (m[1].includes('{') || m[1].includes('sacrifice') || m[1].includes('remove'))) {
       const costStr = m[1];
       const effectText = m[2];
       if (/^add /.test(effectText)) continue; // habilidad de maná: la lleva producedMana
@@ -636,6 +767,7 @@ export function buildScript(card) {
       const sac = /sacrifice ~/.test(costStr);
       const rc = costStr.match(/remove (a|an|one|two|three|x)? ?\+1\/\+1 counters? from ~/);
       const removeCounters = rc ? parseNum(rc[1] ?? 1) : 0;
+      const removeAnyCounter = /remove a counter from a nonland permanent you control/.test(costStr);
       // Coste adicional "sacrifice N <tipo>" (que no sea la propia carta).
       let sacExtra = null;
       const se = costStr.match(/sacrifice (a|an|two|three)? ?([a-z ]+?)$/);
@@ -644,7 +776,7 @@ export function buildScript(card) {
       const ops = parseEffectOps(effectText, script.unknown);
       const sorceryOnly = /activate only as a sorcery/.test(text);
       const fromGraveyard = ops.some((op) => op.op === 'gyToHand' || op.op === 'gyToBattlefield');
-      if (ops.length) script.activated.push({ mana, tap, sac, sacExtra, removeCounters, ops, sorceryOnly, fromGraveyard });
+      if (ops.length) script.activated.push({ mana, tap, sac, sacExtra, removeCounters, removeAnyCounter, ops, sorceryOnly, fromGraveyard });
       continue;
     }
     if (/^\{t\}: add/.test(l) || /^\{t\}, (tap|sacrifice)/.test(l)) continue;
@@ -723,6 +855,20 @@ export function opsValue(ops) {
       case 'bolster': v += op.n * 1.2; break;
       case 'doubleCounters': v += 3; break;
       case 'wheel': v += 3; break;
+      case 'stun': v += 1.5; break;
+      case 'shield': v += op.n * 1.2; break;
+      case 'moveFrom': v += 0.5; break;
+      case 'moveTo': v += 1; break;
+      case 'counterCompare': case 'countersEqualPower': v += 2; break;
+      case 'exileUntilLeave': v += 3; break;
+      case 'eachOppBounceBiggest': v += 3; break;
+      case 'treasurePerOppBig': v += 1.5; break;
+      case 'plainsSearch': v += 1.5; break;
+      case 'tuck': v += 3; break;
+      case 'damageToCounters': v += 1.5; break;
+      case 'sacAllButOne': v += 4; break;
+      case 'revealUntilCreature': v += 2; break;
+      case 'pumpFiltered': v += 2; break;
       case 'impulse': v += 1.4; break;
       case 'monarch': v += 2.5; break;
       case 'discardHandEach': v += 2; break;

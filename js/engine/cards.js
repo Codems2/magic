@@ -62,6 +62,8 @@ export class CardInstance {
     this.blocking = null;       // CardInstance a la que bloquea
     this.enteredTurn = 0;
     this.crewed = false;        // vehículos: es criatura hasta el final del turno
+    this.stunCounters = 0;      // no se endereza mientras tenga
+    this.shieldCounters = 0;    // absorbe el próximo daño/destrucción
   }
 
   // Nombre para mostrar (español si está localizado). El motor y el intérprete
@@ -189,6 +191,7 @@ export class CardInstance {
     this.attacking = null;
     this.blocking = null;
     this.crewed = false;
+    this._damageToCounters = false;
   }
 }
 

@@ -365,9 +365,16 @@ export class BotController {
 
   async chooseTarget(game, source, op, candidates) {
     const p = this.player;
+    // Mover contadores: origen = el menos valioso con contadores (o el rival con más),
+    // destino = tu mejor criatura.
+    if (op.op === 'moveFrom') {
+      const enemies = candidates.filter((t) => !(t instanceof Player) && t.controller !== p);
+      if (enemies.length) return enemies.sort((a, b) => b.counters - a.counters)[0];
+      return candidates.slice().sort((a, b) => this.cardValue(a, game) - this.cardValue(b, game))[0];
+    }
     const negativeCounters = op.op === 'counters' && typeof op.n === 'number' && op.n < 0;
     const beneficial = !negativeCounters &&
-      ['pump', 'counters', 'support', 'distribute', 'fightSel', 'bolster'].includes(op.op);
+      ['pump', 'counters', 'support', 'distribute', 'fightSel', 'bolster', 'moveTo', 'shield'].includes(op.op);
     if (beneficial) {
       const own = candidates.filter((t) => !(t instanceof Player) && t.controller === p);
       if (own.length) return own.sort((a, b) => this.cardValue(b, game) - this.cardValue(a, game))[0];

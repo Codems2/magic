@@ -147,9 +147,17 @@ export class Game {
     p.landsPlayedThisTurn = 0;
     p.castNoncreatureThisTurn = false;
 
-    // Enderezar.
+    // Enderezar (los contadores de aturdir lo impiden y se consumen).
     this.phase = 'untap';
-    for (const c of p.battlefield) { c.tapped = false; c.summoningSick = false; }
+    for (const c of p.battlefield) {
+      c.summoningSick = false;
+      if (c.tapped && c.stunCounters > 0) {
+        c.stunCounters--;
+        this.log(`${c.name} sigue girada (aturdir, quedan ${c.stunCounters}).`);
+        continue;
+      }
+      c.tapped = false;
+    }
 
     // Mantenimiento.
     this.phase = 'upkeep';
@@ -266,7 +274,10 @@ export class Game {
       this.log(`${c.name} vuelve al campo de batalla.`);
     }
     this._returnAtEnd = [];
-    for (const q of this.players) for (const c of q.battlefield) c.cleanupEndOfTurn();
+    for (const q of this.players) {
+      q._countersPutThisTurn = false;
+      for (const c of q.battlefield) { c.cleanupEndOfTurn(); c._counterGotThisTurn = false; }
+    }
     this.checkState();
     this.nextPlayer();
   }
@@ -347,8 +358,15 @@ export class Game {
     this.putOnBattlefield(card, p);
     p.landsPlayedThisTurn++;
     this.log(`${p.name} juega ${card.name}.`);
-    // Tierras que entran giradas.
-    if (/enters?( the battlefield)? tapped/.test(card.oracleText.toLowerCase()) &&
+    // Tierras que entran giradas (incondicionales o con condición evaluada).
+    const tu = card.script?.tapUnless;
+    if (tu) {
+      let ok = false;
+      if (tu.basics) ok = p.lands().filter((l) => l.hasType('Basic')).length >= tu.basics;
+      else if (tu.subtypes) ok = p.lands().some((l) => tu.subtypes.some((s) => l.hasSubtype(s)));
+      else if (tu.handTypes) ok = p.hand.some((c) => tu.handTypes.some((s) => c.hasSubtype(s) || c.hasType(s)));
+      if (!ok) card.tapped = true;
+    } else if (/enters?( the battlefield)? tapped/.test(card.oracleText.toLowerCase()) &&
         !/unless|if you control/.test(card.oracleText.toLowerCase())) {
       card.tapped = true;
     }
@@ -384,6 +402,24 @@ export class Game {
     card.zone = 'stack';
     const tax = fromCommand && card.commanderCasts > 1 ? ` (impuesto ${(card.commanderCasts - 1) * 2})` : '';
     this.log(`${p.name} lanza ${card.name}${tax}${xValue ? ` con X=${xValue}` : ''}.`);
+
+    // "Siempre que (tú|un oponente|un jugador) lance(s) un hechizo...".
+    this._castDepth = (this._castDepth || 0) + 1;
+    if (this._castDepth <= 3) {
+      for (const q of this.alivePlayers()) {
+        for (const perm of [...q.battlefield]) {
+          for (const tr of perm.script?.onCast ?? []) {
+            if (tr.who === 'you' && q !== p) continue;
+            if (tr.who === 'opponent' && q === p) continue;
+            if (tr.filter === 'creature' && !card.isCreature) continue;
+            if (tr.filter === 'noncreature' && card.isCreature) continue;
+            if (tr.filter === 'instant or sorcery' && !card.isInstant && !card.isSorcery) continue;
+            this.resolveOpsSync(tr.ops, { source: perm, controller: q, targets: [], xValue: 0, eventPlayer: p });
+          }
+        }
+      }
+    }
+    this._castDepth--;
 
     // Prowess: hechizos que no son de criatura animan a tus criaturas.
     if (!card.isCreature) {
@@ -515,6 +551,27 @@ export class Game {
           this.log(`Escuadrón: copia de ${card.name}.`);
         }
       }
+      // Sin: absorbe los contadores de tus permanentes y entra con el doble.
+      if (card.script.sinEnter) {
+        let total = 0;
+        for (const c of p.battlefield) {
+          if (c !== card && c.counters > 0 && (c.isCreature || c.isArtifact || c.isEnchantment)) {
+            total += c.counters;
+            c.counters = 0;
+          }
+        }
+        if (total) this.addCounters(card, total * 2, p);
+      }
+      // Clon: entra como copia de la mejor criatura en el campo.
+      if (card.script.cloneEnter) {
+        const all = this.alivePlayers().flatMap((q) => q.creatures()).filter((c) => c !== card);
+        const best = all.sort((a, b) => b.power(this) - a.power(this))[0];
+        if (best) {
+          card.data = { ...best.data, nameEs: card.data.nameEs ?? best.data.nameEs, image: card.data.image, imageSmall: card.data.imageSmall };
+          this.log(`${card.name} entra como copia de ${best.name}.`);
+          if (card.script.cloneEnter.xCounters && xValue) this.addCounters(card, xValue, p);
+        }
+      }
       if (card.script.entersCounters) {
         const n = card.script.entersCounters === 'x' ? xValue : card.script.entersCounters;
         if (n) this.addCounters(card, n, p);
@@ -583,6 +640,13 @@ export class Game {
     if (ability.removeCounters && perm.counters < ability.removeCounters) {
       throw new Error('sin contadores suficientes');
     }
+    let anyCounterSource = null;
+    if (ability.removeAnyCounter) {
+      anyCounterSource = p.battlefield
+        .filter((c) => !c.isLand && c.counters > 0)
+        .sort((a, b) => a.counters - b.counters)[0];
+      if (!anyCounterSource) throw new Error('sin contadores que quitar');
+    }
     const payment = solvePayment(ability.mana, manaSources(p, this), 0);
     if (!payment) throw new Error('sin maná para la habilidad');
 
@@ -607,6 +671,10 @@ export class Game {
     this.paySources(payment);
     if (ability.tap) perm.tapped = true;
     if (ability.removeCounters) perm.counters -= ability.removeCounters;
+    if (anyCounterSource) {
+      anyCounterSource.counters -= 1;
+      this.log(`${p.name} quita un contador de ${anyCounterSource.name}.`);
+    }
     this.log(`${p.name} activa ${perm.name}.`);
     for (const v of extraVictims) this.removeFromBattlefield(v, 'sacrificado');
     if (ability.sac) this.removeFromBattlefield(perm, 'sacrificado');
@@ -630,7 +698,7 @@ export class Game {
 
   // ---- objetivos ---------------------------------------------------------
 
-  legalTargets(spec, forPlayer) {
+  legalTargets(spec, forPlayer, source = null) {
     const out = [];
     const kind = spec.kind ?? spec.target?.kind ?? 'creature';
     const controller = spec.controller ?? spec.target?.controller ?? 'any';
@@ -662,6 +730,8 @@ export class Game {
         if (spec.withFlying && !c.hasKeyword('flying', this)) continue;
         if (spec.withoutFlying && c.hasKeyword('flying', this)) continue;
         if (spec.tapped && !c.tapped) continue;
+        if (spec.withCounters && c.counters <= 0) continue;
+        if (spec.powerLess && source && c.power(this) >= source.power(this)) continue;
         out.push(c);
       }
     }
@@ -672,10 +742,16 @@ export class Game {
     const chosen = [];
     for (const op of targetedOps) {
       const spec = op.target ?? { kind: op.scope === 'target' ? 'creature' : 'any' };
-      const candidates = this.legalTargets(spec, p);
-      if (!candidates.length) return null;
+      const candidates = this.legalTargets(spec, p, source);
+      if (!candidates.length) {
+        if (op.optional) { chosen.push(null); continue; }
+        return null;
+      }
       const pick = await p.controller.chooseTarget(this, source, op, candidates);
-      if (!pick) return null;
+      if (!pick) {
+        if (op.optional) { chosen.push(null); continue; }
+        return null;
+      }
       chosen.push(pick);
     }
     return chosen;
@@ -712,6 +788,10 @@ export class Game {
     card.counters += n;
     if (n > 0) this.log(`${card.name} recibe ${n} contador(es) +1/+1.`);
     else this.log(`${card.name} recibe ${-n} contador(es) -1/-1.`);
+    if (n > 0) {
+      if (putter) putter._countersPutThisTurn = true;
+      card._counterGotThisTurn = true;
+    }
     if (n > 0 && putter) {
       for (const perm of [...putter.battlefield]) {
         for (const tr of perm.script?.onCounters ?? []) {
@@ -1023,6 +1103,7 @@ export class Game {
             for (const k of kws) c.tempKeywords.add(k);
           };
           if (op.scope === 'target') { const t = takeTarget(); if (t instanceof CardInstance) apply(t); }
+          else if (op.scope === 'last') { if (ctx._lastTarget instanceof CardInstance) apply(ctx._lastTarget); }
           else if (op.scope === 'self' && ctx.source.zone === 'battlefield') apply(ctx.source);
           else if (op.scope === 'yours') for (const c of p.creatures()) apply(c);
           break;
@@ -1058,6 +1139,259 @@ export class Game {
           else if (op.scope === 'eachAll') {
             for (const q of this.alivePlayers()) for (const c of [...q.creatures()]) this.addCounters(c, n, p);
           } else if (ctx.source.zone === 'battlefield') this.addCounters(ctx.source, n, p);
+          break;
+        }
+        case 'stun': {
+          let t = op.scope === 'last' ? ctx._lastTarget : takeTarget();
+          if (!(t instanceof CardInstance)) {
+            const enemies = this.legalTargets({ kind: 'creature', controller: 'opponent' }, p);
+            t = enemies.sort((a, b) => b.power(this) - a.power(this))[0];
+          }
+          if (t instanceof CardInstance) {
+            t.tapped = true;
+            t.stunCounters += 1;
+            this.log(`${t.name} queda girada con un contador de aturdir.`);
+          }
+          break;
+        }
+        case 'shield': {
+          const chosen = new Set();
+          for (let i = 0; i < op.n; i++) {
+            const candidates = this.legalTargets({ kind: 'creature', controller: 'you' }, p)
+              .filter((c) => !chosen.has(c));
+            if (!candidates.length) break;
+            const pick = await p.controller.chooseTarget(this, ctx.source, { op: 'shield' }, candidates);
+            if (!pick || pick instanceof Player) break;
+            chosen.add(pick);
+            pick.shieldCounters += 1;
+            this.log(`${pick.name} recibe un contador de escudo.`);
+          }
+          break;
+        }
+        case 'moveFrom': {
+          const t = takeTarget();
+          if (t instanceof CardInstance && t.counters > 0) ctx._moveSrc = t;
+          break;
+        }
+        case 'moveTo': {
+          const t = takeTarget();
+          const src = ctx._moveSrc;
+          if (t instanceof CardInstance && src && src !== t && src.counters > 0) {
+            src.counters -= 1;
+            this.addCounters(t, 1, p);
+            this.log(`${p.name} mueve un contador de ${src.name} a ${t.name}.`);
+          }
+          break;
+        }
+        case 'countersToBestFromSelf': {
+          const n = ctx.source._lastCounters ?? 0;
+          const dest = p.creatures().sort((a, b) => b.power(this) - a.power(this))[0];
+          if (n > 0 && dest) this.addCounters(dest, n, p);
+          break;
+        }
+        case 'selfToLibrary': {
+          const c = ctx.source;
+          if (c.zone === 'graveyard') {
+            const g = c.owner.graveyard;
+            g.splice(g.indexOf(c), 1);
+            c.zone = 'library';
+            c.owner.library.push(c);
+            this.shuffle(c.owner.library);
+            this.log(`${c.name} se baraja en la biblioteca de ${c.owner.name}.`);
+          }
+          break;
+        }
+        case 'reviveEventFlying': {
+          const ev = ctx.eventCard;
+          if (ev && ev.zone === 'graveyard') {
+            const g = ev.owner.graveyard;
+            g.splice(g.indexOf(ev), 1);
+            this.putOnBattlefield(ev, p);
+            ev.script.selfKeywords.push('flying');
+            this.log(`${ev.name} regresa al campo de batalla con un contador de volar.`);
+          }
+          break;
+        }
+        case 'counterCompare': {
+          const ev = ctx.eventCard;
+          if (ev && ev.zone === 'battlefield' && ctx.source.zone === 'battlefield') {
+            const dest = ev.power(this) < ctx.source.power(this) ? ev : ctx.source;
+            this.addCounters(dest, 1, p);
+          }
+          break;
+        }
+        case 'countersEqualPower': {
+          if (ctx.source.zone !== 'battlefield') break;
+          const others = p.creatures().filter((c) => c !== ctx.source);
+          if (!others.length) break;
+          const dest = p.isBot
+            ? others.sort((a, b) => b.power(this) - a.power(this))[0]
+            : await p.controller.chooseTarget(this, ctx.source, { op: 'counters', n: 1 }, others);
+          if (dest instanceof CardInstance) this.addCounters(dest, ctx.source.power(this), p);
+          break;
+        }
+        case 'exileUntilLeave': {
+          const t = takeTarget();
+          if (t instanceof CardInstance && ctx.source.zone === 'battlefield') {
+            this.exileCard(t);
+            if (t.zone === 'exile') (ctx.source._exiledUntilLeave ??= []).push(t);
+            this.log(`${t.name} queda exiliado mientras ${ctx.source.name} esté en el campo.`);
+          }
+          break;
+        }
+        case 'eachOppBounceBiggest': {
+          for (const q of this.opponentsOf(p)) {
+            const biggest = q.creatures().sort((a, b) => b.cmc - a.cmc)[0];
+            if (biggest) this.bounce(biggest);
+          }
+          break;
+        }
+        case 'treasurePerOppBig': {
+          const n = this.opponentsOf(p).filter((q) => q.creatures().some((c) => c.power(this) >= op.p)).length;
+          for (let i = 0; i < n; i++) {
+            const tok = makeToken({ name: 'Treasure', pt: [0, 0], types: 'Artifact', producedMana: ['W', 'U', 'B', 'R', 'G'] }, p, this.turn);
+            tok.script = buildScript(tok.data);
+            this.putOnBattlefield(tok, p);
+          }
+          if (n) this.log(`${p.name} crea ${n} Tesoro(s).`);
+          break;
+        }
+        case 'plainsSearch': {
+          const idx = p.library.findIndex((c) => c.isLand && c.hasSubtype('Plains'));
+          if (idx === -1) break;
+          const land = p.library.splice(idx, 1)[0];
+          this.shuffle(p.library);
+          const oppMoreLands = this.opponentsOf(p).some((q) => q.lands().length > p.lands().length);
+          if (oppMoreLands) {
+            this.putOnBattlefield(land, p);
+            land.tapped = true;
+            this.log(`${p.name} busca ${land.name} y la pone en juego girada.`);
+          } else {
+            land.zone = 'hand';
+            p.hand.push(land);
+            this.log(`${p.name} busca ${land.name} a su mano.`);
+          }
+          break;
+        }
+        case 'tuck': {
+          const t = takeTarget();
+          if (t instanceof CardInstance && t.zone === 'battlefield') {
+            this.detachAll(t);
+            const q = t.controller;
+            q.battlefield.splice(q.battlefield.indexOf(t), 1);
+            if (t.isCommander) { t.zone = 'command'; t.owner.command.push(t); this.log(`${t.name} vuelve a la zona de mando.`); }
+            else if (t.isToken) this.log(`La ficha ${t.name} desaparece.`);
+            else {
+              t.zone = 'library'; t.counters = 0; t.damage = 0;
+              t.owner.library.push(t);
+              this.log(`${t.name} va al fondo de la biblioteca de ${t.owner.name}.`);
+            }
+          }
+          break;
+        }
+        case 'damageToCounters': {
+          const t = takeTarget();
+          if (t instanceof CardInstance) {
+            t._damageToCounters = true;
+            this.log(`${t.name}: el daño de este turno se convierte en contadores +1/+1.`);
+          }
+          break;
+        }
+        case 'sacAllButOne': {
+          for (const q of this.alivePlayers()) {
+            const creatures = q.creatures();
+            if (creatures.length <= 1) continue;
+            let keep = null;
+            if (!q.isBot) {
+              const chosen = await q.controller.chooseCards(this, creatures, 1, 'Elige la criatura que conservas');
+              keep = chosen[0] ?? null;
+            }
+            if (!keep) keep = creatures.slice().sort((a, b) => b.cmc - a.cmc)[0];
+            for (const c of [...creatures]) {
+              if (c !== keep) this.removeFromBattlefield(c, 'sacrificado');
+            }
+          }
+          break;
+        }
+        case 'revealUntilCreature': {
+          const revealed = [];
+          let found = null;
+          while (p.library.length) {
+            const c = p.library.shift();
+            if (c.isCreature) { found = c; break; }
+            revealed.push(c);
+          }
+          this.shuffle(revealed);
+          p.library.push(...revealed);
+          if (found) {
+            found.zone = 'hand';
+            p.hand.push(found);
+            this.log(`${p.name} revela hasta ${found.name} y la pone en su mano.`);
+            if (op.counters) {
+              const dest = p.creatures().sort((a, b) => b.power(this) - a.power(this))[0];
+              if (dest) this.addCounters(dest, found.cmc, p);
+            }
+          }
+          break;
+        }
+        case 'rampTyped': {
+          const idx = p.library.findIndex((c) => c.isLand && op.subtypes.some((s) => c.hasSubtype(s)));
+          if (idx !== -1) {
+            const land = p.library.splice(idx, 1)[0];
+            this.shuffle(p.library);
+            this.putOnBattlefield(land, p);
+            if (op.tapped) land.tapped = true;
+            this.log(`${p.name} busca ${land.name} y la pone en juego${op.tapped ? ' girada' : ''}.`);
+          }
+          break;
+        }
+        case 'drawPerCounters': {
+          const n = p.creatures().filter((c) => c.counters > 0).length;
+          if (n > 0) this.drawCards(p, n);
+          break;
+        }
+        case 'moveSelfCountersOut': {
+          const src = ctx.source;
+          if (src.zone !== 'battlefield' || src.counters <= 0) break;
+          const dest = p.creatures().filter((c) => c !== src)
+            .sort((a, b) => this.botValueOf?.(b) - this.botValueOf?.(a) || b.power(this) - a.power(this))[0];
+          if (dest) {
+            const n = src.counters;
+            src.counters = 0;
+            this.addCounters(dest, n, p);
+            this.log(`${p.name} mueve ${n} contador(es) de ${src.name} a ${dest.name}.`);
+          }
+          break;
+        }
+        case 'basicForLastController': {
+          const t = ctx._lastTarget;
+          const q = t instanceof CardInstance ? t.owner : t instanceof Player ? t : null;
+          if (q?.alive) {
+            const idx = q.library.findIndex((c) => c.hasType('Basic') && c.isLand);
+            if (idx !== -1) {
+              const land = q.library.splice(idx, 1)[0];
+              this.shuffle(q.library);
+              this.putOnBattlefield(land, q);
+              land.tapped = true;
+              this.log(`${q.name} busca una básica girada.`);
+            }
+          }
+          break;
+        }
+        case 'pumpFiltered': {
+          for (const c of p.creatures()) {
+            if (op.filter === 'counters' && c.counters <= 0) continue;
+            for (const k of op.keywords) c.tempKeywords.add(k);
+          }
+          this.log(`Las criaturas con contadores de ${p.name} ganan ${op.keywords.join(', ')}.`);
+          break;
+        }
+        case 'ifCountersPutThisTurn': {
+          if (p._countersPutThisTurn) await this.resolveOps(op.ops, ctx);
+          break;
+        }
+        case 'ifSelfCounterThisTurn': {
+          if (ctx.source._counterGotThisTurn) await this.resolveOps(op.ops, ctx);
           break;
         }
         case 'bolster': {
@@ -1457,6 +1791,16 @@ export class Game {
 
   damageCreature(c, n, source) {
     if (n <= 0 || c.zone !== 'battlefield') return;
+    // "Si se le fuera a hacer daño, en vez de eso ponle contadores".
+    if (c._damageToCounters) {
+      this.addCounters(c, n, c.controller);
+      return;
+    }
+    if (c.shieldCounters > 0) {
+      c.shieldCounters--;
+      this.log(`${c.name} gasta un contador de escudo.`);
+      return;
+    }
     if (c.hasKeyword('indestructible', this)) {
       if (source && source.isCreature === false) return;
     }
@@ -1477,12 +1821,18 @@ export class Game {
 
   destroy(c, source, fromDamage = false) {
     if (c.zone !== 'battlefield') return;
+    if (c.shieldCounters > 0) {
+      c.shieldCounters--;
+      this.log(`${c.name} gasta un contador de escudo.`);
+      return;
+    }
     if (c.hasKeyword('indestructible', this) ) return;
     this.removeFromBattlefield(c, 'muere');
   }
 
   exileCard(c) {
     this.detachAll(c);
+    this.releaseExiled(c);
     const p = c.controller;
     p.battlefield.splice(p.battlefield.indexOf(c), 1);
     if (c.isCommander) {
@@ -1497,6 +1847,7 @@ export class Game {
   bounce(c) {
     if (c.zone !== 'battlefield') return;
     this.detachAll(c);
+    this.releaseExiled(c);
     const p = c.controller;
     p.battlefield.splice(p.battlefield.indexOf(c), 1);
     if (c.isToken) { this.log(`La ficha ${c.name} desaparece.`); return; }
@@ -1525,17 +1876,45 @@ export class Game {
           if (tr.yoursOnly && controller !== q) continue;
           if (tr.subtype && !dead.hasSubtype(tr.subtype)) continue;
           this.log(`Se dispara ${perm.name} (muere ${dead.name}).`);
-          this.resolveOpsSync(tr.ops, { source: perm, controller: q, targets: [], xValue: 0 });
+          this.resolveOpsSync(tr.ops, { source: perm, controller: q, targets: [], xValue: 0, eventCard: dead });
         }
       }
     }
   }
 
+  // Libera cartas exiliadas "hasta que ~ deje el campo de batalla".
+  releaseExiled(c) {
+    for (const ex of c._exiledUntilLeave ?? []) {
+      if (ex.zone !== 'exile') continue;
+      const zone = ex.owner.exile;
+      zone.splice(zone.indexOf(ex), 1);
+      this.putOnBattlefield(ex, ex.owner);
+      this.log(`${ex.name} regresa al campo de batalla.`);
+    }
+    c._exiledUntilLeave = [];
+  }
+
   removeFromBattlefield(c, verb) {
     if (c.zone !== 'battlefield') return;
     this.detachAll(c);
+    this.releaseExiled(c);
     const p = c.controller;
+    const hadCounters = c.counters;
+    c._lastCounters = hadCounters;
     p.battlefield.splice(p.battlefield.indexOf(c), 1);
+    // Yuna: "si tenía contadores, ponlos en otra criatura".
+    if (hadCounters > 0) {
+      for (const perm of p.battlefield) {
+        if (perm.script?.allyDiesCounters && perm !== c) {
+          const dest = p.creatures().sort((a, b) => b.power(this) - a.power(this))[0];
+          if (dest) {
+            this.log(`Se dispara ${perm.name}: los contadores de ${c.name} pasan a ${dest.name}.`);
+            this.addCounters(dest, hadCounters, p);
+          }
+          break;
+        }
+      }
+    }
     // "Siempre que sacrifiques una criatura/artefacto/permanente...".
     if (verb === 'sacrificado') {
       this._sacDepth = (this._sacDepth || 0) + 1;
@@ -1544,8 +1923,9 @@ export class Game {
           for (const tr of perm.script?.onSac ?? []) {
             const match = tr.what === 'permanent' ||
               (tr.what === 'creature' && c.isCreature) ||
-              (tr.what === 'artifact' && c.isArtifact);
-            if (match) this.resolveOpsSync(tr.ops, { source: perm, controller: p, targets: [], xValue: 0 });
+              (tr.what === 'artifact' && c.isArtifact) ||
+              c.hasSubtype(tr.what) || c.name.toLowerCase() === tr.what;
+            if (match) this.resolveOpsSync(tr.ops, { source: perm, controller: p, targets: [], xValue: 0, eventCard: c });
           }
         }
       }
@@ -1621,12 +2001,20 @@ export class Game {
     if (!card.isCreature) return;
     this._etbDepth = (this._etbDepth || 0) + 1;
     if (this._etbDepth > 5) { this._etbDepth--; return; } // corta bucles de fichas
+    // Tromell: otras criaturas no ficha entran con un contador adicional.
+    if (!card.isToken) {
+      for (const perm of p.battlefield) {
+        if (perm !== card && perm.script?.allyEnterCounter) {
+          this.addCounters(card, perm.script.allyEnterCounter, p);
+        }
+      }
+    }
     for (const perm of [...p.battlefield]) {
       for (const tr of perm.script?.allyEtb || []) {
         if (card === perm && !tr.includeSelf) continue;
         if (tr.subtype && !card.hasSubtype(tr.subtype)) continue;
         this.log(`Se dispara ${perm.name} (entra ${card.name}).`);
-        this.resolveOpsSync(tr.ops, { source: perm, controller: p, targets: [], xValue: 0 });
+        this.resolveOpsSync(tr.ops, { source: perm, controller: p, targets: [], xValue: 0, eventCard: card });
       }
       if (perm !== card && perm.isCreature && (perm.data.keywords || []).includes('Evolve') &&
           (card.power(this) > perm.power(this) || card.toughness(this) > perm.toughness(this))) {
@@ -1695,6 +2083,7 @@ export class Game {
       for (const st of perm.script?.statics || []) {
         if (st.other && perm === card) continue;
         if (st.subtype && !card.hasSubtype(st.subtype) && !(st.subtype === 'token' && card.isToken)) continue;
+        if (st.needsCounters && card.counters <= 0) continue;
         out.push({ pt: st.pt, keywords: st.keywords });
       }
     }
@@ -1709,8 +2098,8 @@ export class Game {
       for (const tr of c.script?.beginCombat || []) {
         if (tr.cond === 'noncreature' && !attackerP.castNoncreatureThisTurn) continue;
         if (tr.cond === 'commander' && !attackerP.battlefield.some((x) => x.isCommander)) continue;
-        this.log(`Se dispara ${c.name} (inicio de combate).`);
-        this.resolveOpsSync(tr.ops, { source: c, controller: attackerP, targets: [], xValue: 0 });
+        await this.resolveTriggered(c, tr.ops, 'inicio de combate');
+        if (this.over) return;
       }
     }
     if (this.over) return;
@@ -1753,6 +2142,13 @@ export class Game {
       this.log(`${attackerP.name} ataca a ${def.name} con ${atks.map((a) => `${a.name} (${a.power(this)}/${a.toughness(this)})`).join(', ')}.`);
     }
 
+    // "Siempre que ataques" (Chocobo Knights y similares).
+    for (const c of [...attackerP.battlefield]) {
+      if (c.script?.onYouAttack?.length) {
+        this.resolveOpsSync(c.script.onYouAttack, { source: c, controller: attackerP, targets: [], xValue: 0 });
+      }
+    }
+
     // Melee: +1/+1 por cada oponente distinto atacado.
     const distinctDefenders = new Set(valid.map((d) => d.defender)).size;
     for (const { attacker } of valid) {
@@ -1769,6 +2165,23 @@ export class Game {
       }
     }
     if (this.over) return;
+
+    // "Siempre que un oponente te ataque" (Lulu: aturdir al mayor atacante).
+    for (const [def, atks] of byDefender) {
+      if (!def.alive) continue;
+      for (const perm of [...def.battlefield]) {
+        for (const tr of perm.script?.onAttacked ?? []) {
+          if (tr.op === 'stunAttacker') {
+            const biggest = atks.filter((a) => a.zone === 'battlefield')
+              .sort((a, b) => b.power(this) - a.power(this))[0];
+            if (biggest) {
+              biggest.stunCounters += 1;
+              this.log(`${perm.name}: ${biggest.name} recibe un contador de aturdir.`);
+            }
+          }
+        }
+      }
+    }
 
     // Ventana de instantáneos para cada defensor.
     for (const def of byDefender.keys()) {
@@ -1906,6 +2319,11 @@ export class Game {
       for (const tr of perm.script?.combatHit || []) {
         if (tr.scope === 'self' && perm !== atk) continue;
         if (tr.subtype && !atk.hasSubtype(tr.subtype)) continue;
+        if (tr.needsCounters && atk.counters <= 0) continue;
+        if (tr.once) {
+          if (perm._onceUsedTurn === this.turn) continue;
+          perm._onceUsedTurn = this.turn;
+        }
         const source = tr.scope === 'self' ? perm : atk;
         this.resolveOpsSync(tr.ops, { source, controller: p, targets: [], xValue: 0 });
       }
