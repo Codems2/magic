@@ -546,8 +546,9 @@ export class Game {
         const g = src.card.owner.graveyard;
         const i = g.indexOf(src.card);
         if (i !== -1) { g.splice(i, 1); src.card.zone = 'exile'; src.card.owner.exile.push(src.card); }
-      } else if (src.perm.name === 'Treasure') this.removeFromBattlefield(src.perm, 'sacrificado');
-      else src.perm.tapped = true;
+      } else if (src.perm.name === 'Treasure' || src.perm.data._sacMana) {
+        this.removeFromBattlefield(src.perm, 'sacrificado');
+      } else src.perm.tapped = true;
     }
   }
 
@@ -834,6 +835,19 @@ export class Game {
         }
         case 'sacAtEnd': {
           for (const c of ctx._lastCreated ?? []) c._sacAtEnd = true;
+          break;
+        }
+        case 'tokensSacMana': {
+          // Engendros/vástagos Eldrazi: "sacrifica ~: agrega {C}".
+          for (const c of ctx._lastCreated ?? []) {
+            c.data.producedMana = ['C'];
+            c.data._sacMana = true;
+          }
+          break;
+        }
+        case 'damagePerEach': {
+          const n = this.countFor(p, op.what);
+          if (n > 0) for (const q of this.opponentsOf(p)) this.damagePlayer(q, n, ctx.source);
           break;
         }
         case 'exileAtEnd': {
@@ -1183,6 +1197,7 @@ export class Game {
             Clue: { text: '{2}, sacrifice ~: draw a card.' },
             Food: { text: '{2}, {t}, sacrifice ~: you gain 3 life.' },
             Blood: { text: '{1}, {t}, sacrifice ~: draw a card.' },
+            Powerstone: { text: '', producedMana: ['C'] },
           };
           const spec = SPECS[op.kind] ?? { text: '' };
           for (let i = 0; i < n; i++) {

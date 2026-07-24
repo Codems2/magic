@@ -82,8 +82,13 @@ function parseSentence(s) {
   if ((m = s.match(/^(?:~|it) explores?$/))) return [{ op: 'explore' }];
   if ((m = s.match(/^amass (?:[a-z]+ )?(\w+)/))) return [{ op: 'amass', n: parseNum(m[1]) }];
   if (/^populate/.test(s)) return [{ op: 'populate' }];
-  if ((m = s.match(/^create (a|an|one|two|three|x|\d+) (?:tapped )?(food|blood|clue|treasure) tokens?/)))
+  if ((m = s.match(/^create (a|an|one|two|three|x|\d+) (?:tapped )?(food|blood|clue|treasure|powerstone) tokens?/)))
     return [{ op: 'tokenSpecial', kind: m[2][0].toUpperCase() + m[2].slice(1), n: m[1] === 'x' ? 'x' : parseNum(m[1]) }];
+  if (/^(?:it has|they have) "sacrifice ~: add \{c\}\."?$/.test(s)) return [{ op: 'tokensSacMana' }];
+  if ((m = s.match(/^draw cards equal to the number of ([a-z' ]+?)(?: you control)?$/)))
+    return [{ op: 'drawPer', what: m[1].trim().replace(/ves$/, 'f').replace(/s$/, '') }];
+  if ((m = s.match(/^~ deals damage to each opponent equal to the number of ([a-z' ]+?) you control$/)))
+    return [{ op: 'damagePerEach', what: m[1].trim().replace(/ves$/, 'f').replace(/s$/, '') }];
   if ((m = s.match(/^put (?:a|an|one|two|three|\w+) \+1\/\+1 counters? on each of up to (\w+) (?:other )?target creatures?/)))
     return [{ op: 'support', n: parseNum(m[1]) }];
   if ((m = s.match(/^distribute (\w+) \+1\/\+1 counters? among/)))
@@ -100,9 +105,9 @@ function parseSentence(s) {
   if (/^~ deals damage equal to its power to target creature/.test(s))
     return [{ op: 'pounce', target: { kind: 'creature' }, targeted: true }];
   if ((m = s.match(/^draw a card for each ([a-z' ]+?)(?: you control)?$/)))
-    return [{ op: 'drawPer', what: m[1].trim().replace(/s$/, '') }];
+    return [{ op: 'drawPer', what: m[1].trim().replace(/ves$/, 'f').replace(/s$/, '') }];
   if ((m = s.match(/^(?:you )?gain (\w+) life for each ([a-z' ]+?)(?: you control)?$/)))
-    return [{ op: 'gainLifePer', n: parseNum(m[1]), what: m[2].trim().replace(/s$/, '') }];
+    return [{ op: 'gainLifePer', n: parseNum(m[1]), what: m[2].trim().replace(/ves$/, 'f').replace(/s$/, '') }];
   if (/^return ~ from your graveyard to your hand$/.test(s)) return [{ op: 'gyToHand' }];
   if ((m = s.match(/^return ~ from your graveyard to the battlefield( tapped)?$/)))
     return [{ op: 'gyToBattlefield', tapped: !!m[1] }];
@@ -283,7 +288,7 @@ export function parseEffectOps(text, unknown) {
     text = text.replace(m[0], '');
   }
   if ((m = text.match(/count the number of ([a-z' ]+?) you control\.?\s*draw that many cards\./))) {
-    ops.push({ op: 'drawPer', what: m[1].trim().replace(/s$/, '') });
+    ops.push({ op: 'drawPer', what: m[1].trim().replace(/ves$/, 'f').replace(/s$/, '') });
     text = text.replace(m[0], '');
   }
   if ((m = text.match(/flip a coin\.?\s*if you win the flip, ([^.]+\.)(?:\s*if you lose the flip, ([^.]+\.))?/))) {
@@ -416,7 +421,7 @@ export function buildScript(card) {
     if ((m = l.match(/^vanishing (\d+)/))) { script.vanishing = parseInt(m[1], 10); continue; }
     if ((m = l.match(/^backup (\d+)/))) { script.etb.push({ op: 'support', n: parseInt(m[1], 10), allowSelf: true }); continue; }
     if ((m = l.match(/^~'s power and toughness are each equal to the number of ([a-z' ]+?)(?: you control| in your (hand|graveyard))?\.?$/))) {
-      script.dynPT = { what: m[1].trim().replace(/s$/, ''), where: m[2] ?? 'battlefield' };
+      script.dynPT = { what: m[1].trim().replace(/ves$/, 'f').replace(/s$/, ''), where: m[2] ?? 'battlefield' };
       continue;
     }
     if ((m = l.match(/^landfall — whenever a land (?:you control )?enters(?: the battlefield)?(?: under your control)?, (.+)/)) ||
@@ -455,7 +460,7 @@ export function buildScript(card) {
 
     // Disparos "aliados" (tribales): otra criatura tuya entra o muere.
     const normSub = (w) => {
-      const s2 = w.trim().replace(/s$/, '');
+      const s2 = w.trim().replace(/ves$/, 'f').replace(/s$/, '');
       return s2 === 'creature' || s2 === 'permanent' ? null : s2;
     };
     if ((m = l.match(/^whenever (~ or )?a(?:n|nother)? ([a-z' ]+?) you control enters(?: the battlefield)?, (.+)/))) {
@@ -564,7 +569,7 @@ export function buildScript(card) {
       // Coste adicional "sacrifice N <tipo>" (que no sea la propia carta).
       let sacExtra = null;
       const se = costStr.match(/sacrifice (a|an|two|three)? ?([a-z ]+?)$/);
-      if (se && !sac) sacExtra = { n: parseNum(se[1] ?? 1), what: se[2].trim().replace(/s$/, '') };
+      if (se && !sac) sacExtra = { n: parseNum(se[1] ?? 1), what: se[2].trim().replace(/ves$/, 'f').replace(/s$/, '') };
       const mana = parseManaCost(costStr.replace(/\{t\}/g, ''));
       const ops = parseEffectOps(effectText, script.unknown);
       const sorceryOnly = /activate only as a sorcery/.test(text);
@@ -643,6 +648,8 @@ export function opsValue(ops) {
       case 'blinkReturn': v -= 1.5; break; // vuelve al final: removal temporal
       case 'untapYours': v += 1; break;
       case 'discover': v += op.n * 0.5; break;
+      case 'damagePerEach': v += 3; break;
+      case 'tokensSacMana': v += 1; break;
       case 'impulse': v += 1.4; break;
       case 'monarch': v += 2.5; break;
       case 'discardHandEach': v += 2; break;

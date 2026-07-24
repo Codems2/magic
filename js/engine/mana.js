@@ -7,8 +7,8 @@ export function producibleColors(perm, game) {
   if (isCreatureSource && perm.summoningSick && !perm.hasKeyword('haste', game)) return null;
 
   if (perm.data.producedMana && perm.data.producedMana.length) {
-    // Solo si de verdad es una habilidad de maná con {T} (o una tierra).
-    if (perm.isLand || /\{T\}[^:]*: add/i.test(perm.oracleText)) {
+    // Tierras, permanentes con "{T}: Add" y fichas de maná (Tesoro, Engendro...).
+    if (perm.isLand || perm.isToken || /\{T\}[^:]*: add/i.test(perm.oracleText)) {
       return perm.data.producedMana.filter((c) => 'WUBRGC'.includes(c));
     }
   }
@@ -66,8 +66,10 @@ export function solvePayment(cost, sources, xValue = 0) {
     for (let i = 0; i < pool.length; i++) {
       const src = pool[i];
       if (!src.colors.some((c) => options.includes(c))) continue;
-      // Preferir la fuente menos flexible; las criaturas (convocar) al final.
-      const score = src.colors.length + (src.convoke ? 10 : 0);
+      // Preferir la fuente menos flexible; convocar y fuentes que se
+      // sacrifican (Tesoros, Engendros) al final.
+      const sacCost = src.perm?.data?._sacMana || src.perm?.name === 'Treasure' ? 50 : 0;
+      const score = src.colors.length + (src.convoke ? 10 : 0) + sacCost;
       if (score < bestScore) { bestScore = score; bestIdx = i; }
     }
     if (bestIdx === -1) return null;
@@ -77,7 +79,11 @@ export function solvePayment(cost, sources, xValue = 0) {
   let genericNeeded = cost.generic + cost.x * xValue;
   // Para el genérico, gastar primero las fuentes más flexibles/incoloras.
   pool.sort((a, b) => {
-    const score = (s) => (s.delve ? -2 : 0) + (s.colors.includes('C') && s.colors.length === 1 ? -1 : s.colors.length) + (s.convoke ? 100 : 0);
+    const score = (s) =>
+      (s.delve ? -2 : 0) +
+      (s.colors.includes('C') && s.colors.length === 1 ? -1 : s.colors.length) +
+      (s.convoke ? 100 : 0) +
+      (s.perm?.data?._sacMana || s.perm?.name === 'Treasure' ? 50 : 0);
     return score(a) - score(b);
   });
   while (genericNeeded > 0) {
