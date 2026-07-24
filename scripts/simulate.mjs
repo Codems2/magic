@@ -15,7 +15,13 @@ const nGames = parseInt(process.argv[2] ?? '5', 10);
 const verbose = process.argv.includes('--verbose');
 
 const slugs = JSON.parse(readFileSync(join(DIR, 'index.json'), 'utf8')).map((d) => d.slug);
-const decks = Object.fromEntries(slugs.map((s) => [s, JSON.parse(readFileSync(join(DIR, `${s}.json`), 'utf8'))]));
+const deckCache = new Map();
+const decks = new Proxy({}, {
+  get(_, slug) {
+    if (!deckCache.has(slug)) deckCache.set(slug, JSON.parse(readFileSync(join(DIR, `${slug}.json`), 'utf8')));
+    return deckCache.get(slug);
+  },
+});
 
 const wins = {};
 let crashes = 0;

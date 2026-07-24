@@ -18,69 +18,71 @@ function watchableBot(name, delay = 250) {
   return bot;
 }
 
-async function loadDecks() {
-  const index = await (await fetch('data/precons/index.json')).json();
-  const decks = {};
-  await Promise.all(index.map(async (d) => {
-    decks[d.slug] = await (await fetch(`data/precons/${d.slug}.json`)).json();
-  }));
-  return { index, decks };
-}
+const loadDeck = (slug) => fetch(`data/precons/${slug}.json`).then((r) => r.json());
 
 async function main() {
-  const { index, decks } = await loadDecks();
+  const index = await (await fetch('data/precons/index.json')).json();
   let selected = null;
 
   const list = $('deckList');
-  list.innerHTML = '';
-  for (const d of index) {
-    const deck = decks[d.slug];
-    const div = document.createElement('div');
-    div.className = 'deck-card';
-    const img = deck.commanders[0]?.image;
-    div.innerHTML = `
-      ${img ? `<img src="${img}" alt="${d.name}" loading="lazy">` : ''}
-      <div class="dname">${d.name}</div>
-      <div class="dtheme">${d.theme}</div>
-      <div class="dcmd">⭐ ${d.commanders.join(' + ')}</div>`;
-    div.onclick = () => {
-      list.querySelectorAll('.deck-card').forEach((e) => e.classList.remove('selected'));
-      div.classList.add('selected');
-      selected = d.slug;
-      $('startBtn').disabled = false;
-    };
-    list.appendChild(div);
-  }
+  const renderList = (filter = '') => {
+    const q = filter.trim().toLowerCase();
+    const shown = !q ? index : index.filter((d) =>
+      `${d.name} ${d.commanders.join(' ')} ${d.theme} ${d.setCode}`.toLowerCase().includes(q));
+    $('deckCount').textContent = `${shown.length} de ${index.length} mazos`;
+    list.innerHTML = '';
+    for (const d of shown) {
+      const div = document.createElement('div');
+      div.className = 'deck-card';
+      if (d.slug === selected) div.classList.add('selected');
+      div.innerHTML = `
+        ${d.image ? `<img src="${d.image}" alt="${d.name}" loading="lazy">` : ''}
+        <div class="dname">${d.name}</div>
+        <div class="dtheme">${d.theme}</div>
+        <div class="dcmd">⭐ ${d.commanders.join(' + ')}</div>
+        <div class="dset">${d.setCode} · ${d.releaseDate ?? ''}</div>`;
+      div.onclick = () => {
+        list.querySelectorAll('.deck-card').forEach((e) => e.classList.remove('selected'));
+        div.classList.add('selected');
+        selected = d.slug;
+        $('startBtn').disabled = false;
+      };
+      list.appendChild(div);
+    }
+  };
+  renderList();
+  $('deckSearch').oninput = (e) => renderList(e.target.value);
 
-  $('startBtn').onclick = () => startGame(selected, decks, index);
+  $('startBtn').onclick = () => { if (selected) startGame(selected, index); };
 }
 
-async function startGame(mySlug, decks, index) {
+async function startGame(mySlug, index) {
   const nBots = parseInt($('botCount').value, 10);
   $('setup').classList.add('hidden');
   $('game').classList.remove('hidden');
 
-  // Mazos distintos para los bots.
+  // Mazos distintos al azar para los bots (solo se descargan los necesarios).
   const others = index.map((d) => d.slug).filter((s) => s !== mySlug);
   for (let i = others.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [others[i], others[j]] = [others[j], others[i]];
   }
+  const botSlugs = others.slice(0, nBots);
+  const [myDeck, ...botDecks] = await Promise.all([mySlug, ...botSlugs].map(loadDeck));
 
   const ui = new UI();
   const human = new HumanController(ui);
   const configs = [
-    { name: 'Tú', deck: decks[mySlug], controller: human, isBot: false },
+    { name: 'Tú', deck: myDeck, controller: human, isBot: false },
   ];
-  for (let i = 0; i < nBots; i++) {
-    const slug = others[i];
+  botDecks.forEach((deck, i) => {
     configs.push({
-      name: `${decks[slug].name} (Bot)`,
-      deck: decks[slug],
+      name: `${deck.name} (Bot)`,
+      deck,
       controller: watchableBot(`Bot${i + 1}`),
       isBot: true,
     });
-  }
+  });
   // Orden de turno aleatorio.
   for (let i = configs.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));

@@ -1,32 +1,21 @@
 #!/usr/bin/env node
 /**
- * Importa mazos preconstruidos de Commander desde APIs publicas:
- *  - Listas de mazos: MTGJSON (https://mtgjson.com/api/v5/decks/<fileName>.json)
+ * Importa TODOS los mazos preconstruidos de Commander desde APIs publicas:
+ *  - Catálogo y listas de mazos: MTGJSON (https://mtgjson.com/api/v5/DeckList.json
+ *    y /api/v5/decks/<fileName>.json)
  *  - Datos de cartas: Scryfall (https://api.scryfall.com/cards/collection)
  *
  * Genera data/precons/<slug>.json con la lista del mazo y los datos de cada
- * carta (coste, tipo, texto de oraculo, fuerza/resistencia, imagen, etc.).
+ * carta, y data/precons/index.json con el catálogo.
  *
  * Uso:  node scripts/fetch-precons.mjs
  */
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(ROOT, 'data', 'precons');
-
-// Precons de Commander seleccionados (fileName de MTGJSON).
-const DECKS = [
-  { file: 'SpiritSquadron_VOC',    slug: 'spirit-squadron',    theme: 'Espíritus (Blanco-Azul)' },
-  { file: 'VampiricBloodline_VOC', slug: 'vampiric-bloodline', theme: 'Vampiros (Negro-Rojo)' },
-  { file: 'FaeDominion_WOC',       slug: 'fae-dominion',       theme: 'Hadas (Azul-Negro)' },
-  { file: 'VirtueAndValor_WOC',    slug: 'virtue-and-valor',   theme: 'Encantamientos (Verde-Blanco)' },
-  { file: 'LandSWrath_ZNC',        slug: 'lands-wrath',        theme: 'Tierras (Rojo-Verde-Blanco)' },
-  { file: 'SneakAttack_ZNC',       slug: 'sneak-attack',       theme: 'Pícaros (Azul-Negro)' },
-  { file: 'AbzanArmor_TDC',        slug: 'abzan-armor',        theme: 'Contadores (Blanco-Negro-Verde)' },
-  { file: 'TemurRoar_TDC',         slug: 'temur-roar',         theme: 'Criaturas grandes (Verde-Azul-Rojo)' },
-];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -66,85 +55,129 @@ function slimCard(sc) {
   };
 }
 
-async function scryfallCollection(names) {
-  const byName = new Map();
-  for (let i = 0; i < names.length; i += 75) {
-    const chunk = names.slice(i, i + 75);
-    // Scryfall busca cartas de doble cara/aventura por la cara frontal.
-    const body = JSON.stringify({ identifiers: chunk.map((name) => ({ name: name.split(' // ')[0] })) });
+// Caché global de cartas (compartida entre mazos: básicas y staples se piden una vez).
+const cardCache = new Map();
+
+async function resolveCards(names) {
+  const missing = [...new Set(names.map((n) => n.split(' // ')[0].toLowerCase()))]
+    .filter((n) => !cardCache.has(n));
+  for (let i = 0; i < missing.length; i += 75) {
+    const chunk = missing.slice(i, i + 75);
+    const body = JSON.stringify({ identifiers: chunk.map((name) => ({ name })) });
     const data = await fetchJson('https://api.scryfall.com/cards/collection', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
     });
-    for (const card of data.data) byName.set(card.name.toLowerCase(), slimCard(card));
+    for (const card of data.data) {
+      const slim = slimCard(card);
+      cardCache.set(card.name.toLowerCase(), slim);
+      cardCache.set(card.name.toLowerCase().split(' // ')[0], slim);
+    }
     if (data.not_found?.length) {
       console.warn('  Scryfall no encontró:', data.not_found.map((n) => n.name).join(', '));
     }
     await sleep(120); // cortesía con la API
   }
-  return byName;
 }
 
-function lookup(byName, name) {
-  const key = name.toLowerCase();
-  return (
-    byName.get(key) ||
-    byName.get(key.split(' // ')[0]) ||
-    [...byName.values()].find((c) => c.name.toLowerCase().split(' // ')[0] === key.split(' // ')[0])
-  );
+const lookup = (name) =>
+  cardCache.get(name.toLowerCase()) ?? cardCache.get(name.toLowerCase().split(' // ')[0]);
+
+const COLOR_NAMES = { W: 'Blanco', U: 'Azul', B: 'Negro', R: 'Rojo', G: 'Verde' };
+const WUBRG = ['W', 'U', 'B', 'R', 'G'];
+
+function themeFor(colorIdentity) {
+  const colors = WUBRG.filter((c) => colorIdentity.includes(c));
+  return colors.length ? colors.map((c) => COLOR_NAMES[c]).join('-') : 'Incoloro';
+}
+
+function slugFor(fileName) {
+  return fileName
+    .replace(/_/g, '-')
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-');
 }
 
 async function main() {
   mkdirSync(OUT_DIR, { recursive: true });
-  const index = [];
-
-  for (const deck of DECKS) {
-    console.log(`Descargando lista: ${deck.file} (MTGJSON)...`);
-    const raw = (await fetchJson(`https://mtgjson.com/api/v5/decks/${deck.file}.json`)).data;
-
-    const commanderEntries = raw.commander.map((c) => ({ name: c.name, count: c.count }));
-    const mainEntries = raw.mainBoard.map((c) => ({ name: c.name, count: c.count }));
-    const allNames = [...new Set([...commanderEntries, ...mainEntries].map((c) => c.name))];
-
-    console.log(`  ${allNames.length} cartas únicas → Scryfall...`);
-    const byName = await scryfallCollection(allNames);
-
-    const resolve = (entry) => {
-      const card = lookup(byName, entry.name);
-      if (!card) throw new Error(`Sin datos de Scryfall para: ${entry.name}`);
-      return { count: entry.count, ...card };
-    };
-
-    const out = {
-      slug: deck.slug,
-      name: raw.name,
-      theme: deck.theme,
-      setCode: raw.code,
-      releaseDate: raw.releaseDate,
-      sources: {
-        decklist: `https://mtgjson.com/api/v5/decks/${deck.file}.json`,
-        cards: 'https://api.scryfall.com/cards/collection',
-      },
-      commanders: commanderEntries.map(resolve),
-      cards: mainEntries.map(resolve),
-    };
-
-    const total = out.cards.reduce((n, c) => n + c.count, 0) + out.commanders.length;
-    console.log(`  OK: ${raw.name} — ${total} cartas (${out.commanders.map((c) => c.name).join(' + ')})`);
-
-    writeFileSync(join(OUT_DIR, `${deck.slug}.json`), JSON.stringify(out, null, 1));
-    index.push({
-      slug: deck.slug,
-      name: raw.name,
-      theme: deck.theme,
-      commanders: out.commanders.map((c) => c.name),
-      colorIdentity: [...new Set(out.commanders.flatMap((c) => c.colorIdentity))],
-    });
+  // Regeneración completa: fuera los JSON anteriores.
+  for (const f of readdirSync(OUT_DIR)) {
+    if (f.endsWith('.json')) rmSync(join(OUT_DIR, f));
   }
 
+  console.log('Descargando catálogo de mazos (MTGJSON)...');
+  const catalog = (await fetchJson('https://mtgjson.com/api/v5/DeckList.json')).data;
+  const precons = catalog.filter((d) => d.type === 'Commander Deck');
+  console.log(`${precons.length} precons de Commander en el catálogo.`);
+
+  const index = [];
+  const seen = new Set();
+  let done = 0; let skipped = 0;
+
+  for (const entry of precons) {
+    const slug = slugFor(entry.fileName);
+    if (seen.has(slug)) continue;
+    seen.add(slug);
+    done++;
+    const tag = `[${done}/${precons.length}]`;
+    try {
+      const raw = (await fetchJson(`https://mtgjson.com/api/v5/decks/${entry.fileName}.json`)).data;
+      if (!raw.commander?.length || !raw.mainBoard?.length) {
+        console.warn(`${tag} ${entry.name}: sin comandante o sin mazo, omitido.`);
+        skipped++;
+        continue;
+      }
+      const commanderEntries = raw.commander.map((c) => ({ name: c.name, count: c.count }));
+      const mainEntries = raw.mainBoard.map((c) => ({ name: c.name, count: c.count }));
+      await resolveCards([...commanderEntries, ...mainEntries].map((c) => c.name));
+
+      const missing = [...commanderEntries, ...mainEntries].filter((c) => !lookup(c.name));
+      if (missing.length) {
+        console.warn(`${tag} ${entry.name}: ${missing.length} carta(s) sin datos (${missing.slice(0, 3).map((c) => c.name).join(', ')}…), omitido.`);
+        skipped++;
+        continue;
+      }
+      const resolve = (e) => ({ count: e.count, ...lookup(e.name) });
+      const commanders = commanderEntries.map(resolve);
+      const colorIdentity = [...new Set(commanders.flatMap((c) => c.colorIdentity))];
+
+      const out = {
+        slug,
+        name: raw.name,
+        theme: themeFor(colorIdentity),
+        setCode: raw.code,
+        releaseDate: raw.releaseDate,
+        sources: {
+          decklist: `https://mtgjson.com/api/v5/decks/${entry.fileName}.json`,
+          cards: 'https://api.scryfall.com/cards/collection',
+        },
+        commanders,
+        cards: mainEntries.map(resolve),
+      };
+      writeFileSync(join(OUT_DIR, `${slug}.json`), JSON.stringify(out));
+      index.push({
+        slug,
+        name: raw.name,
+        theme: out.theme,
+        setCode: raw.code,
+        releaseDate: raw.releaseDate,
+        commanders: commanders.map((c) => c.name),
+        colorIdentity,
+        image: commanders[0].image,
+      });
+      console.log(`${tag} OK ${raw.name} (${raw.code}) — ${commanders.map((c) => c.name).join(' + ')}`);
+    } catch (err) {
+      console.warn(`${tag} ${entry.name}: error (${err.message}), omitido.`);
+      skipped++;
+    }
+  }
+
+  index.sort((a, b) => (b.releaseDate ?? '').localeCompare(a.releaseDate ?? '') || a.name.localeCompare(b.name));
   writeFileSync(join(OUT_DIR, 'index.json'), JSON.stringify(index, null, 1));
-  console.log(`\nListo: ${index.length} mazos en data/precons/`);
+  console.log(`\nListo: ${index.length} mazos importados, ${skipped} omitidos, ${cardCache.size} entradas de carta en caché.`);
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });

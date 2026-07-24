@@ -25,6 +25,12 @@ body {
 #setup h2 { margin: 18px 0 12px; }
 .setup-row { margin: 10px 0; }
 .setup-row select { background: var(--panel2); color: var(--text); border: 1px solid #3a4763; padding: 6px 10px; border-radius: 6px; font-size: 1rem; }
+.setup-row input[type="search"] {
+  background: var(--panel2); color: var(--text); border: 1px solid #3a4763;
+  padding: 8px 14px; border-radius: 8px; font-size: 1rem; width: min(480px, 90%);
+}
+.deck-count { color: var(--dim); margin-left: 10px; font-size: .9rem; }
+.deck-card .dset { color: var(--dim); font-size: .72rem; margin-top: 2px; }
 .deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-bottom: 24px; }
 .deck-card {
   background: var(--panel); border: 2px solid transparent; border-radius: 10px;

@@ -30,13 +30,13 @@ Abre <http://localhost:8000>, elige tu mazo, el número de bots (1–3) y juega.
 | Listas de los mazos preconstruidos | [MTGJSON](https://mtgjson.com) (`/api/v5/decks/…`) |
 | Datos e imágenes de cada carta | [Scryfall](https://scryfall.com/docs/api) (`/cards/collection`) |
 
-Las listas ya están **importadas** en `data/precons/` (8 precons oficiales de
-Commander: Spirit Squadron, Vampiric Bloodline, Fae Dominion, Virtue and
-Valor, Land's Wrath, Sneak Attack, Abzan Armor y Temur Roar). Las imágenes se
-cargan en tiempo real desde Scryfall; sin conexión se muestra el texto de la
-carta.
+Las listas ya están **importadas** en `data/precons/`: el catálogo completo de
+precons de Commander publicados en MTGJSON (~190 mazos, desde los Commander
+2013 hasta los más recientes), con buscador por nombre, comandante, colores o
+colección en la pantalla inicial. Las imágenes se cargan en tiempo real desde
+Scryfall; sin conexión se muestra el texto de la carta.
 
-Para reimportar o añadir mazos (edita la lista `DECKS` del script):
+Para reimportar el catálogo completo:
 
 ```bash
 node scripts/fetch-precons.mjs
