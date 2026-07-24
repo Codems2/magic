@@ -439,6 +439,12 @@ export class BotController {
       }
       if (this.shouldAttack(atk, defender, game)) decls.push({ attacker: atk, defender });
     }
+    // "Ataca cada combate si puede".
+    for (const atk of ready) {
+      if (atk.script?.mustAttack && !decls.some((d) => d.attacker === atk)) {
+        decls.push({ attacker: atk, defender: primary });
+      }
+    }
     return decls;
   }
 

@@ -351,6 +351,21 @@ export class Game {
         }
       }
     }
+    // Extorsionar (solo bots: pago automático con maná sobrante).
+    if (p.isBot) {
+      for (const c of p.battlefield) {
+        if (!(c.data.keywords || []).includes('Extort')) continue;
+        const pay = solvePayment({ generic: 0, pips: [['W', 'B']], x: 0 }, manaSources(p, this));
+        if (!pay) break;
+        this.paySources(pay);
+        const opps = this.opponentsOf(p);
+        for (const q of opps) q.life -= 1;
+        p.life += opps.length;
+        this.log(`${p.name} extorsiona: cada oponente pierde 1 vida (+${opps.length} para ${p.name}).`);
+        this.checkState();
+        break;
+      }
+    }
 
     // Ventana de respuesta: contrahechizos de los demás.
     const countered = await this.responseWindow(p, card);
@@ -534,6 +549,7 @@ export class Game {
       if (controller === 'you' && q !== forPlayer) continue;
       for (const c of q.battlefield) {
         if (q !== forPlayer && c.hasKeyword('hexproof', this)) continue;
+        if (c.hasKeyword('shroud', this)) continue;
         if (kind === 'any' || kind === 'creature') { if (!c.isCreature) continue; }
         else if (kind === 'artifact') { if (!c.isArtifact) continue; }
         else if (kind === 'enchantment') { if (!c.isEnchantment) continue; }
@@ -1026,6 +1042,17 @@ export class Game {
           if (n > 0) { p.life += n; this.log(`${p.name} gana ${n} vidas (${p.life}).`); }
           break;
         }
+        case 'selfToHand': {
+          const c = ctx.source;
+          if (c.zone === 'battlefield') this.bounce(c);
+          else if (c.zone === 'graveyard') {
+            const g = c.owner.graveyard;
+            g.splice(g.indexOf(c), 1);
+            c.zone = 'hand'; c.owner.hand.push(c);
+            this.log(`${c.name} vuelve a la mano de ${c.owner.name}.`);
+          }
+          break;
+        }
         case 'gyToHand': {
           const c = ctx.source;
           const g = c.owner.graveyard;
@@ -1338,6 +1365,15 @@ export class Game {
       this.log(`${attackerP.name} ataca a ${def.name} con ${atks.map((a) => `${a.name} (${a.power(this)}/${a.toughness(this)})`).join(', ')}.`);
     }
 
+    // Melee: +1/+1 por cada oponente distinto atacado.
+    const distinctDefenders = new Set(valid.map((d) => d.defender)).size;
+    for (const { attacker } of valid) {
+      if ((attacker.data.keywords || []).includes('Melee')) {
+        attacker.tempPT = [attacker.tempPT[0] + distinctDefenders, attacker.tempPT[1] + distinctDefenders];
+        this.log(`${attacker.name} recibe +${distinctDefenders}/+${distinctDefenders} (cuerpo a cuerpo).`);
+      }
+    }
+
     // Disparos de ataque.
     for (const { attacker } of valid) {
       if (attacker.script.attack.length && attacker.zone === 'battlefield') {
@@ -1427,6 +1463,10 @@ export class Game {
       } else {
         def.life -= power;
         this.log(`${atk.name} golpea a ${def.name} por ${power} (${def.life}).`);
+        if (atk.script?.toxic) {
+          def.poison += atk.script.toxic;
+          this.log(`${def.name} recibe ${atk.script.toxic} contador(es) de veneno (☠${def.poison}/10).`);
+        }
       }
       if (atk.hasKeyword('lifelink', this)) atk.controller.life += power;
       if (atk.isCommander) {

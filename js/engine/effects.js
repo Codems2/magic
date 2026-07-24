@@ -10,6 +10,8 @@ const KNOWN_KEYWORDS = [
   'indestructible', 'defender', 'flash', 'ward',
   // implementadas en el motor por otra vía (combate, ETB, lanzamiento)
   'fear', 'intimidate', 'shadow', 'horsemanship', 'prowess', 'evolve', 'undying',
+  'persist', 'infect', 'myriad', 'melee', 'skulk', 'shroud', 'extort',
+  'islandwalk', 'swampwalk', 'mountainwalk', 'forestwalk', 'plainswalk',
 ];
 
 // ---- especificaciones de objetivo ----------------------------------------
@@ -52,7 +54,7 @@ function parseSentence(s) {
   s = s.trim().toLowerCase().replace(/\.$/, '').replace(/^you may /, '').replace(/^then /, '');
   if (!s) return [];
   // Ruido sin efecto en el simulador.
-  if (/^shuffle$|^(?:it|they) can't be regenerated$|^it's still a land$|^activate only|^exile ~$|^(?:it|they) gains? haste(?: until end of turn)?$|^untap up to \w+ lands?$|^regenerate ~$|^you may choose new targets|^put the rest on the bottom of your library|^shuffle your library$|^then shuffle$/.test(s)) return [];
+  if (/^shuffle$|^(?:it|they) can't be regenerated$|^it's still a land$|^activate only|^exile ~$|^(?:it|they) gains? haste(?: until end of turn)?$|^untap up to \w+ lands?$|^regenerate ~$|^you may choose new targets|^put the rest on the bottom of your library|^shuffle your library$|^then shuffle$|^do this only once each turn$|^if you search your library this way, shuffle$/.test(s)) return [];
   let m;
 
   if ((m = s.match(/^(?:you )?mills? (\w+) cards?$/))) return [{ op: 'mill', n: parseNum(m[1]), who: 'you' }];
@@ -102,6 +104,7 @@ function parseSentence(s) {
   if (/^return ~ from your graveyard to your hand$/.test(s)) return [{ op: 'gyToHand' }];
   if ((m = s.match(/^return ~ from your graveyard to the battlefield( tapped)?$/)))
     return [{ op: 'gyToBattlefield', tapped: !!m[1] }];
+  if (/^return (?:~|it) to its owner's hand$/.test(s)) return [{ op: 'selfToHand' }];
   if ((m = s.match(/^put a land card from your hand onto the battlefield( tapped)?/)))
     return [{ op: 'landFromHand', tapped: !!m[1] }];
   if (/^you may play an additional land this turn/.test(s)) return [{ op: 'extraLandTurn' }];
@@ -156,7 +159,7 @@ function parseSentence(s) {
   if ((m = s.match(/^create (a|an|one|two|three|x|\d+) treasure tokens?/)))
     return [{ op: 'treasure', n: m[1] === 'x' ? 'x' : parseNum(m[1]) }];
 
-  if ((m = s.match(/^search your library for (?:up to (\w+) )?basic land(?: card)?s?.*?put (?:it|them|that card|those cards) onto the battlefield( tapped)?/)))
+  if ((m = s.match(/^search your library for (?:a |an |up to (\w+) )?basic land(?: card)?s?.*?put (?:it|them|that card|those cards) onto the battlefield( tapped)?/)))
     return [{ op: 'ramp', n: parseNum(m[1] ?? 1), tapped: !!m[2] }];
   if (/^search your library for (?:up to (\w+) )?basic lands?.*?(?:into|to) your hand/.test(s))
     return [{ op: 'landToHand', n: 1 }];
@@ -222,6 +225,10 @@ export function parseEffectOps(text, unknown) {
   }
   if ((m = text.match(/exile the top card of your library\.?\s*(?:until end of turn, )?you may (?:play|cast) (?:that card|it)[^.]*\./))) {
     ops.push({ op: 'impulse', n: 1 });
+    text = text.replace(m[0], '');
+  }
+  if ((m = text.match(/exile the top (\w+) cards of your library\.?\s*(?:until [^,.]+, )?you may (?:play|cast) (?:them|those cards|cards exiled this way)[^.]*\./))) {
+    ops.push({ op: 'impulse', n: parseNum(m[1]) });
     text = text.replace(m[0], '');
   }
   if ((m = text.match(/you may pay ((?:\{e\})+)\.?\s*if you do, ([^.]+\.)/))) {
@@ -341,6 +348,8 @@ export function buildScript(card) {
     if (/^delve$/.test(l)) { script.delve = true; continue; }
     if (/^rebound$/.test(l)) { script.rebound = true; continue; }
     if ((m = l.match(/^squad \{(.+?)\}/))) { script.squad = parseManaCost(`{${m[1]}}`); continue; }
+    if ((m = l.match(/^toxic (\d+)/))) { script.toxic = parseInt(m[1], 10); continue; }
+    if (/^~ attacks each combat if able/.test(l)) { script.mustAttack = true; continue; }
     if ((m = l.match(/^level up (\{.+?\})+/))) {
       // Aproximación: subir de nivel = contador +1/+1 (a velocidad de conjuro).
       const cost = parseManaCost(l.replace('level up ', ''));
@@ -403,6 +412,9 @@ export function buildScript(card) {
       script.etb.push(...parseEffectOps(m[1], script.unknown)); continue;
     }
     if ((m = l.match(/^when(?:ever)? ~ dies, (.+)/))) {
+      script.dies.push(...parseEffectOps(m[1], script.unknown)); continue;
+    }
+    if ((m = l.match(/^when ~ is put into a graveyard from the battlefield, (.+)/))) {
       script.dies.push(...parseEffectOps(m[1], script.unknown)); continue;
     }
     if ((m = l.match(/^whenever ~ attacks, (.+)/))) {
@@ -515,6 +527,7 @@ export function opsValue(ops) {
       case 'landFromHand': v += 2; break;
       case 'extraLandTurn': v += 1.5; break;
       case 'topFilter': v += 1; break;
+      case 'selfToHand': v += 0.5; break;
       case 'impulse': v += 1.4; break;
       case 'monarch': v += 2.5; break;
       case 'discardHandEach': v += 2; break;

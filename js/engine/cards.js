@@ -151,6 +151,12 @@ export class CardInstance {
     if (aKws.has('intimidate') && !(this.isArtifact || (this.data.colors || []).some((c) => (attacker.data.colors || []).includes(c)))) return false;
     if (aKws.has('shadow') !== bKws.has('shadow')) return false;
     if (aKws.has('horsemanship') && !bKws.has('horsemanship')) return false;
+    if (aKws.has('skulk') && this.power(game) > attacker.power(game)) return false;
+    // Landwalk: imbloqueble si el defensor controla ese tipo de tierra.
+    const walks = { islandwalk: 'Island', swampwalk: 'Swamp', mountainwalk: 'Mountain', forestwalk: 'Forest', plainswalk: 'Plains' };
+    for (const [kw, landType] of Object.entries(walks)) {
+      if (aKws.has(kw) && this.controller.battlefield.some((l) => l.isLand && l.hasSubtype(landType))) return false;
+    }
     return true;
   }
 
