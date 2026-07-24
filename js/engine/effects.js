@@ -54,7 +54,7 @@ function parseSentence(s) {
   s = s.trim().toLowerCase().replace(/\.$/, '').replace(/^you may /, '').replace(/^then /, '');
   if (!s) return [];
   // Ruido sin efecto en el simulador.
-  if (/^shuffle$|^(?:it|they) can't be regenerated$|^it's still a land$|^activate only|^exile ~$|^(?:it|they) gains? haste(?: until end of turn)?$|^untap up to \w+ lands?$|^regenerate ~$|^you may choose new targets|^put the rest on the bottom of your library|^shuffle your library$|^then shuffle$|^do this only once each turn$|^if you search your library this way, shuffle$/.test(s)) return [];
+  if (/^shuffle$|^(?:it|they) can't be regenerated$|^it's still a land$|^activate only|^exile ~$|^(?:it|they) gains? haste(?: until end of turn)?$|^untap up to \w+ lands?$|^regenerate ~$|^you may choose new targets|^put the rest on the bottom of your library|^shuffle your library$|^then shuffle$|^do this only once each turn$|^if you search your library this way, shuffle$|^(?:reveal|look at) the top card of your library$/.test(s)) return [];
   let m;
 
   if ((m = s.match(/^(?:you )?mills? (\w+) cards?$/))) return [{ op: 'mill', n: parseNum(m[1]), who: 'you' }];
@@ -105,6 +105,8 @@ function parseSentence(s) {
   if ((m = s.match(/^return ~ from your graveyard to the battlefield( tapped)?$/)))
     return [{ op: 'gyToBattlefield', tapped: !!m[1] }];
   if (/^return (?:~|it) to its owner's hand$/.test(s)) return [{ op: 'selfToHand' }];
+  if (/^sacrifice (?:it|them|that token) at the beginning of the next end step$/.test(s)) return [{ op: 'sacAtEnd' }];
+  if (/^goad target creature$/.test(s)) return [{ op: 'goad', target: { kind: 'creature', controller: 'opponent' }, targeted: true }];
   if ((m = s.match(/^put a land card from your hand onto the battlefield( tapped)?/)))
     return [{ op: 'landFromHand', tapped: !!m[1] }];
   if (/^you may play an additional land this turn/.test(s)) return [{ op: 'extraLandTurn' }];

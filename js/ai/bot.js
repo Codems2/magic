@@ -439,10 +439,16 @@ export class BotController {
       }
       if (this.shouldAttack(atk, defender, game)) decls.push({ attacker: atk, defender });
     }
-    // "Ataca cada combate si puede".
+    // "Ataca cada combate si puede" e incitadas.
     for (const atk of ready) {
-      if (atk.script?.mustAttack && !decls.some((d) => d.attacker === atk)) {
-        decls.push({ attacker: atk, defender: primary });
+      if (decls.some((d) => d.attacker === atk)) continue;
+      const goaded = atk._goadedBy && game.turn <= (atk._goadedUntil ?? 0) && atk._goadedBy.alive;
+      if (atk.script?.mustAttack || goaded) {
+        let target = primary;
+        if (goaded && target === atk._goadedBy) {
+          target = opps.find((q) => q !== atk._goadedBy) ?? primary;
+        }
+        decls.push({ attacker: atk, defender: target });
       }
     }
     return decls;

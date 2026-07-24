@@ -225,6 +225,12 @@ export class Game {
       const toDiscard = await p.controller.discardTo(this, p.hand.length - 7);
       for (const c of toDiscard) this.moveToGraveyard(c, 'descarta');
     }
+    // Fichas marcadas "sacrifícala al comienzo del próximo paso final".
+    for (const q of this.alivePlayers()) {
+      for (const c of [...q.battlefield]) {
+        if (c._sacAtEnd) this.removeFromBattlefield(c, 'sacrificado');
+      }
+    }
     for (const q of this.players) for (const c of q.battlefield) c.cleanupEndOfTurn();
     this.checkState();
     this.nextPlayer();
@@ -721,10 +727,25 @@ export class Game {
         case 'token': {
           const n = this.num(op, ctx);
           this.log(`${p.name} crea ${n} ficha(s) de ${op.name} ${op.pt[0]}/${op.pt[1]}.`);
+          ctx._lastCreated = [];
           for (let i = 0; i < n; i++) {
             const tok = makeToken(op, p, this.turn);
             tok.script = buildScript(tok.data);
             this.putOnBattlefield(tok, p);
+            ctx._lastCreated.push(tok);
+          }
+          break;
+        }
+        case 'sacAtEnd': {
+          for (const c of ctx._lastCreated ?? []) c._sacAtEnd = true;
+          break;
+        }
+        case 'goad': {
+          const t = takeTarget();
+          if (t instanceof CardInstance) {
+            t._goadedBy = p;
+            t._goadedUntil = this.turn + this.alivePlayers().length;
+            this.log(`${t.name} queda incitada: debe atacar a otro jugador.`);
           }
           break;
         }
