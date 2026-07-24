@@ -31,10 +31,11 @@ Abre <http://localhost:8000>, elige tu mazo, el número de bots (1–3) y juega.
 | Datos e imágenes de cada carta | [Scryfall](https://scryfall.com/docs/api) (`/cards/collection`) |
 
 Las listas ya están **importadas** en `data/precons/`: el catálogo completo de
-precons de Commander publicados en MTGJSON (~190 mazos, desde los Commander
-2013 hasta los más recientes), con buscador por nombre, comandante, colores o
-colección en la pantalla inicial. Las imágenes se cargan en tiempo real desde
-Scryfall; sin conexión se muestra el texto de la carta.
+precons de Commander publicados en MTGJSON (178 mazos, desde los Commander
+2013 hasta los más recientes, sin duplicar las ediciones de coleccionista),
+con buscador por nombre, comandante, colores o colección en la pantalla
+inicial. Las imágenes se cargan en tiempo real desde Scryfall; sin conexión
+se muestra el texto de la carta.
 
 Para reimportar el catálogo completo:
 

@@ -110,7 +110,13 @@ async function main() {
 
   console.log('Descargando catálogo de mazos (MTGJSON)...');
   const catalog = (await fetchJson('https://mtgjson.com/api/v5/DeckList.json')).data;
-  const precons = catalog.filter((d) => d.type === 'Commander Deck');
+  let precons = catalog.filter((d) => d.type === 'Commander Deck');
+  // Las "Collector's Edition" son la misma lista con otro acabado: fuera si existe la normal.
+  const baseNames = new Set(precons.map((d) => d.name));
+  precons = precons.filter((d) => {
+    const m = d.name.match(/^(.*) Collector's Edition$/);
+    return !(m && baseNames.has(m[1]));
+  });
   console.log(`${precons.length} precons de Commander en el catálogo.`);
 
   const index = [];
