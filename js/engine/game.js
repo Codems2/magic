@@ -1,0 +1,1016 @@
+// Motor de partida de Commander multijugador.
+
+import { CardInstance, makeToken, resetIds } from './cards.js';
+import { buildScript } from './effects.js';
+import { manaSources, solvePayment, maxAffordableX } from './mana.js';
+
+// RNG con semilla para partidas reproducibles.
+export function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export class Player {
+  constructor(name, deck, controller, isBot) {
+    this.name = name;
+    this.deck = deck;
+    this.controller = controller;
+    this.isBot = isBot;
+    this.life = 40;
+    this.library = [];
+    this.hand = [];
+    this.battlefield = [];
+    this.graveyard = [];
+    this.exile = [];
+    this.command = [];
+    this.commanderDamage = new Map(); // commanderId -> daño
+    this.landsPlayedThisTurn = 0;
+    this.lost = false;
+    this.lossReason = null;
+  }
+  get alive() { return !this.lost; }
+  creatures() { return this.battlefield.filter((c) => c.isCreature); }
+  lands() { return this.battlefield.filter((c) => c.isLand); }
+}
+
+export class Game {
+  constructor(configs, { seed = 42, onLog = null, maxTurns = 80 } = {}) {
+    resetIds();
+    this.rng = mulberry32(seed);
+    this.onLog = onLog;
+    this.maxTurns = maxTurns;
+    this.turn = 0;
+    this.phase = 'setup';
+    this.activeIdx = 0;
+    this.winner = null;
+    this.over = false;
+    this.logLines = [];
+
+    this.players = configs.map((cfg) => {
+      const p = new Player(cfg.name, cfg.deck, cfg.controller, cfg.isBot);
+      cfg.controller.player = p;
+      return p;
+    });
+
+    for (const p of this.players) {
+      for (const entry of p.deck.cards) {
+        for (let i = 0; i < entry.count; i++) {
+          const card = new CardInstance(entry, p);
+          card.script = buildScript(entry);
+          p.library.push(card);
+        }
+      }
+      for (const entry of p.deck.commanders) {
+        const card = new CardInstance(entry, p);
+        card.script = buildScript(entry);
+        card.isCommander = true;
+        card.zone = 'command';
+        p.command.push(card);
+      }
+      this.shuffle(p.library);
+    }
+  }
+
+  log(msg) {
+    this.logLines.push(msg);
+    if (this.onLog) this.onLog(msg);
+  }
+
+  shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rng() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+
+  get activePlayer() { return this.players[this.activeIdx]; }
+  alivePlayers() { return this.players.filter((p) => p.alive); }
+  opponentsOf(p) { return this.players.filter((q) => q !== p && q.alive); }
+
+  // ---- preparación -------------------------------------------------------
+
+  async start() {
+    for (const p of this.players) {
+      p.hand = p.library.splice(0, 7);
+      p.hand.forEach((c) => (c.zone = 'hand'));
+    }
+    // Mulligan de Londres.
+    for (const p of this.players) {
+      let mulls = 0;
+      while (mulls < 3) {
+        const wants = await p.controller.mulligan(this, p.hand, mulls);
+        if (!wants) break;
+        mulls++;
+        p.library.push(...p.hand.splice(0));
+        this.shuffle(p.library);
+        p.hand = p.library.splice(0, 7);
+        p.hand.forEach((c) => (c.zone = 'hand'));
+        this.log(`${p.name} hace mulligan (${mulls}).`);
+      }
+      if (mulls > 0) {
+        const bottom = await p.controller.chooseBottom(this, mulls);
+        for (const c of bottom) {
+          p.hand.splice(p.hand.indexOf(c), 1);
+          c.zone = 'library';
+          p.library.push(c);
+        }
+      }
+    }
+    this.log(`Comienza la partida. Orden: ${this.players.map((p) => p.name).join(' → ')}.`);
+  }
+
+  async run() {
+    await this.start();
+    while (!this.over) await this.playTurn();
+    return this.winner;
+  }
+
+  // ---- turno -------------------------------------------------------------
+
+  async playTurn() {
+    if (this.over) return;
+    const p = this.activePlayer;
+    if (!p.alive) { this.nextPlayer(); return; }
+    this.turn++;
+    if (this.turn > this.maxTurns) return this.endByTimeout();
+
+    this.log(`— Turno ${this.turn}: ${p.name} (${p.life} vidas) —`);
+    p.landsPlayedThisTurn = 0;
+
+    // Enderezar.
+    this.phase = 'untap';
+    for (const c of p.battlefield) { c.tapped = false; c.summoningSick = false; }
+
+    // Mantenimiento.
+    this.phase = 'upkeep';
+    for (const c of [...p.battlefield]) {
+      if (c.script.upkeep.length) await this.resolveTriggered(c, c.script.upkeep, 'mantenimiento');
+    }
+    if (this.over) return;
+
+    // Robar.
+    this.phase = 'draw';
+    this.drawCards(p, 1);
+    if (this.over) return;
+
+    // Primera fase principal.
+    this.phase = 'main1';
+    await this.mainPhase(p);
+    if (this.over) return;
+
+    // Combate.
+    this.phase = 'combat';
+    await this.combatPhase(p);
+    if (this.over) return;
+
+    // Segunda fase principal.
+    this.phase = 'main2';
+    await this.mainPhase(p);
+    if (this.over) return;
+
+    // Paso final.
+    this.phase = 'end';
+    for (const c of [...p.battlefield]) {
+      if (c.script.endStep.length) await this.resolveTriggered(c, c.script.endStep, 'paso final');
+    }
+    if (p.hand.length > 7) {
+      const toDiscard = await p.controller.discardTo(this, p.hand.length - 7);
+      for (const c of toDiscard) this.moveToGraveyard(c, 'descarta');
+    }
+    for (const q of this.players) for (const c of q.battlefield) c.cleanupEndOfTurn();
+    this.checkState();
+    this.nextPlayer();
+  }
+
+  nextPlayer() {
+    for (let i = 1; i <= this.players.length; i++) {
+      const idx = (this.activeIdx + i) % this.players.length;
+      if (this.players[idx].alive) { this.activeIdx = idx; return; }
+    }
+  }
+
+  endByTimeout() {
+    const ranked = this.alivePlayers().sort((a, b) => b.life - a.life);
+    this.winner = ranked[0] ?? null;
+    this.over = true;
+    this.log(`Límite de turnos alcanzado. Gana ${this.winner?.name ?? 'nadie'} por vidas.`);
+  }
+
+  // ---- fase principal ----------------------------------------------------
+
+  async mainPhase(p) {
+    let guard = 0;
+    while (!this.over && guard++ < 200) {
+      const action = await p.controller.mainAction(this);
+      if (!action || action.type === 'pass') return;
+      try {
+        await this.performAction(p, action);
+      } catch (err) {
+        this.log(`(!) Acción inválida de ${p.name}: ${err.message}`);
+        return;
+      }
+      this.checkState();
+      if (!p.alive) return;
+    }
+  }
+
+  async performAction(p, action) {
+    switch (action.type) {
+      case 'playLand': return this.playLand(p, action.card);
+      case 'cast': return this.castSpell(p, action.card, action);
+      case 'activate': return this.activateAbility(p, action.permanent, action.ability, action);
+      case 'equip': return this.equip(p, action.equipment, action.creature);
+      default: throw new Error(`acción desconocida ${action.type}`);
+    }
+  }
+
+  playLand(p, card) {
+    if (p.landsPlayedThisTurn >= 1) throw new Error('ya jugó tierra');
+    if (!card.isLand || card.zone !== 'hand') throw new Error('no es una tierra en mano');
+    p.hand.splice(p.hand.indexOf(card), 1);
+    this.putOnBattlefield(card, p);
+    p.landsPlayedThisTurn++;
+    this.log(`${p.name} juega ${card.name}.`);
+    // Tierras que entran giradas.
+    if (/enters?( the battlefield)? tapped/.test(card.oracleText.toLowerCase()) &&
+        !/unless|if you control/.test(card.oracleText.toLowerCase())) {
+      card.tapped = true;
+    }
+  }
+
+  commanderCost(card) {
+    const base = card.parsedCost;
+    return { generic: base.generic + 2 * card.commanderCasts, pips: base.pips, x: base.x };
+  }
+
+  async castSpell(p, card, { targets = null, xValue = 0 } = {}) {
+    const fromCommand = card.zone === 'command';
+    if (card.zone !== 'hand' && !fromCommand) throw new Error('carta fuera de mano');
+    const cost = fromCommand ? this.commanderCost(card) : card.parsedCost;
+    if (cost.x && !xValue) xValue = await p.controller.chooseX(this, card, maxAffordableX(cost, p, this));
+
+    const payment = solvePayment(cost, manaSources(p, this), xValue);
+    if (!payment) throw new Error(`no puede pagar ${card.name}`);
+
+    // Elegir objetivos del hechizo.
+    if (!targets && card.script.targets.length) {
+      targets = await this.pickTargetsFor(p, card, card.script.targets);
+      if (targets === null) throw new Error(`sin objetivos legales para ${card.name}`);
+    }
+
+    this.paySources(payment);
+    if (fromCommand) {
+      p.command.splice(p.command.indexOf(card), 1);
+      card.commanderCasts++;
+    } else {
+      p.hand.splice(p.hand.indexOf(card), 1);
+    }
+    card.zone = 'stack';
+    const tax = fromCommand && card.commanderCasts > 1 ? ` (impuesto ${(card.commanderCasts - 1) * 2})` : '';
+    this.log(`${p.name} lanza ${card.name}${tax}${xValue ? ` con X=${xValue}` : ''}.`);
+
+    // Ventana de respuesta: contrahechizos de los demás.
+    const countered = await this.responseWindow(p, card);
+    if (countered) {
+      this.log(`${card.name} es contrarrestado.`);
+      this.moveToGraveyard(card, null);
+      return;
+    }
+    await this.resolveSpell(p, card, targets ?? [], xValue);
+  }
+
+  async responseWindow(caster, spell) {
+    for (const q of this.opponentsOf(caster)) {
+      const resp = await q.controller.respond(this, spell);
+      if (resp && resp.card) {
+        const c = resp.card;
+        const payment = solvePayment(c.parsedCost, manaSources(q, this), 0);
+        if (!payment) continue;
+        this.paySources(payment);
+        q.hand.splice(q.hand.indexOf(c), 1);
+        this.log(`${q.name} responde con ${c.name}.`);
+        this.moveToGraveyard(c, null);
+        if (c.script.castOps.some((op) => op.op === 'counterSpell')) return true;
+      }
+    }
+    return false;
+  }
+
+  async resolveSpell(p, card, targets, xValue) {
+    if (card.isPermanentType) {
+      // Auras: se anexan a su objetivo.
+      if (card.isAura) {
+        let host = targets?.[0];
+        if (!host || !(host instanceof CardInstance)) {
+          const own = p.creatures();
+          host = own.sort((a, b) => b.power(this) - a.power(this))[0];
+        }
+        if (!host) { this.moveToGraveyard(card, 'sin objetivo'); return; }
+        this.putOnBattlefield(card, p);
+        card.attachedTo = host;
+        host.attachments.push(card);
+        this.log(`${card.name} encanta a ${host.name}.`);
+      } else {
+        this.putOnBattlefield(card, p);
+        if (card.script.entersTapped) card.tapped = true;
+      }
+      if (card.script.etb.length) await this.resolveTriggered(card, card.script.etb, 'entra al campo', xValue);
+      if (card.script.unknown.length && !card.isLand) {
+        this.log(`(${card.name}: parte de su texto no está simulado)`);
+      }
+    } else {
+      await this.resolveOps(card.script.castOps, { source: card, controller: p, targets: targets.slice(), xValue });
+      this.moveToGraveyard(card, null);
+    }
+    this.checkState();
+  }
+
+  paySources(payment) {
+    for (const src of payment) {
+      if (src.perm.name === 'Treasure') this.removeFromBattlefield(src.perm, 'sacrificado');
+      else src.perm.tapped = true;
+    }
+  }
+
+  async activateAbility(p, perm, ability, { targets = null } = {}) {
+    if (perm.zone !== 'battlefield') throw new Error('permanente fuera del campo');
+    if (ability.tap && (perm.tapped || (perm.isCreature && perm.summoningSick && !perm.hasKeyword('haste', this)))) {
+      throw new Error('no puede girarse');
+    }
+    const payment = solvePayment(ability.mana, manaSources(p, this), 0);
+    if (!payment) throw new Error('sin maná para la habilidad');
+
+    const targetedOps = ability.ops.filter((op) => op.targeted || op.target?.targeted);
+    if (!targets && targetedOps.length) {
+      targets = await this.pickTargetsFor(p, perm, targetedOps);
+      if (targets === null) throw new Error('sin objetivos legales');
+    }
+    this.paySources(payment);
+    if (ability.tap) perm.tapped = true;
+    this.log(`${p.name} activa ${perm.name}.`);
+    if (ability.sac) this.removeFromBattlefield(perm, 'sacrificado');
+    await this.resolveOps(ability.ops, { source: perm, controller: p, targets: targets ?? [], xValue: 0 });
+    this.checkState();
+  }
+
+  equip(p, equipment, creature) {
+    if (!equipment.script.equipCost) throw new Error('no es equipo');
+    const payment = solvePayment(equipment.script.equipCost, manaSources(p, this), 0);
+    if (!payment) throw new Error('sin maná para equipar');
+    this.paySources(payment);
+    if (equipment.attachedTo) {
+      const prev = equipment.attachedTo;
+      prev.attachments.splice(prev.attachments.indexOf(equipment), 1);
+    }
+    equipment.attachedTo = creature;
+    creature.attachments.push(equipment);
+    this.log(`${p.name} equipa ${equipment.name} a ${creature.name}.`);
+  }
+
+  // ---- objetivos ---------------------------------------------------------
+
+  legalTargets(spec, forPlayer) {
+    const out = [];
+    const kind = spec.kind ?? spec.target?.kind ?? 'creature';
+    const controller = spec.controller ?? spec.target?.controller ?? 'any';
+    const wantsPlayers = ['any', 'player', 'opponentPlayer', 'eachOpponent'].includes(kind);
+    if (wantsPlayers) {
+      for (const q of this.alivePlayers()) {
+        if (kind === 'opponentPlayer' && q === forPlayer) continue;
+        out.push(q);
+      }
+      if (kind !== 'any') return out;
+    }
+    for (const q of this.alivePlayers()) {
+      if (controller === 'opponent' && q === forPlayer) continue;
+      if (controller === 'you' && q !== forPlayer) continue;
+      for (const c of q.battlefield) {
+        if (q !== forPlayer && c.hasKeyword('hexproof', this)) continue;
+        if (kind === 'any' || kind === 'creature') { if (!c.isCreature) continue; }
+        else if (kind === 'artifact') { if (!c.isArtifact) continue; }
+        else if (kind === 'enchantment') { if (!c.isEnchantment) continue; }
+        else if (kind === 'artifact-or-enchantment') { if (!c.isArtifact && !c.isEnchantment) continue; }
+        else if (kind === 'planeswalker') { if (!c.isPlaneswalker) continue; }
+        else if (kind === 'land') { if (!c.isLand) continue; }
+        else if (kind === 'nonland-permanent') { if (c.isLand) continue; }
+        else if (kind === 'permanent') { /* cualquiera */ }
+        else if (kind === 'attacking-or-blocking') { if (!c.attacking && !c.blocking) continue; }
+        else continue;
+        if (spec.attacking && !c.attacking) continue;
+        if (spec.withFlying && !c.hasKeyword('flying', this)) continue;
+        if (spec.withoutFlying && c.hasKeyword('flying', this)) continue;
+        if (spec.tapped && !c.tapped) continue;
+        out.push(c);
+      }
+    }
+    return out;
+  }
+
+  async pickTargetsFor(p, source, targetedOps) {
+    const chosen = [];
+    for (const op of targetedOps) {
+      const spec = op.target ?? { kind: op.scope === 'target' ? 'creature' : 'any' };
+      const candidates = this.legalTargets(spec, p);
+      if (!candidates.length) return null;
+      const pick = await p.controller.chooseTarget(this, source, op, candidates);
+      if (!pick) return null;
+      chosen.push(pick);
+    }
+    return chosen;
+  }
+
+  // ---- resolución de efectos --------------------------------------------
+
+  async resolveTriggered(source, ops, label, xValue = 0) {
+    const p = source.controller;
+    const targetedOps = ops.filter((op) => op.targeted || op.target?.targeted);
+    let targets = [];
+    if (targetedOps.length) {
+      targets = await this.pickTargetsFor(p, source, targetedOps);
+      if (targets === null) return; // sin objetivos: no pasa nada
+    }
+    this.log(`Se dispara ${source.name} (${label}).`);
+    await this.resolveOps(ops, { source, controller: p, targets, xValue });
+    this.checkState();
+  }
+
+  num(op, ctx) { return op.n === 'x' ? ctx.xValue : op.n; }
+
+  async resolveOps(ops, ctx) {
+    for (const op of ops) {
+      if (this.over) return;
+      const p = ctx.controller;
+      const takeTarget = () => (op.targeted || op.target?.targeted) ? ctx.targets.shift() : null;
+      switch (op.op) {
+        case 'draw': {
+          const n = this.num(op, ctx);
+          if (op.who === 'each') for (const q of this.alivePlayers()) this.drawCards(q, 1);
+          else this.drawCards(p, n);
+          break;
+        }
+        case 'damage': {
+          const n = this.num(op, ctx);
+          const kind = op.target?.kind;
+          if (kind === 'eachOpponent') for (const q of this.opponentsOf(p)) this.damagePlayer(q, n, ctx.source);
+          else if (kind === 'eachPlayer') for (const q of this.alivePlayers()) this.damagePlayer(q, n, ctx.source);
+          else if (kind === 'eachCreature') {
+            for (const q of this.alivePlayers()) for (const c of [...q.battlefield]) {
+              if (c.isCreature) this.damageCreature(c, n, ctx.source);
+            }
+          } else {
+            const t = takeTarget();
+            if (t instanceof Player) this.damagePlayer(t, n, ctx.source);
+            else if (t) this.damageCreature(t, n, ctx.source);
+          }
+          break;
+        }
+        case 'destroy': {
+          const t = takeTarget();
+          if (t instanceof CardInstance) this.destroy(t, ctx.source);
+          break;
+        }
+        case 'exile': {
+          const t = takeTarget();
+          if (t instanceof CardInstance) this.exileCard(t);
+          break;
+        }
+        case 'wipe': {
+          this.log('¡El campo de batalla queda arrasado!');
+          for (const q of this.alivePlayers()) {
+            for (const c of [...q.battlefield]) {
+              const match =
+                (op.what.includes('creature') && c.isCreature) ||
+                (op.what.includes('artifact') && c.isArtifact) ||
+                (op.what.includes('enchantment') && c.isEnchantment) ||
+                (op.what.includes('nonland') && !c.isLand);
+              if (match) op.exile ? this.exileCard(c) : this.destroy(c, ctx.source, true);
+            }
+          }
+          break;
+        }
+        case 'bounce': {
+          const t = takeTarget();
+          if (t instanceof CardInstance) this.bounce(t);
+          break;
+        }
+        case 'token': {
+          const n = this.num(op, ctx);
+          for (let i = 0; i < n; i++) {
+            const tok = makeToken(op, p, this.turn);
+            tok.script = buildScript(tok.data);
+            p.battlefield.push(tok);
+          }
+          this.log(`${p.name} crea ${n} ficha(s) de ${op.name} ${op.pt[0]}/${op.pt[1]}.`);
+          break;
+        }
+        case 'treasure': {
+          const n = this.num(op, ctx);
+          for (let i = 0; i < n; i++) {
+            const tok = makeToken({ name: 'Treasure', pt: [0, 0], types: 'Artifact', producedMana: ['W', 'U', 'B', 'R', 'G'] }, p, this.turn);
+            tok.script = buildScript(tok.data);
+            p.battlefield.push(tok);
+          }
+          this.log(`${p.name} crea ${n} Tesoro(s).`);
+          break;
+        }
+        case 'ramp': {
+          let found = 0;
+          for (let i = 0; i < op.n; i++) {
+            const idx = p.library.findIndex((c) => c.hasType('Basic') && c.isLand);
+            if (idx === -1) break;
+            const land = p.library.splice(idx, 1)[0];
+            this.putOnBattlefield(land, p);
+            land.tapped = op.tapped !== false;
+            found++;
+          }
+          if (found) { this.shuffle(p.library); this.log(`${p.name} pone ${found} tierra(s) básica(s) en juego.`); }
+          break;
+        }
+        case 'landToHand': {
+          const idx = p.library.findIndex((c) => c.hasType('Basic') && c.isLand);
+          if (idx !== -1) {
+            const land = p.library.splice(idx, 1)[0];
+            land.zone = 'hand';
+            p.hand.push(land);
+            this.shuffle(p.library);
+            this.log(`${p.name} busca una tierra básica a su mano.`);
+          }
+          break;
+        }
+        case 'pump': {
+          const pt = op.pt; const kws = op.keywords || [];
+          const apply = (c) => {
+            c.tempPT = [c.tempPT[0] + pt[0], c.tempPT[1] + pt[1]];
+            for (const k of kws) c.tempKeywords.add(k);
+          };
+          if (op.scope === 'target') { const t = takeTarget(); if (t instanceof CardInstance) apply(t); }
+          else if (op.scope === 'self' && ctx.source.zone === 'battlefield') apply(ctx.source);
+          else if (op.scope === 'yours') for (const c of p.creatures()) apply(c);
+          break;
+        }
+        case 'gainLife': {
+          const n = this.num(op, ctx);
+          p.life += n;
+          this.log(`${p.name} gana ${n} vidas (${p.life}).`);
+          break;
+        }
+        case 'gainLifePerOpp': {
+          const n = op.n * this.opponentsOf(p).length;
+          p.life += n;
+          this.log(`${p.name} gana ${n} vidas (${p.life}).`);
+          break;
+        }
+        case 'loseLife': {
+          if (op.who === 'eachOpponent') {
+            for (const q of this.opponentsOf(p)) { q.life -= op.n; this.log(`${q.name} pierde ${op.n} vidas (${q.life}).`); }
+          } else {
+            const t = takeTarget();
+            if (t instanceof Player) { t.life -= op.n; this.log(`${t.name} pierde ${op.n} vidas (${t.life}).`); }
+          }
+          break;
+        }
+        case 'counters': {
+          const n = this.num(op, ctx);
+          if (op.scope === 'target') { const t = takeTarget(); if (t instanceof CardInstance) t.counters += n; }
+          else if (op.scope === 'yours') for (const c of p.creatures()) c.counters += n;
+          else if (ctx.source.zone === 'battlefield') ctx.source.counters += n;
+          break;
+        }
+        case 'scry': {
+          const n = Math.min(op.n, p.library.length);
+          if (!n) break;
+          const cards = p.library.splice(0, n);
+          const { top, bottom } = await p.controller.scryDecision(this, cards);
+          p.library.unshift(...top);
+          p.library.push(...bottom);
+          this.log(`${p.name} adivina ${n}.`);
+          break;
+        }
+        case 'mill': {
+          const doMill = (q) => {
+            const cards = q.library.splice(0, op.n);
+            for (const c of cards) { c.zone = 'graveyard'; q.graveyard.push(c); }
+            this.log(`${q.name} muele ${cards.length} carta(s).`);
+          };
+          if (op.who === 'eachOpponent') for (const q of this.opponentsOf(p)) doMill(q);
+          else { const t = takeTarget(); if (t instanceof Player) doMill(t); }
+          break;
+        }
+        case 'discard': {
+          const doDiscard = async (q) => {
+            const picked = await q.controller.discardTo(this, Math.min(op.n, q.hand.length));
+            for (const c of picked) this.moveToGraveyard(c, 'descarta');
+          };
+          if (op.who === 'eachOpponent') for (const q of this.opponentsOf(p)) await doDiscard(q);
+          else { const t = takeTarget(); if (t instanceof Player) await doDiscard(t); }
+          break;
+        }
+        case 'tap': {
+          const t = takeTarget();
+          if (t instanceof CardInstance) { t.tapped = true; this.log(`${t.name} se gira.`); }
+          break;
+        }
+        case 'untapSelf': ctx.source.tapped = false; break;
+        case 'regrow': {
+          const matches = p.graveyard.filter((c) => c.isCreature).slice(-op.n);
+          for (const c of matches) {
+            p.graveyard.splice(p.graveyard.indexOf(c), 1);
+            c.zone = 'hand'; p.hand.push(c);
+            this.log(`${p.name} devuelve ${c.name} a su mano.`);
+          }
+          break;
+        }
+        case 'reanimateAny': {
+          let best = null;
+          for (const q of this.alivePlayers()) {
+            for (const c of q.graveyard) {
+              if (c.isCreature && (!best || c.cmc > best.cmc)) best = c;
+            }
+          }
+          if (best) {
+            best.owner.graveyard.splice(best.owner.graveyard.indexOf(best), 1);
+            this.putOnBattlefield(best, p);
+            this.log(`${p.name} pone ${best.name} en el campo de batalla desde un cementerio.`);
+          }
+          break;
+        }
+        case 'reanimate': {
+          const best = p.graveyard.filter((c) => c.isCreature).sort((a, b) => b.cmc - a.cmc)[0];
+          if (best) {
+            p.graveyard.splice(p.graveyard.indexOf(best), 1);
+            this.putOnBattlefield(best, p);
+            this.log(`${p.name} regresa ${best.name} al campo de batalla.`);
+          }
+          break;
+        }
+        case 'counterSpell': break; // se maneja en responseWindow
+        default: break;
+      }
+    }
+  }
+
+  // ---- daño, muertes y zonas ---------------------------------------------
+
+  damagePlayer(q, n, source) {
+    if (!q.alive || n <= 0) return;
+    q.life -= n;
+    this.log(`${source?.name ?? 'Efecto'} hace ${n} de daño a ${q.name} (${q.life}).`);
+    if (source?.isCommander) {
+      // solo daño de combate cuenta; se controla en combate
+    }
+    if (source && source.isCreature && source.hasKeyword('lifelink', this)) {
+      source.controller.life += n;
+    }
+    this.checkState();
+  }
+
+  damageCreature(c, n, source) {
+    if (n <= 0 || c.zone !== 'battlefield') return;
+    if (c.hasKeyword('indestructible', this)) {
+      if (source && source.isCreature === false) return;
+    }
+    c.damage += n;
+    if (source && source.isCreature && source.hasKeyword('lifelink', this)) source.controller.life += n;
+    const lethal = source && (source.hasKeyword?.('deathtouch', this));
+    if (c.damage >= c.toughness(this) || (lethal && n > 0)) {
+      if (!c.hasKeyword('indestructible', this)) this.destroy(c, source, true);
+    }
+  }
+
+  destroy(c, source, fromDamage = false) {
+    if (c.zone !== 'battlefield') return;
+    if (c.hasKeyword('indestructible', this) ) return;
+    this.removeFromBattlefield(c, 'muere');
+  }
+
+  exileCard(c) {
+    this.detachAll(c);
+    const p = c.controller;
+    p.battlefield.splice(p.battlefield.indexOf(c), 1);
+    if (c.isCommander) {
+      c.zone = 'command'; c.owner.command.push(c);
+      this.log(`${c.name} vuelve a la zona de mando.`);
+    } else if (!c.isToken) {
+      c.zone = 'exile'; c.owner.exile.push(c);
+      this.log(`${c.name} es exiliado.`);
+    }
+  }
+
+  bounce(c) {
+    if (c.zone !== 'battlefield') return;
+    this.detachAll(c);
+    const p = c.controller;
+    p.battlefield.splice(p.battlefield.indexOf(c), 1);
+    if (c.isToken) { this.log(`La ficha ${c.name} desaparece.`); return; }
+    if (c.isCommander) { c.zone = 'command'; c.owner.command.push(c); this.log(`${c.name} vuelve a la zona de mando.`); return; }
+    c.zone = 'hand'; c.owner.hand.push(c);
+    this.log(`${c.name} vuelve a la mano de ${c.owner.name}.`);
+  }
+
+  detachAll(c) {
+    for (const att of [...c.attachments]) {
+      att.attachedTo = null;
+      c.attachments.splice(c.attachments.indexOf(att), 1);
+    }
+    if (c.attachedTo) {
+      c.attachedTo.attachments.splice(c.attachedTo.attachments.indexOf(c), 1);
+      c.attachedTo = null;
+    }
+  }
+
+  removeFromBattlefield(c, verb) {
+    if (c.zone !== 'battlefield') return;
+    this.detachAll(c);
+    const p = c.controller;
+    p.battlefield.splice(p.battlefield.indexOf(c), 1);
+    if (c.isCommander) {
+      c.zone = 'command'; c.damage = 0; c.owner.command.push(c);
+      this.log(`${c.name} ${verb}: vuelve a la zona de mando.`);
+      return;
+    }
+    if (c.isToken) { this.log(`La ficha ${c.name} ${verb}.`); return; }
+    c.zone = 'graveyard';
+    c.damage = 0; c.counters = 0; c.cleanupEndOfTurn?.();
+    c.owner.graveyard.push(c);
+    this.log(`${c.name} ${verb}.`);
+    if (c.script.dies.length && c.isCreature) {
+      this._pendingDies = this._pendingDies || [];
+      this._pendingDies.push(c);
+    }
+  }
+
+  moveToGraveyard(c, verb) {
+    if (c.zone === 'battlefield') return this.removeFromBattlefield(c, verb ?? 'muere');
+    const holder = c.zone === 'hand' ? c.owner.hand : null;
+    if (holder) holder.splice(holder.indexOf(c), 1);
+    if (c.isCommander) { c.zone = 'command'; c.owner.command.push(c); return; }
+    c.zone = 'graveyard';
+    c.owner.graveyard.push(c);
+    if (verb) this.log(`${c.owner.name} ${verb} ${c.name}.`);
+  }
+
+  putOnBattlefield(card, p) {
+    card.zone = 'battlefield';
+    card.controller = p;
+    card.tapped = false;
+    card.damage = 0;
+    card.summoningSick = card.isCreature;
+    card.enteredTurn = this.turn;
+    p.battlefield.push(card);
+  }
+
+  drawCards(p, n) {
+    for (let i = 0; i < n; i++) {
+      if (!p.library.length) {
+        this.eliminate(p, 'se queda sin cartas para robar');
+        return;
+      }
+      const c = p.library.shift();
+      c.zone = 'hand';
+      p.hand.push(c);
+    }
+    if (n > 0) this.log(`${p.name} roba ${n} carta(s).`);
+  }
+
+  // ---- bonos estáticos (anthems) ----------------------------------------
+
+  staticBonusesFor(card) {
+    if (card.zone !== 'battlefield' || !card.isCreature) return [];
+    const out = [];
+    const p = card.controller;
+    for (const perm of p.battlefield) {
+      for (const st of perm.script?.statics || []) {
+        if (st.other && perm === card) continue;
+        if (st.subtype && !card.hasSubtype(st.subtype) && !(st.subtype === 'token' && card.isToken)) continue;
+        out.push({ pt: st.pt, keywords: st.keywords });
+      }
+    }
+    return out;
+  }
+
+  // ---- combate -----------------------------------------------------------
+
+  async combatPhase(attackerP) {
+    const decls = await attackerP.controller.declareAttackers(this);
+    if (!decls || !decls.length) return;
+
+    const valid = decls.filter((d) => d.attacker.canAttack(this) && d.defender.alive && d.defender !== attackerP);
+    if (!valid.length) return;
+    for (const { attacker, defender } of valid) {
+      attacker.attacking = defender;
+      if (!attacker.hasKeyword('vigilance', this)) attacker.tapped = true;
+    }
+    const byDefender = new Map();
+    for (const d of valid) {
+      if (!byDefender.has(d.defender)) byDefender.set(d.defender, []);
+      byDefender.get(d.defender).push(d.attacker);
+    }
+    for (const [def, atks] of byDefender) {
+      this.log(`${attackerP.name} ataca a ${def.name} con ${atks.map((a) => `${a.name} (${a.power(this)}/${a.toughness(this)})`).join(', ')}.`);
+    }
+
+    // Disparos de ataque.
+    for (const { attacker } of valid) {
+      if (attacker.script.attack.length && attacker.zone === 'battlefield') {
+        await this.resolveTriggered(attacker, attacker.script.attack, 'ataca');
+      }
+    }
+    if (this.over) return;
+
+    // Ventana de instantáneos para cada defensor.
+    for (const def of byDefender.keys()) {
+      if (!def.alive) continue;
+      await this.instantWindow(def);
+      if (this.over) return;
+    }
+
+    // Bloqueos.
+    const blocks = new Map(); // attacker -> [blockers]
+    for (const [def, atks] of byDefender) {
+      if (!def.alive) continue;
+      const alive = atks.filter((a) => a.zone === 'battlefield' && a.attacking === def);
+      if (!alive.length) continue;
+      const decl = (await def.controller.declareBlockers(this, alive)) || [];
+      for (const { blocker, attacker } of decl) {
+        if (!blocker.canBlock(attacker, this) || blocker.controller !== def) continue;
+        blocker.blocking = attacker;
+        if (!blocks.has(attacker)) blocks.set(attacker, []);
+        blocks.get(attacker).push(blocker);
+      }
+    }
+    // Menace: necesita 2+ bloqueadores.
+    for (const [atk, blkrs] of [...blocks]) {
+      if (atk.hasKeyword('menace', this) && blkrs.length < 2) {
+        for (const b of blkrs) b.blocking = null;
+        blocks.delete(atk);
+      }
+    }
+    for (const [atk, blkrs] of blocks) {
+      this.log(`${blkrs.map((b) => `${b.name} (${b.power(this)}/${b.toughness(this)})`).join(' y ')} bloquea(n) a ${atk.name}.`);
+    }
+
+    // Daño (con primer golpe).
+    const strikers = (phase) => valid
+      .map((d) => d.attacker)
+      .filter((a) => a.zone === 'battlefield' && a.attacking)
+      .filter((a) => {
+        const fs = a.hasKeyword('first strike', this); const ds = a.hasKeyword('double strike', this);
+        return phase === 'first' ? (fs || ds) : (!fs || ds);
+      });
+
+    const dealCombat = (phase) => {
+      for (const atk of strikers(phase)) {
+        const blkrs = (blocks.get(atk) || []).filter((b) => b.zone === 'battlefield');
+        this.combatDamageFromAttacker(atk, blkrs);
+      }
+      // Bloqueadores devuelven daño.
+      for (const [atk, blkrs] of blocks) {
+        for (const b of blkrs.filter((x) => x.zone === 'battlefield')) {
+          const fs = b.hasKeyword('first strike', this); const ds = b.hasKeyword('double strike', this);
+          const inPhase = phase === 'first' ? (fs || ds) : (!fs || ds);
+          if (!inPhase || atk.zone !== 'battlefield') continue;
+          this.damageCreature(atk, b.power(this), b);
+        }
+      }
+      this.processDies();
+    };
+
+    dealCombat('first');
+    if (!this.over) dealCombat('normal');
+    this.checkState();
+    for (const q of this.players) for (const c of q.battlefield) { c.attacking = null; c.blocking = null; }
+  }
+
+  combatDamageFromAttacker(atk, blkrs) {
+    const def = atk.attacking;
+    if (!def || !def.alive) return;
+    let power = atk.power(this);
+    if (!blkrs.length) {
+      def.life -= power;
+      this.log(`${atk.name} golpea a ${def.name} por ${power} (${def.life}).`);
+      if (atk.hasKeyword('lifelink', this)) atk.controller.life += power;
+      if (atk.isCommander) {
+        const dmg = (def.commanderDamage.get(atk.id) || 0) + power;
+        def.commanderDamage.set(atk.id, dmg);
+        if (dmg >= 21) this.eliminate(def, `recibe 21+ de daño de comandante de ${atk.name}`);
+      }
+      if (power > 0) this.fireCombatHit(atk);
+      this.checkState();
+      return;
+    }
+    const deathtouch = atk.hasKeyword('deathtouch', this);
+    const trample = atk.hasKeyword('trample', this);
+    for (const b of blkrs) {
+      if (power <= 0) break;
+      const need = deathtouch ? 1 : Math.max(1, b.toughness(this) - b.damage);
+      const assign = Math.min(power, need);
+      power -= assign;
+      this.damageCreature(b, assign, atk);
+    }
+    if (trample && power > 0) {
+      def.life -= power;
+      this.log(`${atk.name} arrolla a ${def.name} por ${power} (${def.life}).`);
+      if (atk.hasKeyword('lifelink', this)) atk.controller.life += power;
+      if (atk.isCommander) {
+        const dmg = (def.commanderDamage.get(atk.id) || 0) + power;
+        def.commanderDamage.set(atk.id, dmg);
+        if (dmg >= 21) this.eliminate(def, `recibe 21+ de daño de comandante de ${atk.name}`);
+      }
+      this.fireCombatHit(atk);
+    }
+    this.checkState();
+  }
+
+  // Disparos "hace daño de combate a un jugador".
+  fireCombatHit(atk) {
+    const p = atk.controller;
+    for (const perm of [...p.battlefield]) {
+      for (const tr of perm.script?.combatHit || []) {
+        if (tr.scope === 'self' && perm !== atk) continue;
+        if (tr.subtype && !atk.hasSubtype(tr.subtype)) continue;
+        const source = tr.scope === 'self' ? perm : atk;
+        this.resolveOpsSync(tr.ops, { source, controller: p, targets: [], xValue: 0 });
+      }
+    }
+  }
+
+  async instantWindow(p) {
+    let guard = 0;
+    while (guard++ < 10) {
+      const action = await p.controller.combatInstant(this);
+      if (!action) return;
+      try {
+        await this.castSpell(p, action.card, action);
+      } catch (err) {
+        this.log(`(!) ${p.name}: ${err.message}`);
+        return;
+      }
+      if (this.over) return;
+    }
+  }
+
+  processDies() {
+    const pending = this._pendingDies || [];
+    this._pendingDies = [];
+    for (const c of pending) {
+      // Disparo de muerte (sin objetivos: solo efectos automáticos).
+      this.resolveOpsSync(c.script.dies, { source: c, controller: c.controller, targets: [], xValue: 0 });
+    }
+  }
+
+  // Versión síncrona para disparos de muerte simples (sin objetivos ni scry).
+  resolveOpsSync(ops, ctx) {
+    const safe = ops.filter((op) => !op.targeted && !op.target?.targeted && op.op !== 'scry' && op.op !== 'discard');
+    if (safe.length) this.resolveOps(safe, ctx);
+  }
+
+  // ---- estado ------------------------------------------------------------
+
+  checkState() {
+    if (this.over) return;
+    // Criaturas con resistencia <= 0.
+    for (const q of this.players) {
+      for (const c of [...q.battlefield]) {
+        if (c.isCreature && c.toughness(this) <= 0) this.removeFromBattlefield(c, 'muere');
+        else if (c.isCreature && c.damage >= c.toughness(this) && c.damage > 0 && !c.hasKeyword('indestructible', this)) {
+          this.removeFromBattlefield(c, 'muere');
+        }
+        // Auras/equipos huérfanos.
+        if ((c.isAura || c.isEquipment) && c.attachedTo && c.attachedTo.zone !== 'battlefield') {
+          this.detachAll(c);
+          if (c.isAura) this.removeFromBattlefield(c, 'va al cementerio');
+        }
+      }
+    }
+    this.processDies();
+    // Jugadores muertos.
+    for (const q of this.players) {
+      if (q.alive && q.life <= 0) this.eliminate(q, 'se queda sin vidas');
+    }
+  }
+
+  eliminate(q, reason) {
+    if (!q.alive || this.over) return;
+    q.lost = true;
+    q.lossReason = reason;
+    this.log(`☠ ${q.name} ${reason}. ¡Eliminado!`);
+    for (const c of [...q.battlefield]) {
+      this.detachAll(c);
+      q.battlefield.splice(q.battlefield.indexOf(c), 1);
+    }
+    const alive = this.alivePlayers();
+    if (alive.length === 1) {
+      this.winner = alive[0];
+      this.over = true;
+      this.log(`🏆 ¡${this.winner.name} gana la partida!`);
+    } else if (alive.length === 0) {
+      this.over = true;
+      this.log('La partida termina sin ganador.');
+    }
+  }
+}
