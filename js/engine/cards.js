@@ -137,7 +137,8 @@ export class CardInstance {
   canAttack(game) {
     return this.isCreature && !this.tapped &&
       (!this.summoningSick || this.hasKeyword('haste', game)) &&
-      !this.hasKeyword('defender', game);
+      !this.hasKeyword('defender', game) &&
+      !this.hasKeyword('cantattack', game);
   }
 
   canBlock(attacker, game) {

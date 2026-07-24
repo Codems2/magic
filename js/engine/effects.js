@@ -12,6 +12,7 @@ const KNOWN_KEYWORDS = [
   'fear', 'intimidate', 'shadow', 'horsemanship', 'prowess', 'evolve', 'undying',
   'persist', 'infect', 'myriad', 'melee', 'skulk', 'shroud', 'extort',
   'islandwalk', 'swampwalk', 'mountainwalk', 'forestwalk', 'plainswalk',
+  'living weapon', 'for mirrodin!',
 ];
 
 // ---- especificaciones de objetivo ----------------------------------------
@@ -106,6 +107,8 @@ function parseSentence(s) {
     return [{ op: 'gyToBattlefield', tapped: !!m[1] }];
   if (/^return (?:~|it) to its owner's hand$/.test(s)) return [{ op: 'selfToHand' }];
   if (/^sacrifice (?:it|them|that token) at the beginning of the next end step$/.test(s)) return [{ op: 'sacAtEnd' }];
+  if ((m = s.match(/^exile the top (\w+) cards? of your library$/)))
+    return [{ op: 'exileTop', n: m[1] === 'card' ? 1 : parseNum(m[1]) }];
   if (/^goad target creature$/.test(s)) return [{ op: 'goad', target: { kind: 'creature', controller: 'opponent' }, targeted: true }];
   if ((m = s.match(/^put a land card from your hand onto the battlefield( tapped)?/)))
     return [{ op: 'landFromHand', tapped: !!m[1] }];
@@ -243,6 +246,14 @@ export function parseEffectOps(text, unknown) {
   }
   if ((m = text.match(/you may discard a card\.?\s*if you do, ([^.]+\.)/))) {
     ops.push({ op: 'lootDiscard', ops: parseEffectOps(m[1], unknown) });
+    text = text.replace(m[0], '');
+  }
+  if ((m = text.match(/you may sacrifice (?:a|an|another) ([a-z ]+?)\.?\s*if you do, ([^.]+\.)/))) {
+    ops.push({ op: 'optSac', what: m[1].trim(), ops: parseEffectOps(m[2], unknown) });
+    text = text.replace(m[0], '');
+  }
+  if ((m = text.match(/count the number of ([a-z' ]+?) you control\.?\s*draw that many cards\./))) {
+    ops.push({ op: 'drawPer', what: m[1].trim().replace(/s$/, '') });
     text = text.replace(m[0], '');
   }
   if ((m = text.match(/flip a coin\.?\s*if you win the flip, ([^.]+\.)(?:\s*if you lose the flip, ([^.]+\.))?/))) {
@@ -445,6 +456,17 @@ export function buildScript(card) {
       if (kws.length) { script.grantsKeywords.push(...kws); continue; }
       script.unknown.push(l); continue;
     }
+    if ((m = l.match(/^enchanted creature can't attack( or block)?/))) {
+      script.grantsKeywords.push('cantattack');
+      if (m[1]) script.grantsKeywords.push('cantblock');
+      if (!script.attachPT) script.attachPT = [0, 0];
+      continue;
+    }
+    if (/^enchanted creature can't block/.test(l)) {
+      script.grantsKeywords.push('cantblock');
+      if (!script.attachPT) script.attachPT = [0, 0];
+      continue;
+    }
 
     // Anthems y estáticas de grupo.
     if ((m = l.match(/^(other )?([a-z' ]*?)(?:creatures?|permanents?) you control(?: of the chosen type)? (?:get|have) ([+-]\d+\/[+-]\d+)?(?: and (?:have|gain) )?(.*?)(?:\.|$)/))) {
@@ -530,6 +552,9 @@ export function opsValue(ops) {
       case 'extraLandTurn': v += 1.5; break;
       case 'topFilter': v += 1; break;
       case 'selfToHand': v += 0.5; break;
+      case 'optSac': v += opsValue(op.ops) * 0.4; break;
+      case 'exileTop': v += 0.2; break;
+      case 'goad': v += 1.5; break;
       case 'impulse': v += 1.4; break;
       case 'monarch': v += 2.5; break;
       case 'discardHandEach': v += 2; break;

@@ -179,8 +179,13 @@ export class BotController {
         });
         if (!ok) continue;
       }
-      // Auras solo con criatura propia que mejorar.
-      if (card.isAura && !p.creatures().length) continue;
+      // Auras: las de mejora piden criatura propia; las de control, enemiga.
+      if (card.isAura) {
+        const debuff = (card.script.attachPT && card.script.attachPT[0] + card.script.attachPT[1] < 0) ||
+          card.script.grantsKeywords.some((k) => k.startsWith('cant'));
+        if (debuff && !game.opponentsOf(p).some((q) => q.creatures().length)) continue;
+        if (!debuff && !p.creatures().length) continue;
+      }
       out.push(card);
     }
     return out;
@@ -228,6 +233,18 @@ export class BotController {
       const tv = target instanceof Player ? 2 : this.cardValue(target, game);
       if (tv < 3.5) return 0;
       score = tv + 2;
+    }
+
+    // Auras de control: valen lo que la amenaza que neutralizan.
+    if (card.isAura) {
+      const debuff = (s.attachPT && s.attachPT[0] + s.attachPT[1] < 0) ||
+        s.grantsKeywords.some((k) => k.startsWith('cant'));
+      if (debuff) {
+        const enemies = game.opponentsOf(p).flatMap((q) => q.creatures());
+        const best = enemies.sort((a, b) => this.cardValue(b, game) - this.cardValue(a, game))[0];
+        if (!best || this.cardValue(best, game) < 3.5) return 0;
+        return this.cardValue(best, game) + 1;
+      }
     }
 
     // Barreduras: solo si vamos por detrás en mesa.

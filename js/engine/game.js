@@ -425,14 +425,18 @@ export class Game {
 
   async resolveSpell(p, card, targets, xValue) {
     if (card.isPermanentType) {
-      // Auras: se anexan a su objetivo.
+      // Auras: se anexan a su objetivo (las de control apuntan al rival).
       if (card.isAura) {
         let host = targets?.[0];
         if (!host || !(host instanceof CardInstance)) {
-          const own = p.creatures();
-          host = own.sort((a, b) => b.power(this) - a.power(this))[0];
+          const debuff = (card.script.attachPT && card.script.attachPT[0] + card.script.attachPT[1] < 0) ||
+            card.script.grantsKeywords.some((k) => k.startsWith('cant'));
+          const candidates = this.legalTargets({ kind: 'creature' }, p);
+          if (candidates.length) {
+            host = await p.controller.chooseTarget(this, card, { op: debuff ? 'destroy' : 'pump' }, candidates);
+          }
         }
-        if (!host) { this.moveToGraveyard(card, 'sin objetivo'); return; }
+        if (!host || !(host instanceof CardInstance)) { this.moveToGraveyard(card, 'sin objetivo'); return; }
         this.putOnBattlefield(card, p);
         card.attachedTo = host;
         host.attachments.push(card);
@@ -440,6 +444,18 @@ export class Game {
       } else {
         this.putOnBattlefield(card, p);
         if (card.script.entersTapped) card.tapped = true;
+        // Arma viviente / ¡Por Mirrodin!: el equipo entra con su portador.
+        const kws = card.data.keywords || [];
+        if (card.isEquipment && (kws.includes('Living weapon') || kws.includes('For Mirrodin!'))) {
+          const germ = kws.includes('Living weapon')
+            ? makeToken({ name: 'Phyrexian Germ', pt: [0, 0], colors: ['B'] }, p, this.turn)
+            : makeToken({ name: 'Rebel', pt: [2, 2], colors: ['R'] }, p, this.turn);
+          germ.script = buildScript(germ.data);
+          this.putOnBattlefield(germ, p);
+          card.attachedTo = germ;
+          germ.attachments.push(card);
+          this.log(`${card.name} entra anexada a una ficha de ${germ.name}.`);
+        }
       }
       // Escuadrón: paga el coste extra N veces para crear N copias.
       if (card.script.squad && card.isCreature) {
@@ -734,6 +750,36 @@ export class Game {
             this.putOnBattlefield(tok, p);
             ctx._lastCreated.push(tok);
           }
+          break;
+        }
+        case 'optSac': {
+          const match = (c) =>
+            (op.what.includes('creature') && c.isCreature) ||
+            (op.what.includes('artifact') && c.isArtifact) ||
+            (op.what.includes('land') && c.isLand) ||
+            (op.what.includes('permanent'));
+          const candidates = p.battlefield.filter((c) => c !== ctx.source && match(c));
+          if (!candidates.length) break;
+          let pick = null;
+          if (p.isBot) {
+            const sorted = candidates.slice().sort((a, b) => a.cmc - b.cmc);
+            pick = sorted[0];
+            if (pick.isCreature && pick.power(this) >= 3) pick = null; // no sacrificar cuerpos buenos
+          } else {
+            const chosen = await p.controller.chooseCards(this, candidates, 1,
+              `¿Sacrificas un(a) ${op.what} para ${ctx.source.name}? (puedes confirmar sin elegir)`);
+            pick = chosen[0] ?? null;
+          }
+          if (pick) {
+            this.removeFromBattlefield(pick, 'sacrificado');
+            await this.resolveOps(op.ops, ctx);
+          }
+          break;
+        }
+        case 'exileTop': {
+          const cards = p.library.splice(0, Math.min(op.n, p.library.length));
+          for (const c of cards) { c.zone = 'exile'; c.owner.exile.push(c); }
+          if (cards.length) this.log(`${p.name} exilia ${cards.length} carta(s) de su biblioteca.`);
           break;
         }
         case 'sacAtEnd': {
