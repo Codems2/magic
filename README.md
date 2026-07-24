@@ -39,11 +39,12 @@ se muestra el texto de la carta.
 
 **Cartas en español**: `data/es.json` guarda, para cada carta del catálogo,
 su impresión española más reciente en Scryfall (nombre, tipo, texto e
-imagen impresos). El simulador la usa automáticamente para mostrar cartas,
-registro y vista previa; las cartas que nunca se imprimieron en español se
-muestran en inglés. Internamente el motor sigue interpretando el texto de
-oráculo en inglés (Scryfall solo lo mantiene en ese idioma), así que la
-localización no cambia las reglas.
+imagen impresos) — cubre el 93% del catálogo (5.813 de 6.257 cartas). El
+simulador la usa automáticamente para mostrar cartas, registro y vista
+previa; las cartas que nunca se imprimieron en español (p. ej. Universes
+Beyond recientes) se muestran en inglés. Internamente el motor sigue
+interpretando el texto de oráculo en inglés (Scryfall solo lo mantiene en
+ese idioma), así que la localización no cambia las reglas.
 
 Para reimportar el catálogo completo y regenerar la localización:
 
