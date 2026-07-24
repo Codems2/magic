@@ -49,6 +49,7 @@ export class Game {
     this.activeIdx = 0;
     this.winner = null;
     this.over = false;
+    this.monarch = null;
     this.logLines = [];
 
     this.players = configs.map((cfg) => {
@@ -178,6 +179,11 @@ export class Game {
     for (const c of [...p.battlefield]) {
       if (c.script.endStep.length) await this.resolveTriggered(c, c.script.endStep, 'paso final');
     }
+    if (this.monarch === p && p.alive) {
+      this.log(`👑 ${p.name} roba por ser el monarca.`);
+      this.drawCards(p, 1);
+      if (this.over) return;
+    }
     if (p.hand.length > 7) {
       const toDiscard = await p.controller.discardTo(this, p.hand.length - 7);
       for (const c of toDiscard) this.moveToGraveyard(c, 'descarta');
@@ -225,8 +231,29 @@ export class Game {
       case 'cast': return this.castSpell(p, action.card, action);
       case 'activate': return this.activateAbility(p, action.permanent, action.ability, action);
       case 'equip': return this.equip(p, action.equipment, action.creature);
+      case 'crew': return this.crewVehicle(p, action.vehicle);
       default: throw new Error(`acción desconocida ${action.type}`);
     }
+  }
+
+  crewVehicle(p, vehicle) {
+    const need = vehicle.script?.crew;
+    if (!need || vehicle.crewed || vehicle.zone !== 'battlefield') throw new Error('no se puede tripular');
+    // Gira criaturas propias (las de menos fuerza primero) hasta sumar la tripulación.
+    const crew = [];
+    let sum = 0;
+    const pool = p.creatures().filter((c) => !c.tapped && c !== vehicle && !c.crewed)
+      .sort((a, b) => a.power(this) - b.power(this));
+    // Primero intenta con una sola criatura justa, si no, acumula desde abajo.
+    const single = pool.find((c) => c.power(this) >= need);
+    if (single) { crew.push(single); sum = single.power(this); }
+    else {
+      for (const c of pool) { crew.push(c); sum += c.power(this); if (sum >= need) break; }
+    }
+    if (sum < need) throw new Error('sin tripulación suficiente');
+    for (const c of crew) c.tapped = true;
+    vehicle.crewed = true;
+    this.log(`${p.name} tripula ${vehicle.name} con ${crew.map((c) => c.name).join(', ')}.`);
   }
 
   playLand(p, card) {
@@ -318,6 +345,11 @@ export class Game {
       } else {
         this.putOnBattlefield(card, p);
         if (card.script.entersTapped) card.tapped = true;
+      }
+      if (card.script.entersCounters) {
+        const n = card.script.entersCounters === 'x' ? xValue : card.script.entersCounters;
+        card.counters += n;
+        if (n) this.log(`${card.name} entra con ${n} contador(es) +1/+1.`);
       }
       if (card.script.etb.length) await this.resolveTriggered(card, card.script.etb, 'entra al campo', xValue);
       if (card.script.unknown.length && !card.isLand) {
@@ -450,7 +482,38 @@ export class Game {
         case 'draw': {
           const n = this.num(op, ctx);
           if (op.who === 'each') for (const q of this.alivePlayers()) this.drawCards(q, 1);
+          else if (op.who === 'target') { const t = takeTarget(); if (t instanceof Player) this.drawCards(t, n); }
           else this.drawCards(p, n);
+          break;
+        }
+        case 'dig': {
+          const cards = p.library.splice(0, Math.min(op.look, p.library.length));
+          if (!cards.length) break;
+          const chosen = await p.controller.chooseCards(this, cards, Math.min(op.take, cards.length),
+            `Elige ${op.take} carta(s) para tu mano`);
+          for (const c of chosen) { c.zone = 'hand'; p.hand.push(c); }
+          const rest = cards.filter((c) => !chosen.includes(c));
+          this.shuffle(rest);
+          p.library.push(...rest);
+          this.log(`${p.name} mira ${cards.length} carta(s) y se queda ${chosen.length}.`);
+          break;
+        }
+        case 'impulse': {
+          // Exilio "puedes jugarla": simplificado como robo.
+          this.drawCards(p, this.num(op, ctx));
+          break;
+        }
+        case 'monarch': {
+          this.monarch = p;
+          this.log(`👑 ${p.name} se convierte en el monarca.`);
+          break;
+        }
+        case 'discardHandEach': {
+          for (const q of this.alivePlayers()) {
+            const n = q.hand.length;
+            for (const c of [...q.hand]) this.moveToGraveyard(c, null);
+            if (n) this.log(`${q.name} descarta su mano (${n}).`);
+          }
           break;
         }
         case 'damage': {
@@ -566,7 +629,10 @@ export class Game {
           break;
         }
         case 'loseLife': {
-          if (op.who === 'eachOpponent') {
+          if (op.who === 'you') {
+            p.life -= op.n;
+            this.log(`${p.name} pierde ${op.n} vidas (${p.life}).`);
+          } else if (op.who === 'eachOpponent') {
             for (const q of this.opponentsOf(p)) { q.life -= op.n; this.log(`${q.name} pierde ${op.n} vidas (${q.life}).`); }
           } else {
             const t = takeTarget();
@@ -606,7 +672,8 @@ export class Game {
             const picked = await q.controller.discardTo(this, Math.min(op.n, q.hand.length));
             for (const c of picked) this.moveToGraveyard(c, 'descarta');
           };
-          if (op.who === 'eachOpponent') for (const q of this.opponentsOf(p)) await doDiscard(q);
+          if (op.who === 'you') await doDiscard(p);
+          else if (op.who === 'eachOpponent') for (const q of this.opponentsOf(p)) await doDiscard(q);
           else { const t = takeTarget(); if (t instanceof Player) await doDiscard(t); }
           break;
         }
@@ -852,7 +919,7 @@ export class Game {
     card.controller = p;
     card.tapped = false;
     card.damage = 0;
-    card.summoningSick = card.isCreature;
+    card.summoningSick = card.isCreature || card.isVehicle;
     card.enteredTurn = this.turn;
     p.battlefield.push(card);
   }
@@ -1021,6 +1088,11 @@ export class Game {
 
   // Disparos "hace daño de combate a un jugador".
   fireCombatHit(atk) {
+    const def = atk.attacking;
+    if (def && this.monarch === def) {
+      this.monarch = atk.controller;
+      this.log(`👑 ${atk.controller.name} le roba la corona a ${def.name}.`);
+    }
     const p = atk.controller;
     for (const perm of [...p.battlefield]) {
       for (const tr of perm.script?.combatHit || []) {
@@ -1058,7 +1130,7 @@ export class Game {
 
   // Versión síncrona para disparos de muerte simples (sin decisiones interactivas).
   resolveOpsSync(ops, ctx) {
-    const interactive = new Set(['scry', 'discard', 'support', 'distribute']);
+    const interactive = new Set(['scry', 'discard', 'support', 'distribute', 'dig']);
     const safe = ops.filter((op) => !op.targeted && !op.target?.targeted && !interactive.has(op.op));
     if (safe.length) this.resolveOps(safe, ctx);
   }
@@ -1092,6 +1164,7 @@ export class Game {
     if (!q.alive || this.over) return;
     q.lost = true;
     q.lossReason = reason;
+    if (this.monarch === q) this.monarch = null;
     this.log(`☠ ${q.name} ${reason}. ¡Eliminado!`);
     for (const c of [...q.battlefield]) {
       this.detachAll(c);

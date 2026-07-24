@@ -48,6 +48,10 @@ export class HumanController {
     return out;
   }
 
+  async chooseCards(game, cards, n, label) {
+    return this.ui.chooseCardsDialog(label ?? `Elige ${n} carta(s)`, cards, n);
+  }
+
   async scryDecision(game, cards) {
     const top = []; const bottom = [];
     for (const c of cards) {
@@ -78,10 +82,13 @@ export class HumanController {
     for (const c of p.command) {
       if (canPay(game.commanderCost(c), p, game, 0)) out.push(c);
     }
-    // Equipos y habilidades activadas.
+    // Equipos, vehículos y habilidades activadas.
     for (const perm of p.battlefield) {
       if (perm.isEquipment && perm.script.equipCost && p.creatures().length &&
           solvePayment(perm.script.equipCost, manaSources(p, game))) out.push(perm);
+      else if (perm.script?.crew && !perm.crewed && !perm.summoningSick &&
+          p.creatures().filter((c) => !c.tapped && c !== perm)
+            .reduce((s, c) => s + c.power(game), 0) >= perm.script.crew) out.push(perm);
       else if ((perm.script?.activated ?? []).some((ab) =>
         solvePayment(ab.mana, manaSources(p, game)) &&
         !(ab.tap && (perm.tapped || (perm.isCreature && perm.summoningSick))))) out.push(perm);
@@ -107,6 +114,7 @@ export class HumanController {
           if (!target) continue;
           return { type: 'equip', equipment: card, creature: target };
         }
+        if (card.script?.crew && !card.crewed) return { type: 'crew', vehicle: card };
         const ab = (card.script?.activated ?? []).find((a) =>
           solvePayment(a.mana, manaSources(p, game)) &&
           !(a.tap && (card.tapped || (card.isCreature && card.summoningSick))));

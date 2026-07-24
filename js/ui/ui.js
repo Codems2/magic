@@ -42,6 +42,37 @@ export class UI {
     st.resolve(result);
   }
 
+  // Diálogo de selección de N cartas (mirar la parte superior de la biblioteca, etc.).
+  chooseCardsDialog(title, cards, n) {
+    return new Promise((resolve) => {
+      const ov = $('overlay');
+      ov.classList.remove('hidden');
+      const dlg = document.createElement('div');
+      dlg.className = 'dialog';
+      dlg.innerHTML = `<h2>${title}</h2><p>Haz clic para seleccionar (máx. ${n}).</p>`;
+      const wrap = document.createElement('div');
+      wrap.className = 'cards';
+      const chosen = new Set();
+      for (const c of cards) {
+        const el = this.cardEl(c, 'board-card');
+        el.classList.add('selectable');
+        el.onclick = () => {
+          if (chosen.has(c)) { chosen.delete(c); el.classList.remove('selected'); }
+          else if (chosen.size < n) { chosen.add(c); el.classList.add('selected'); }
+        };
+        wrap.appendChild(el);
+      }
+      dlg.appendChild(wrap);
+      const ok = document.createElement('button');
+      ok.className = 'primary';
+      ok.textContent = 'Confirmar';
+      ok.onclick = () => { ov.classList.add('hidden'); ov.innerHTML = ''; resolve([...chosen]); };
+      dlg.appendChild(ok);
+      ov.innerHTML = '';
+      ov.appendChild(dlg);
+    });
+  }
+
   // Diálogo modal (mulligan, scry, fin de partida).
   dialog({ title, body = '', cards = [], buttons, perCardButtons = null }) {
     return new Promise((resolve) => {
@@ -136,7 +167,7 @@ export class UI {
       const cmdDmg = [...p.commanderDamage.values()].reduce((a, b) => Math.max(a, b), 0);
       div.innerHTML = `
         <div class="phead">
-          <span class="pname">${p.name}</span>
+          <span class="pname">${g.monarch === p ? '👑 ' : ''}${p.name}</span>
           <span class="plife">❤ ${p.life}</span>
           <span class="pmeta">✋ ${p.hand.length} · 📚 ${p.library.length}${cmdDmg ? ` · ⚔cmd ${cmdDmg}` : ''}</span>
         </div>`;
@@ -190,7 +221,7 @@ export class UI {
     const g = this.game;
     const cmdDmg = [...me.commanderDamage.values()].reduce((a, b) => Math.max(a, b), 0);
     $('playerBar').innerHTML = `
-      <span class="pname">${me.name}</span>
+      <span class="pname">${g.monarch === me ? '👑 ' : ''}${me.name}</span>
       <span class="plife">❤ ${me.life}</span>
       <span class="pmeta">📚 Biblioteca: ${me.library.length} · 🪦 Cementerio: ${me.graveyard.length}${cmdDmg ? ` · ⚔ Daño de comandante: ${cmdDmg}` : ''}${me.lost ? ' · ☠ ELIMINADO (espectador)' : ''}</span>`;
   }
@@ -219,6 +250,10 @@ export class UI {
       div.innerHTML = fallback;
     }
     if (badge) div.innerHTML += `<span class="badge">${badge}</span>`;
+    // Aviso: parte del texto de esta carta no está simulado.
+    if (card.script?.unknown?.length && sizeClass !== 'mini') {
+      div.innerHTML += `<span class="badge warnb" title="Parte del texto de esta carta no está simulado">⚠</span>`;
+    }
     if (card.isCreature && card.zone === 'battlefield') {
       const p = card.power(g); const t = card.toughness(g);
       const [bp, bt] = card.basePT();

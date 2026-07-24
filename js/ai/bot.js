@@ -124,6 +124,12 @@ export class BotController {
     const eq = this.bestEquip(game);
     if (eq) return eq;
 
+    // 3b. Tripular vehículos que compensen antes de combate.
+    if (game.phase === 'main1') {
+      const crew = this.bestCrew(game);
+      if (crew) return crew;
+    }
+
     // 4. Habilidades activadas útiles.
     const act = this.bestActivation(game);
     if (act) return act;
@@ -270,6 +276,28 @@ export class BotController {
     return null;
   }
 
+  bestCrew(game) {
+    const p = this.player;
+    for (const v of p.battlefield) {
+      if (!v.script?.crew || v.crewed || v.summoningSick) continue;
+      if (this._activatedThisTurn.has(v.id)) continue;
+      const pool = p.creatures().filter((c) => !c.tapped && c !== v)
+        .sort((a, b) => a.power(game) - b.power(game));
+      let sum = 0; const crew = [];
+      const single = pool.find((c) => c.power(game) >= v.script.crew);
+      if (single) { crew.push(single); sum = single.power(game); }
+      else for (const c of pool) { crew.push(c); sum += c.power(game); if (sum >= v.script.crew) break; }
+      if (sum < v.script.crew) continue;
+      // Solo si el vehículo pega más que lo que giramos para tripularlo.
+      const crewPower = crew.reduce((n, c) => n + c.power(game), 0);
+      const vp = parseInt(v.data.power, 10) || 0;
+      if (vp <= crewPower) continue;
+      this._activatedThisTurn.add(v.id);
+      return { type: 'crew', vehicle: v };
+    }
+    return null;
+  }
+
   bestActivation(game) {
     const p = this.player;
     for (const perm of p.battlefield) {
@@ -319,6 +347,15 @@ export class BotController {
   }
 
   async chooseX(game, card, maxX) { return Math.min(maxX, 10); }
+
+  async chooseCards(game, cards, n) {
+    const needLand = this.player.lands().length < 4;
+    return cards.slice().sort((a, b) => {
+      const av = this.cardValue(a, game) + (needLand && a.isLand ? 3 : 0);
+      const bv = this.cardValue(b, game) + (needLand && b.isLand ? 3 : 0);
+      return bv - av;
+    }).slice(0, n);
+  }
 
   // ---- respuestas --------------------------------------------------------
 

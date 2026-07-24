@@ -132,6 +132,9 @@ button.primary:disabled { opacity: .4; cursor: default; }
   position: absolute; top: 2px; left: 2px; background: rgba(216,166,60,.92);
   color: #201804; font-size: .6rem; font-weight: 800; border-radius: 3px; padding: 0 3px;
 }
+.card .badge.warnb {
+  top: auto; bottom: 2px; left: 2px; background: rgba(208,120,40,.92); color: #fff;
+}
 .stack-count {
   position: absolute; top: 2px; right: 2px; background: rgba(20,25,38,.9);
   font-size: .7rem; border-radius: 3px; padding: 0 4px; font-weight: 700;

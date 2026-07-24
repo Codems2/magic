@@ -61,6 +61,7 @@ export class CardInstance {
     this.attacking = null;      // Player al que ataca
     this.blocking = null;       // CardInstance a la que bloquea
     this.enteredTurn = 0;
+    this.crewed = false;        // vehículos: es criatura hasta el final del turno
   }
 
   // Nombre para mostrar (español si está localizado). El motor y el intérprete
@@ -72,7 +73,8 @@ export class CardInstance {
 
   hasType(t) { return this.typeLine.toLowerCase().includes(t.toLowerCase()); }
   get isLand() { return this.hasType('Land'); }
-  get isCreature() { return this.hasType('Creature'); }
+  get isCreature() { return this.hasType('Creature') || this.crewed; }
+  get isVehicle() { return this.hasSubtype('Vehicle'); }
   get isArtifact() { return this.hasType('Artifact'); }
   get isEnchantment() { return this.hasType('Enchantment'); }
   get isPlaneswalker() { return this.hasType('Planeswalker'); }
@@ -140,6 +142,7 @@ export class CardInstance {
 
   canBlock(attacker, game) {
     if (!this.isCreature || this.tapped) return false;
+    if (this.hasKeyword('cantblock', game)) return false;
     const aKws = attacker.keywords(game);
     if (aKws.has('unblockable')) return false;
     const bKws = this.keywords(game);
@@ -157,6 +160,7 @@ export class CardInstance {
     this.damage = 0;
     this.attacking = null;
     this.blocking = null;
+    this.crewed = false;
   }
 }
 

@@ -50,8 +50,20 @@ function parseSentence(s) {
   s = s.trim().toLowerCase().replace(/\.$/, '').replace(/^you may /, '').replace(/^then /, '');
   if (!s) return [];
   // Ruido sin efecto en el simulador.
-  if (/^shuffle$|^they can't be regenerated$|^it's still a land$|^activate only|^exile ~$|^it gains haste$|^untap up to \w+ lands?$/.test(s)) return [];
+  if (/^shuffle$|^(?:it|they) can't be regenerated$|^it's still a land$|^activate only|^exile ~$|^(?:it|they) gains? haste(?: until end of turn)?$|^untap up to \w+ lands?$|^regenerate ~$|^you may choose new targets|^put the rest on the bottom of your library|^shuffle your library$|^then shuffle$/.test(s)) return [];
   let m;
+
+  if ((m = s.match(/^(?:you )?mills? (\w+) cards?$/))) return [{ op: 'mill', n: parseNum(m[1]), who: 'you' }];
+  if ((m = s.match(/^each player mills (\w+) cards?/))) return [{ op: 'mill', n: parseNum(m[1]), who: 'each' }];
+  if ((m = s.match(/^(?:you )?discards? (a|an|one|two|three|\w+) cards?(?: at random)?$/)))
+    return [{ op: 'discard', n: parseNum(m[1]), who: 'you' }];
+  if (/^as an additional cost to cast this spell, discard a card/.test(s))
+    return [{ op: 'discard', n: 1, who: 'you' }];
+  if (/^each player discards their hand/.test(s)) return [{ op: 'discardHandEach' }];
+  if (/^you become the monarch/.test(s)) return [{ op: 'monarch' }];
+  if ((m = s.match(/^(?:you )?loses? (\w+) life$/))) return [{ op: 'loseLife', n: parseNum(m[1]), who: 'you' }];
+  if ((m = s.match(/^target player draws (\w+) cards?/)))
+    return [{ op: 'draw', n: parseNum(m[1]), who: 'target', target: { kind: 'player' }, targeted: true }];
 
   if ((m = s.match(/^surveil (\w+)/))) return [{ op: 'scry', n: parseNum(m[1]) }];
   if (/^put target creature card from a graveyard onto the battlefield under your control/.test(s))
@@ -168,6 +180,16 @@ function parseSentence(s) {
 // Parsea un bloque de texto de efecto en ops; las frases no entendidas van a unknown.
 export function parseEffectOps(text, unknown) {
   const ops = [];
+  let m;
+  // Patrones multi-frase (se consumen antes del troceo por frases).
+  if ((m = text.match(/look at the top (\w+) cards? of your library[.,]?\s*(?:you may )?put (?:up to )?(\w+) of (?:them|those cards?) into your hand[^.]*\.(?:\s*put the rest[^.]*\.)?/))) {
+    ops.push({ op: 'dig', look: parseNum(m[1]), take: parseNum(m[2]) });
+    text = text.replace(m[0], '');
+  }
+  if ((m = text.match(/exile the top card of your library\.?\s*(?:until end of turn, )?you may (?:play|cast) (?:that card|it)[^.]*\./))) {
+    ops.push({ op: 'impulse', n: 1 });
+    text = text.replace(m[0], '');
+  }
   const sentences = text.split(/(?<=\.)\s+|, then /i);
   for (const sentence of sentences) {
     const parsed = parseSentence(sentence);
@@ -187,6 +209,8 @@ const IGNORE_LINES = [
   /^choose an opponent/, /^umbra armor/, /^ward/, /^partner/, /^this spell costs/, /^~ costs/,
   /spells? you cast cost/, /^split second/, /^this spell can't be countered/, /^protection from/,
   /^unearth/, /^flashback/, /^kicker/, /^landfall$/, /^storm$/, /^affinity/, /^devoid$/,
+  /^~ can be your commander/, /^doctor's companion$/, /^you may look at the top card of your library/,
+  /^friends forever$/, /^choose a background$/,
 ];
 
 export function buildScript(card) {
@@ -194,12 +218,16 @@ export function buildScript(card) {
     castOps: [], etb: [], dies: [], attack: [], upkeep: [], endStep: [],
     statics: [], activated: [], attachPT: null, grantsKeywords: [],
     equipCost: null, unknown: [], combatHit: [], entersTapped: false, selfKeywords: [],
+    entersCounters: 0, crew: null,
   };
   const name = card.name.split(' // ')[0];
   const shortName = name.split(',')[0];
   const raw = (card.oracleText || '').split('\n//\n')[0]; // solo cara frontal
-  let text = raw.replaceAll(name, '~');
-  if (shortName.length > 2) text = text.replaceAll(shortName, '~');
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let text = raw.replace(new RegExp(`\\b${esc(name)}\\b`, 'g'), '~');
+  if (shortName.length > 2 && shortName !== name) {
+    text = text.replace(new RegExp(`\\b${esc(shortName)}\\b`, 'g'), '~');
+  }
   text = text
     .replace(/\([^)]*\)/g, '') // recordatorios
     .toLowerCase()
@@ -216,6 +244,12 @@ export function buildScript(card) {
     if (IGNORE_LINES.some((re) => re.test(l))) continue;
     if (/^~ enters tapped\.?$/.test(l)) { script.entersTapped = true; continue; }
     if (/^~ can't be blocked\.?$/.test(l)) { script.selfKeywords.push('unblockable'); continue; }
+    if (/^~ can't block\.?$/.test(l)) { script.selfKeywords.push('cantblock'); continue; }
+    let mm;
+    if ((mm = l.match(/^~ enters(?: the battlefield)? with (\w+|x) \+1\/\+1 counters? on it/))) {
+      script.entersCounters = mm[1] === 'x' ? 'x' : parseNum(mm[1]); continue;
+    }
+    if ((mm = l.match(/^crew (\d+)/))) { script.crew = parseInt(mm[1], 10); continue; }
 
     // Modales: usar el primer modo interpretable.
     if (/^choose (one|two|one or both|up to)/.test(l)) { modal = true; continue; }
@@ -347,6 +381,10 @@ export function opsValue(ops) {
       case 'explore': v += 1; break;
       case 'amass': v += op.n * 1.2; break;
       case 'populate': v += 1.5; break;
+      case 'dig': v += op.take * 1.4; break;
+      case 'impulse': v += 1.4; break;
+      case 'monarch': v += 2.5; break;
+      case 'discardHandEach': v += 2; break;
       case 'scry': v += op.n * 0.4; break;
       case 'mill': v += op.n * 0.3; break;
       case 'discard': v += op.n * (op.who === 'eachOpponent' ? 1.5 : 0.8); break;
