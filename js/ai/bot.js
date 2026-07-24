@@ -34,6 +34,10 @@ export class BotController {
       for (const tr of s.allyDies || []) v += opsValue(tr.ops);
       if (s.entersCounters) v += s.entersCounters === 'x' ? 2 : s.entersCounters;
       for (const st of s.statics) v += (st.pt[0] + st.pt[1]) * 1.5 + st.keywords.length;
+      if (s.counterMod) v += 3;
+      if (s.tokenMod) v += 3;
+      for (const tr of s.onCounters || []) v += opsValue(tr.ops) * 1.2;
+      for (const ch of Object.values(s.saga || {})) v += opsValue(ch) * 0.8;
       for (const ab of s.activated) v += opsValue(ab.ops) * 0.7;
       if (s.attachPT) v += (s.attachPT[0] + s.attachPT[1]) * 0.5;
     }
@@ -358,7 +362,9 @@ export class BotController {
 
   async chooseTarget(game, source, op, candidates) {
     const p = this.player;
-    const beneficial = ['pump', 'counters', 'support', 'distribute', 'fightSel'].includes(op.op);
+    const negativeCounters = op.op === 'counters' && typeof op.n === 'number' && op.n < 0;
+    const beneficial = !negativeCounters &&
+      ['pump', 'counters', 'support', 'distribute', 'fightSel', 'bolster'].includes(op.op);
     if (beneficial) {
       const own = candidates.filter((t) => !(t instanceof Player) && t.controller === p);
       if (own.length) return own.sort((a, b) => this.cardValue(b, game) - this.cardValue(a, game))[0];

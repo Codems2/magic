@@ -216,12 +216,21 @@ function parseSentence(s) {
   if ((m = s.match(/^target (player|opponent) loses (\w+) life/)))
     return [{ op: 'loseLife', n: parseNum(m[2]), who: 'target' }];
 
-  if ((m = s.match(/^put (a|an|one|two|three|four|x|\d+) \+1\/\+1 counters? on (~|it|this creature|target creature|each creature you control|each other creature you control)/))) {
-    const n = m[1] === 'x' ? 'x' : parseNum(m[1]);
-    const where = m[2];
-    const scope = /target/.test(where) ? 'target' : /each/.test(where) ? 'yours' : 'self';
-    return [{ op: 'counters', n, scope, targeted: scope === 'target' }];
+  if ((m = s.match(/^put (a|an|one|two|three|four|x|\d+) ([+-]1)\/[+-]1 counters? on (~|it|this creature|target creature|each creature you control|each other creature you control|each creature|target creature an opponent controls)/))) {
+    let n = m[1] === 'x' ? 'x' : parseNum(m[1]);
+    const negative = m[2] === '-1';
+    if (negative && n !== 'x') n = -n;
+    const where = m[3];
+    const scope = /target/.test(where) ? 'target'
+      : where === 'each creature' ? 'eachAll'
+      : /each/.test(where) ? 'yours' : 'self';
+    const op2 = { op: 'counters', n, scope, targeted: scope === 'target' };
+    if (scope === 'target' && negative) op2.target = { kind: 'creature', controller: 'opponent' };
+    return [op2];
   }
+  if ((m = s.match(/^bolster (\w+)/))) return [{ op: 'bolster', n: parseNum(m[1]) }];
+  if (/^double the number of \+1\/\+1 counters on (target|each) creature/.test(s))
+    return [{ op: 'doubleCounters' }];
 
   if ((m = s.match(/^scry (\w+)/))) return [{ op: 'scry', n: parseNum(m[1]) }];
   if ((m = s.match(/^(each opponent|target player|target opponent) mills? (\w+) cards?/)))
@@ -335,6 +344,8 @@ export function buildScript(card) {
     entersCounters: 0, crew: null, allyEtb: [], allyDies: [], eachUpkeep: [], eachEnd: [],
     convoke: false, cascade: false, improvise: false, delve: false, rebound: false,
     beginCombat: [], noMaxHand: false, landfall: [], dynPT: null, vanishing: 0,
+    counterMod: null, tokenMod: null, onCounters: [], entersCountersPer: null,
+    saga: {}, sagaMax: 0,
   };
   const name = card.name.split(' // ')[0];
   const shortName = name.split(',')[0];
@@ -362,8 +373,46 @@ export function buildScript(card) {
     if (/^~ can't be blocked\.?$/.test(l)) { script.selfKeywords.push('unblockable'); continue; }
     if (/^~ can't block\.?$/.test(l)) { script.selfKeywords.push('cantblock'); continue; }
     let mm;
+    if ((mm = l.match(/^~ enters(?: the battlefield)? with (?:a|an|x) \+1\/\+1 counters? on it for each ([a-z' ]+?)(?: you control)?\.?$/))) {
+      script.entersCountersPer = mm[1].trim().replace(/ves$/, 'f').replace(/s$/, ''); continue;
+    }
     if ((mm = l.match(/^~ enters(?: the battlefield)? with (\w+|x) \+1\/\+1 counters? on it/))) {
       script.entersCounters = mm[1] === 'x' ? 'x' : parseNum(mm[1]); continue;
+    }
+    // Duplicadores de contadores y de fichas.
+    if (/^if one or more \+1\/\+1 counters would be put on (?:a|an) [a-z ]*?(?:creature|permanent)[a-z ]*? you control, that many plus one/.test(l)) {
+      script.counterMod = 'plus1'; continue;
+    }
+    if (/^if one or more \+1\/\+1 counters would be put on (?:a|an) [a-z ]*?(?:creature|permanent)[a-z ]*? you control, twice that many/.test(l)) {
+      script.counterMod = 'double'; continue;
+    }
+    if (/^if an effect would put one or more counters on (?:a|an) [a-z ]*?(?:creature|permanent)[a-z ]*? you control, it puts twice that many/.test(l)) {
+      script.counterMod = 'double'; continue;
+    }
+    if (/^if (?:an effect|one or more tokens) would (?:create|be created)[a-z, ]*? under your control, (?:it creates )?twice (?:that many|as many)/.test(l)) {
+      script.tokenMod = 'double'; continue;
+    }
+    // "Siempre que pongas uno o más contadores +1/+1 sobre una criatura...".
+    if ((mm = l.match(/^whenever (?:you put )?one or more (?:\+1\/\+1 )?counters? (?:are|is)? ?(?:put )?on (a creature you don't control|a creature you control|another target creature|a creature|~)(?: [a-z ]*?)?, (.+)/))) {
+      const where = mm[1];
+      const scope = where === '~' ? 'self'
+        : where.includes("don't control") ? 'notYours'
+        : where.includes('you control') ? 'yours' : 'any';
+      script.onCounters.push({ scope, ops: parseEffectOps(mm[2], script.unknown) });
+      continue;
+    }
+    // Sagas: capítulos con numerales romanos.
+    if ((mm = l.match(/^([iv]+(?:, ?[iv]+)*) — (.+)/))) {
+      const ROMAN = { i: 1, ii: 2, iii: 3, iv: 4, v: 5 };
+      const ops = parseEffectOps(mm[2], script.unknown);
+      for (const numeral of mm[1].split(/, ?/)) {
+        const ch = ROMAN[numeral.trim()];
+        if (ch) {
+          script.saga[ch] = [...(script.saga[ch] ?? []), ...ops];
+          script.sagaMax = Math.max(script.sagaMax, ch);
+        }
+      }
+      continue;
     }
     if ((mm = l.match(/^crew (\d+)/))) { script.crew = parseInt(mm[1], 10); continue; }
     if (/^you have no maximum hand size/.test(l)) { script.noMaxHand = true; continue; }
@@ -560,12 +609,14 @@ export function buildScript(card) {
     }
 
     // Activadas "coste: efecto" (ignorando habilidades de maná).
-    if ((m = l.match(/^([^:."]{1,50}): (.+)/)) && (m[1].includes('{') || m[1].includes('sacrifice'))) {
+    if ((m = l.match(/^([^:."]{1,50}): (.+)/)) && (m[1].includes('{') || m[1].includes('sacrifice') || m[1].includes('remove'))) {
       const costStr = m[1];
       const effectText = m[2];
       if (/^add /.test(effectText)) continue; // habilidad de maná: la lleva producedMana
       const tap = costStr.includes('{t}');
       const sac = /sacrifice ~/.test(costStr);
+      const rc = costStr.match(/remove (a|an|one|two|three|x)? ?\+1\/\+1 counters? from ~/);
+      const removeCounters = rc ? parseNum(rc[1] ?? 1) : 0;
       // Coste adicional "sacrifice N <tipo>" (que no sea la propia carta).
       let sacExtra = null;
       const se = costStr.match(/sacrifice (a|an|two|three)? ?([a-z ]+?)$/);
@@ -574,7 +625,7 @@ export function buildScript(card) {
       const ops = parseEffectOps(effectText, script.unknown);
       const sorceryOnly = /activate only as a sorcery/.test(text);
       const fromGraveyard = ops.some((op) => op.op === 'gyToHand' || op.op === 'gyToBattlefield');
-      if (ops.length) script.activated.push({ mana, tap, sac, sacExtra, ops, sorceryOnly, fromGraveyard });
+      if (ops.length) script.activated.push({ mana, tap, sac, sacExtra, removeCounters, ops, sorceryOnly, fromGraveyard });
       continue;
     }
     if (/^\{t\}: add/.test(l) || /^\{t\}, (tap|sacrifice)/.test(l)) continue;
@@ -650,6 +701,8 @@ export function opsValue(ops) {
       case 'discover': v += op.n * 0.5; break;
       case 'damagePerEach': v += 3; break;
       case 'tokensSacMana': v += 1; break;
+      case 'bolster': v += op.n * 1.2; break;
+      case 'doubleCounters': v += 3; break;
       case 'impulse': v += 1.4; break;
       case 'monarch': v += 2.5; break;
       case 'discardHandEach': v += 2; break;

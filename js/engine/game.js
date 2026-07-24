@@ -181,6 +181,19 @@ export class Game {
     for (const c of [...p.battlefield]) {
       if (c.script.upkeep.length) await this.resolveTriggered(c, c.script.upkeep, 'mantenimiento');
     }
+    // Sagas: siguiente capítulo; tras el último, se sacrifica.
+    for (const c of [...p.battlefield]) {
+      if (!c.script?.sagaMax || c._lore == null) continue;
+      c._lore++;
+      const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
+      if (c.script.saga[c._lore]) {
+        await this.resolveTriggered(c, c.script.saga[c._lore], `capítulo ${ROMAN[c._lore] ?? c._lore}`);
+      }
+      if (c._lore >= c.script.sagaMax && c.zone === 'battlefield') {
+        this.removeFromBattlefield(c, 'se sacrifica (saga completa)');
+      }
+      if (this.over) return;
+    }
     // "Al comienzo de cada mantenimiento" (permanentes de cualquier jugador).
     for (const q of this.alivePlayers()) {
       for (const c of [...q.battlefield]) {
@@ -504,8 +517,16 @@ export class Game {
       }
       if (card.script.entersCounters) {
         const n = card.script.entersCounters === 'x' ? xValue : card.script.entersCounters;
-        card.counters += n;
-        if (n) this.log(`${card.name} entra con ${n} contador(es) +1/+1.`);
+        if (n) this.addCounters(card, n, p);
+      }
+      if (card.script.entersCountersPer) {
+        const n = this.countFor(p, card.script.entersCountersPer);
+        if (n) this.addCounters(card, n, p);
+      }
+      // Sagas: capítulo I al entrar.
+      if (card.script.sagaMax) {
+        card._lore = 1;
+        if (card.script.saga[1]) await this.resolveTriggered(card, card.script.saga[1], 'capítulo I');
       }
       if (card.script.etb.length) await this.resolveTriggered(card, card.script.etb, 'entra al campo', xValue);
       if (card.script.unknown.length && !card.isLand) {
@@ -559,6 +580,9 @@ export class Game {
     if (ability.tap && (perm.tapped || (perm.isCreature && perm.summoningSick && !perm.hasKeyword('haste', this)))) {
       throw new Error('no puede girarse');
     }
+    if (ability.removeCounters && perm.counters < ability.removeCounters) {
+      throw new Error('sin contadores suficientes');
+    }
     const payment = solvePayment(ability.mana, manaSources(p, this), 0);
     if (!payment) throw new Error('sin maná para la habilidad');
 
@@ -582,6 +606,7 @@ export class Game {
     }
     this.paySources(payment);
     if (ability.tap) perm.tapped = true;
+    if (ability.removeCounters) perm.counters -= ability.removeCounters;
     this.log(`${p.name} activa ${perm.name}.`);
     for (const v of extraVictims) this.removeFromBattlefield(v, 'sacrificado');
     if (ability.sac) this.removeFromBattlefield(perm, 'sacrificado');
@@ -672,6 +697,33 @@ export class Game {
   }
 
   num(op, ctx) { return op.n === 'x' ? ctx.xValue : op.n; }
+
+  // Punto único para poner contadores +1/+1: aplica duplicadores
+  // (Hardened Scales, Branching Evolution) y dispara "siempre que pongas
+  // contadores sobre una criatura...".
+  addCounters(card, n, putter) {
+    if (n === 0 || card.zone !== 'battlefield') return;
+    if (n > 0 && putter) {
+      for (const perm of putter.battlefield) {
+        if (perm.script?.counterMod === 'plus1') n += 1;
+        else if (perm.script?.counterMod === 'double') n *= 2;
+      }
+    }
+    card.counters += n;
+    if (n > 0) this.log(`${card.name} recibe ${n} contador(es) +1/+1.`);
+    else this.log(`${card.name} recibe ${-n} contador(es) -1/-1.`);
+    if (n > 0 && putter) {
+      for (const perm of [...putter.battlefield]) {
+        for (const tr of perm.script?.onCounters ?? []) {
+          if (tr.scope === 'self' && perm !== card) continue;
+          if (tr.scope === 'yours' && card.controller !== putter) continue;
+          if (tr.scope === 'notYours' && card.controller === putter) continue;
+          this.resolveOpsSync(tr.ops, { source: perm, controller: putter, targets: [], xValue: 0 });
+        }
+      }
+    }
+    this.checkState();
+  }
 
   // Cuenta "por cada X que controlas" (o cada oponente).
   countFor(p, what) {
@@ -792,7 +844,9 @@ export class Game {
           break;
         }
         case 'token': {
-          const n = this.num(op, ctx);
+          let n = this.num(op, ctx);
+          // Duplicadores de fichas (Doubling Season, Primal Vigor...).
+          if (p.battlefield.some((c) => c.script?.tokenMod === 'double')) n *= 2;
           this.log(`${p.name} crea ${n} ficha(s) de ${op.name} ${op.pt[0]}/${op.pt[1]}.`);
           ctx._lastCreated = [];
           for (let i = 0; i < n; i++) {
@@ -990,9 +1044,22 @@ export class Game {
         }
         case 'counters': {
           const n = this.num(op, ctx);
-          if (op.scope === 'target') { const t = takeTarget(); if (t instanceof CardInstance) t.counters += n; }
-          else if (op.scope === 'yours') for (const c of p.creatures()) c.counters += n;
-          else if (ctx.source.zone === 'battlefield') ctx.source.counters += n;
+          if (op.scope === 'target') { const t = takeTarget(); if (t instanceof CardInstance) this.addCounters(t, n, p); }
+          else if (op.scope === 'yours') for (const c of [...p.creatures()]) this.addCounters(c, n, p);
+          else if (op.scope === 'eachAll') {
+            for (const q of this.alivePlayers()) for (const c of [...q.creatures()]) this.addCounters(c, n, p);
+          } else if (ctx.source.zone === 'battlefield') this.addCounters(ctx.source, n, p);
+          break;
+        }
+        case 'bolster': {
+          const weakest = p.creatures().sort((a, b) => a.toughness(this) - b.toughness(this))[0];
+          if (weakest) this.addCounters(weakest, op.n, p);
+          break;
+        }
+        case 'doubleCounters': {
+          const best = p.creatures().filter((c) => c.counters > 0)
+            .sort((a, b) => b.counters - a.counters)[0];
+          if (best) this.addCounters(best, best.counters, p);
           break;
         }
         case 'scry': {
@@ -1166,8 +1233,7 @@ export class Game {
             const pick = await p.controller.chooseTarget(this, ctx.source, op, candidates);
             if (!pick || pick instanceof Player) break;
             chosen.add(pick);
-            pick.counters += 1;
-            this.log(`${pick.name} recibe un contador +1/+1.`);
+            this.addCounters(pick, 1, p);
           }
           break;
         }
@@ -1177,21 +1243,21 @@ export class Game {
             if (!candidates.length) break;
             const pick = await p.controller.chooseTarget(this, ctx.source, op, candidates);
             if (!pick || pick instanceof Player) break;
-            pick.counters += 1;
-            this.log(`${pick.name} recibe un contador +1/+1.`);
+            this.addCounters(pick, 1, p);
           }
           break;
         }
         case 'proliferate': {
           let hits = 0;
           for (const c of p.battlefield) {
-            if (c.counters > 0) { c.counters += 1; hits++; }
+            if (c.counters > 0) { this.addCounters(c, 1, p); hits++; }
           }
           this.log(`${p.name} prolifera (${hits} permanente(s)).`);
           break;
         }
         case 'tokenSpecial': {
-          const n = this.num(op, ctx);
+          let n = this.num(op, ctx);
+          if (p.battlefield.some((c) => c.script?.tokenMod === 'double')) n *= 2;
           const SPECS = {
             Treasure: { text: '', producedMana: ['W', 'U', 'B', 'R', 'G'] },
             Clue: { text: '{2}, sacrifice ~: draw a card.' },
@@ -1218,8 +1284,7 @@ export class Game {
             p.hand.push(top);
             this.log(`${ctx.source.name} explora: ${top.name} va a la mano.`);
           } else if (ctx.source.zone === 'battlefield') {
-            ctx.source.counters += 1;
-            this.log(`${ctx.source.name} explora: recibe un contador +1/+1.`);
+            this.addCounters(ctx.source, 1, p);
           }
           break;
         }
@@ -1232,8 +1297,7 @@ export class Game {
             this.putOnBattlefield(army, p);
             this.log(`${p.name} crea una ficha de Ejército zombie.`);
           }
-          army.counters += op.n;
-          this.log(`Ejército: +${op.n} contadores (${army.power(this)}/${army.toughness(this)}).`);
+          this.addCounters(army, op.n, p);
           break;
         }
         case 'populate': {
@@ -1542,8 +1606,8 @@ export class Game {
       }
       if (perm !== card && perm.isCreature && (perm.data.keywords || []).includes('Evolve') &&
           (card.power(this) > perm.power(this) || card.toughness(this) > perm.toughness(this))) {
-        perm.counters += 1;
-        this.log(`${perm.name} evoluciona (+1/+1).`);
+        this.log(`${perm.name} evoluciona.`);
+        this.addCounters(perm, 1, p);
       }
     }
     this._etbDepth--;
