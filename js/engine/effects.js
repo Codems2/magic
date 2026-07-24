@@ -109,6 +109,19 @@ function parseSentence(s) {
   if (/^sacrifice (?:it|them|that token) at the beginning of the next end step$/.test(s)) return [{ op: 'sacAtEnd' }];
   if ((m = s.match(/^exile the top (\w+) cards? of your library$/)))
     return [{ op: 'exileTop', n: m[1] === 'card' ? 1 : parseNum(m[1]) }];
+  if (/^target creature can't be blocked this turn$/.test(s))
+    return [{ op: 'pump', scope: 'target', pt: [0, 0], keywords: ['unblockable'], targeted: true }];
+  if ((m = s.match(/^each (player|opponent) sacrifices an? ([a-z ]*?)creature/)))
+    return [{ op: 'eachSac', who: m[1] }];
+  if ((m = s.match(/^adapt (\w+)/))) return [{ op: 'counters', n: parseNum(m[1]), scope: 'self' }];
+  if ((m = s.match(/^put (a|an|one|two|three|\w+) (charge|oil|stun) counters? on ~$/)))
+    return [{ op: 'counters', n: parseNum(m[1]), scope: 'self' }];
+  if ((m = s.match(/^you gain life equal to (?:that creature's|its) (toughness|power)$/)))
+    return [{ op: 'gainLifeLast', stat: m[1] }];
+  if (/^you gain life equal to the life lost this way$/.test(s)) return [{ op: 'gainLifeLostWay' }];
+  if (/^exile (?:it|them|that token) at the beginning of the next end step$/.test(s)) return [{ op: 'exileAtEnd' }];
+  if (/^return (?:that card|it) to the battlefield under its owner's control at the beginning of the next end step$/.test(s))
+    return [{ op: 'blinkReturn' }];
   if (/^goad target creature$/.test(s)) return [{ op: 'goad', target: { kind: 'creature', controller: 'opponent' }, targeted: true }];
   if ((m = s.match(/^put a land card from your hand onto the battlefield( tapped)?/)))
     return [{ op: 'landFromHand', tapped: !!m[1] }];
@@ -252,6 +265,14 @@ export function parseEffectOps(text, unknown) {
     ops.push({ op: 'optSac', what: m[1].trim(), ops: parseEffectOps(m[2], unknown) });
     text = text.replace(m[0], '');
   }
+  if ((m = text.match(/you may sacrifice ~\.?\s*if you do, ([^.]+\.)/))) {
+    ops.push({ op: 'sacSelfThen', ops: parseEffectOps(m[1], unknown) });
+    text = text.replace(m[0], '');
+  }
+  if ((m = text.match(/you may tap ~\.?\s*if you do, ([^.]+\.)/))) {
+    ops.push({ op: 'tapSelfThen', ops: parseEffectOps(m[1], unknown) });
+    text = text.replace(m[0], '');
+  }
   if ((m = text.match(/count the number of ([a-z' ]+?) you control\.?\s*draw that many cards\./))) {
     ops.push({ op: 'drawPer', what: m[1].trim().replace(/s$/, '') });
     text = text.replace(m[0], '');
@@ -295,7 +316,7 @@ export function buildScript(card) {
     equipCost: null, unknown: [], combatHit: [], entersTapped: false, selfKeywords: [],
     entersCounters: 0, crew: null, allyEtb: [], allyDies: [], eachUpkeep: [], eachEnd: [],
     convoke: false, cascade: false, improvise: false, delve: false, rebound: false,
-    beginCombat: [], noMaxHand: false,
+    beginCombat: [], noMaxHand: false, landfall: [], dynPT: null, vanishing: 0,
   };
   const name = card.name.split(' // ')[0];
   const shortName = name.split(',')[0];
@@ -363,6 +384,25 @@ export function buildScript(card) {
     if ((m = l.match(/^squad \{(.+?)\}/))) { script.squad = parseManaCost(`{${m[1]}}`); continue; }
     if ((m = l.match(/^toxic (\d+)/))) { script.toxic = parseInt(m[1], 10); continue; }
     if (/^~ attacks each combat if able/.test(l)) { script.mustAttack = true; continue; }
+    if ((m = l.match(/^vanishing (\d+)/))) { script.vanishing = parseInt(m[1], 10); continue; }
+    if ((m = l.match(/^~'s power and toughness are each equal to the number of ([a-z' ]+?)(?: you control| in your (hand|graveyard))?\.?$/))) {
+      script.dynPT = { what: m[1].trim().replace(/s$/, ''), where: m[2] ?? 'battlefield' };
+      continue;
+    }
+    if ((m = l.match(/^landfall — whenever a land (?:you control )?enters(?: the battlefield)?(?: under your control)?, (.+)/)) ||
+        (m = l.match(/^whenever a land (?:you control )?enters(?: the battlefield)?(?: under your control)?, (.+)/))) {
+      const eff = m[1];
+      const mo = eff.match(/^choose (one|two)/);
+      if (!mo) {
+        const ops = parseEffectOps(eff, script.unknown);
+        if (ops.length) { script.landfall.push(...ops); continue; }
+        continue;
+      }
+      modalList = script.landfall;
+      modalNeed = /two/.test(mo[1]) ? 2 : 1;
+      modalTaken = 0;
+      continue;
+    }
     if ((m = l.match(/^level up (\{.+?\})+/))) {
       // Aproximación: subir de nivel = contador +1/+1 (a velocidad de conjuro).
       const cost = parseManaCost(l.replace('level up ', ''));
@@ -555,6 +595,11 @@ export function opsValue(ops) {
       case 'optSac': v += opsValue(op.ops) * 0.4; break;
       case 'exileTop': v += 0.2; break;
       case 'goad': v += 1.5; break;
+      case 'eachSac': v += 2.5; break;
+      case 'gainLifeLast': case 'gainLifeLostWay': v += 1; break;
+      case 'sacSelfThen': v += opsValue(op.ops) * 0.3; break;
+      case 'tapSelfThen': v += opsValue(op.ops) * 0.6; break;
+      case 'blinkReturn': v -= 1.5; break; // vuelve al final: removal temporal
       case 'impulse': v += 1.4; break;
       case 'monarch': v += 2.5; break;
       case 'discardHandEach': v += 2; break;

@@ -113,8 +113,27 @@ export class CardInstance {
     return [Number.isNaN(p) ? 0 : p, Number.isNaN(t) ? 0 : t];
   }
 
+  // "Su fuerza y resistencia son iguales al número de X".
+  dynCount() {
+    const d = this.script?.dynPT;
+    if (!d || this.zone !== 'battlefield') return null;
+    const p = this.controller;
+    if (d.where === 'hand') return p.hand.length;
+    if (d.where === 'graveyard') {
+      return d.what.includes('creature')
+        ? p.graveyard.filter((c) => c.isCreature).length
+        : p.graveyard.length;
+    }
+    if (d.what === 'land') return p.battlefield.filter((c) => c.isLand).length;
+    if (d.what === 'creature') return p.battlefield.filter((c) => c.isCreature).length;
+    if (d.what === 'artifact') return p.battlefield.filter((c) => c.isArtifact).length;
+    return p.battlefield.filter((c) => c.isCreature && c.hasSubtype(d.what)).length;
+  }
+
   power(game) {
     let [p] = this.basePT();
+    const dyn = this.dynCount();
+    if (dyn !== null) p = dyn;
     p += this.counters + this.tempPT[0];
     for (const att of this.attachments) p += att.script?.attachPT?.[0] || 0;
     if (game) for (const b of game.staticBonusesFor(this)) p += b.pt[0];
@@ -123,6 +142,8 @@ export class CardInstance {
 
   toughness(game) {
     let [, t] = this.basePT();
+    const dyn = this.dynCount();
+    if (dyn !== null) t = dyn;
     t += this.counters + this.tempPT[1];
     for (const att of this.attachments) t += att.script?.attachPT?.[1] || 0;
     if (game) for (const b of game.staticBonusesFor(this)) t += b.pt[1];

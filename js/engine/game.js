@@ -1,7 +1,7 @@
 // Motor de partida de Commander multijugador.
 
 import { CardInstance, makeToken, resetIds } from './cards.js';
-import { buildScript } from './effects.js';
+import { buildScript, opsValue } from './effects.js';
 import { manaSources, solvePayment, maxAffordableX, sourcesFor } from './mana.js';
 
 // RNG con semilla para partidas reproducibles.
@@ -170,6 +170,14 @@ export class Game {
       await this.resolveSpell(p, c, targets, 0);
       if (this.over) return;
     }
+    // Vanishing: quita un contador de tiempo; a cero, se sacrifica.
+    for (const c of [...p.battlefield]) {
+      if (c._timeCounters > 0) {
+        c._timeCounters--;
+        this.log(`${c.name} pierde un contador de tiempo (${c._timeCounters}).`);
+        if (c._timeCounters === 0) this.removeFromBattlefield(c, 'sacrificado');
+      }
+    }
     for (const c of [...p.battlefield]) {
       if (c.script.upkeep.length) await this.resolveTriggered(c, c.script.upkeep, 'mantenimiento');
     }
@@ -225,12 +233,22 @@ export class Game {
       const toDiscard = await p.controller.discardTo(this, p.hand.length - 7);
       for (const c of toDiscard) this.moveToGraveyard(c, 'descarta');
     }
-    // Fichas marcadas "sacrifícala al comienzo del próximo paso final".
+    // Fichas marcadas "sacrifícala/exíliala al comienzo del próximo paso final".
     for (const q of this.alivePlayers()) {
       for (const c of [...q.battlefield]) {
         if (c._sacAtEnd) this.removeFromBattlefield(c, 'sacrificado');
+        else if (c._exileAtEnd) this.exileCard(c);
       }
     }
+    // Cartas parpadeadas: vuelven al campo de batalla.
+    for (const c of this._returnAtEnd ?? []) {
+      if (c.zone !== 'exile') continue;
+      const ex = c.owner.exile;
+      ex.splice(ex.indexOf(c), 1);
+      this.putOnBattlefield(c, c.owner);
+      this.log(`${c.name} vuelve al campo de batalla.`);
+    }
+    this._returnAtEnd = [];
     for (const q of this.players) for (const c of q.battlefield) c.cleanupEndOfTurn();
     this.checkState();
     this.nextPlayer();
@@ -786,6 +804,64 @@ export class Game {
           for (const c of ctx._lastCreated ?? []) c._sacAtEnd = true;
           break;
         }
+        case 'exileAtEnd': {
+          const marks = ctx._lastCreated ?? (ctx._lastTarget ? [ctx._lastTarget] : []);
+          for (const c of marks) c._exileAtEnd = true;
+          break;
+        }
+        case 'blinkReturn': {
+          const t = ctx._lastTarget;
+          if (t instanceof CardInstance && t.zone === 'exile') {
+            (this._returnAtEnd ??= []).push(t);
+            this.log(`${t.name} volverá al campo de batalla al final del turno.`);
+          }
+          break;
+        }
+        case 'eachSac': {
+          const victims = op.who === 'opponent' ? this.opponentsOf(p) : this.alivePlayers();
+          for (const q of victims) {
+            const creatures = q.creatures();
+            if (!creatures.length) continue;
+            let pick = null;
+            if (!q.isBot) {
+              const chosen = await q.controller.chooseCards(this, creatures, 1, 'Sacrifica una criatura');
+              pick = chosen[0] ?? null;
+            }
+            if (!pick) pick = creatures.slice().sort((a, b) => a.cmc - b.cmc)[0];
+            this.removeFromBattlefield(pick, 'sacrificado');
+          }
+          break;
+        }
+        case 'gainLifeLast': {
+          const t = ctx._lastTarget;
+          if (t instanceof CardInstance) {
+            const n = op.stat === 'toughness' ? Math.max(0, t.toughness(this)) : t.power(this);
+            if (n) { p.life += n; this.log(`${p.name} gana ${n} vidas (${p.life}).`); }
+          }
+          break;
+        }
+        case 'gainLifeLostWay': {
+          const n = ctx._lifeLost ?? 0;
+          if (n) { p.life += n; this.log(`${p.name} gana ${n} vidas (${p.life}).`); }
+          break;
+        }
+        case 'sacSelfThen': {
+          if (ctx.source.zone === 'battlefield' &&
+              opsValue(op.ops) >= 2 && ctx.source.power(this) < 2) {
+            this.removeFromBattlefield(ctx.source, 'sacrificado');
+            await this.resolveOps(op.ops, ctx);
+          }
+          break;
+        }
+        case 'tapSelfThen': {
+          const s2 = ctx.source;
+          if (s2.zone === 'battlefield' && !s2.tapped &&
+              !(s2.isCreature && s2.summoningSick && !s2.hasKeyword('haste', this))) {
+            s2.tapped = true;
+            await this.resolveOps(op.ops, ctx);
+          }
+          break;
+        }
         case 'goad': {
           const t = takeTarget();
           if (t instanceof CardInstance) {
@@ -857,7 +933,9 @@ export class Game {
             p.life -= op.n;
             this.log(`${p.name} pierde ${op.n} vidas (${p.life}).`);
           } else if (op.who === 'eachOpponent') {
-            for (const q of this.opponentsOf(p)) { q.life -= op.n; this.log(`${q.name} pierde ${op.n} vidas (${q.life}).`); }
+            const opps = this.opponentsOf(p);
+            ctx._lifeLost = op.n * opps.length;
+            for (const q of opps) { q.life -= op.n; this.log(`${q.name} pierde ${op.n} vidas (${q.life}).`); }
           } else {
             const t = takeTarget();
             if (t instanceof Player) { t.life -= op.n; this.log(`${t.name} pierde ${op.n} vidas (${t.life}).`); }
@@ -1330,8 +1408,22 @@ export class Game {
     this.fireEnterTriggers(card, p);
   }
 
-  // Disparos por la entrada de una criatura: "otra criatura/tribu tuya entra" y evolucionar.
+  // Disparos por entradas: landfall, "otra criatura/tribu tuya entra" y evolucionar.
   fireEnterTriggers(card, p) {
+    if (card.script?.vanishing) card._timeCounters = card.script.vanishing;
+    if (card.isLand) {
+      this._etbDepth = (this._etbDepth || 0) + 1;
+      if (this._etbDepth <= 5) {
+        for (const perm of [...p.battlefield]) {
+          if (perm.script?.landfall?.length) {
+            this.log(`Se dispara ${perm.name} (landfall).`);
+            this.resolveOpsSync(perm.script.landfall, { source: perm, controller: p, targets: [], xValue: 0 });
+          }
+        }
+      }
+      this._etbDepth--;
+      return;
+    }
     if (!card.isCreature) return;
     this._etbDepth = (this._etbDepth || 0) + 1;
     if (this._etbDepth > 5) { this._etbDepth--; return; } // corta bucles de fichas
