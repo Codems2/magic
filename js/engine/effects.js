@@ -114,6 +114,12 @@ function parseSentence(s) {
   if ((m = s.match(/^each (player|opponent) sacrifices an? ([a-z ]*?)creature/)))
     return [{ op: 'eachSac', who: m[1] }];
   if ((m = s.match(/^adapt (\w+)/))) return [{ op: 'counters', n: parseNum(m[1]), scope: 'self' }];
+  if (/^level \w+$/.test(s)) return []; // niveles de Clase: sin efecto simulado
+  if ((m = s.match(/^backup (\w+)/))) return [{ op: 'support', n: parseNum(m[1]), allowSelf: true }];
+  if (/^untap those creatures$/.test(s)) return [{ op: 'untapYours' }];
+  if ((m = s.match(/^discover (\w+)/))) return [{ op: 'discover', n: parseNum(m[1]) }];
+  if ((m = s.match(/^reveal the top card of your library\.? if it's an? ([a-z]+) card, put it onto the battlefield\.? otherwise, put it into your hand/)))
+    return [{ op: 'topFilter', type: m[1], dest: 'battlefield', elseHand: true }];
   if ((m = s.match(/^put (a|an|one|two|three|\w+) (charge|oil|stun) counters? on ~$/)))
     return [{ op: 'counters', n: parseNum(m[1]), scope: 'self' }];
   if ((m = s.match(/^you gain life equal to (?:that creature's|its) (toughness|power)$/)))
@@ -307,6 +313,10 @@ const IGNORE_LINES = [
   /^unearth/, /^flashback/, /^kicker/, /^landfall$/, /^storm$/, /^affinity/, /^devoid$/,
   /^~ can be your commander/, /^doctor's companion$/, /^you may look at the top card of your library/,
   /^friends forever$/, /^choose a background$/,
+  // costes alternativos no simulados: la carta funciona con su coste normal
+  /^foretell/, /^retrace$/, /^multikicker/, /^undaunted$/, /^morph/, /^megamorph/,
+  /^disturb/, /^embalm/, /^eternalize/, /^escape—/, /^overload/, /^prototype/,
+  /^~ can't be countered$/, /^suspend/,
 ];
 
 export function buildScript(card) {
@@ -329,7 +339,7 @@ export function buildScript(card) {
   text = text
     .replace(/\([^)]*\)/g, '') // recordatorios
     .toLowerCase()
-    .replace(/\bthis (creature|artifact|enchantment|permanent|land|equipment|vehicle|token|aura)\b/g, '~')
+    .replace(/\bthis (creature|artifact|enchantment|permanent|land|equipment|vehicle|token|aura|card|spell)\b/g, '~')
     .replace(/ enters the battlefield/g, ' enters');
 
   const typeLine = (card.typeLine || '').toLowerCase();
@@ -350,6 +360,9 @@ export function buildScript(card) {
     if ((mm = l.match(/^crew (\d+)/))) { script.crew = parseInt(mm[1], 10); continue; }
     if (/^you have no maximum hand size/.test(l)) { script.noMaxHand = true; continue; }
     if (/^you may play an additional land on each of your turns/.test(l)) { script.extraLand = true; continue; }
+    if (/^at the beginning of each player's draw step, that player draws an additional card/.test(l)) {
+      script.eachDrawExtra = true; continue;
+    }
 
     // Modales: usar los primeros N modos interpretables.
     const modalM = l.match(/^choose (one|two|three|one or both|up to (?:one|two|three|\w+))/);
@@ -375,6 +388,15 @@ export function buildScript(card) {
     if (words.every((w) => KNOWN_KEYWORDS.includes(w.trim()) || /^ward \{/.test(w.trim()))) continue;
 
     let m;
+    // Si el efecto de un disparo es modal, conecta sus opciones (líneas •) a esa lista.
+    const maybeModal = (effText, list) => {
+      const mo = effText.match(/^choose (one|two|up to)(?: at random| that hasn't been chosen)? ?—?/);
+      if (!mo) return false;
+      modalList = list;
+      modalNeed = /two/.test(mo[1]) ? 2 : 1;
+      modalTaken = 0;
+      return true;
+    };
     if (/^convoke$/.test(l)) { script.convoke = true; continue; }
     if (/^cascade$/.test(l)) { script.cascade = true; continue; }
     if (/^ravenous$/.test(l)) { script.entersCounters = 'x'; continue; }
@@ -385,6 +407,7 @@ export function buildScript(card) {
     if ((m = l.match(/^toxic (\d+)/))) { script.toxic = parseInt(m[1], 10); continue; }
     if (/^~ attacks each combat if able/.test(l)) { script.mustAttack = true; continue; }
     if ((m = l.match(/^vanishing (\d+)/))) { script.vanishing = parseInt(m[1], 10); continue; }
+    if ((m = l.match(/^backup (\d+)/))) { script.etb.push({ op: 'support', n: parseInt(m[1], 10), allowSelf: true }); continue; }
     if ((m = l.match(/^~'s power and toughness are each equal to the number of ([a-z' ]+?)(?: you control| in your (hand|graveyard))?\.?$/))) {
       script.dynPT = { what: m[1].trim().replace(/s$/, ''), where: m[2] ?? 'battlefield' };
       continue;
@@ -449,11 +472,17 @@ export function buildScript(card) {
 
     // Disparadas.
     if ((m = l.match(/^whenever ~ deals combat damage to a player, (.+)/))) {
-      script.combatHit.push({ scope: 'self', ops: parseEffectOps(m[1], script.unknown) }); continue;
+      const entry = { scope: 'self', ops: [] };
+      script.combatHit.push(entry);
+      if (!maybeModal(m[1], entry.ops)) entry.ops.push(...parseEffectOps(m[1], script.unknown));
+      continue;
     }
     if ((m = l.match(/^whenever (?:a|an|one or more) ([a-z']+?)s? you control deals? combat damage to a player, (.+)/))) {
       const sub = m[1] === 'creature' ? null : m[1];
-      script.combatHit.push({ scope: 'yours', subtype: sub, ops: parseEffectOps(m[2], script.unknown) }); continue;
+      const entry = { scope: 'yours', subtype: sub, ops: [] };
+      script.combatHit.push(entry);
+      if (!maybeModal(m[2], entry.ops)) entry.ops.push(...parseEffectOps(m[2], script.unknown));
+      continue;
     }
     if ((m = l.match(/^when(?:ever)? ~ enters or attacks, (.+)/))) {
       const ops = parseEffectOps(m[1], script.unknown);
@@ -471,7 +500,8 @@ export function buildScript(card) {
       script.dies.push(...parseEffectOps(m[1], script.unknown)); continue;
     }
     if ((m = l.match(/^whenever ~ attacks, (.+)/))) {
-      script.attack.push(...parseEffectOps(m[1], script.unknown)); continue;
+      if (!maybeModal(m[1], script.attack)) script.attack.push(...parseEffectOps(m[1], script.unknown));
+      continue;
     }
     if ((m = l.match(/^at the beginning of your upkeep, (.+)/))) {
       script.upkeep.push(...parseEffectOps(m[1], script.unknown)); continue;
@@ -524,11 +554,15 @@ export function buildScript(card) {
       if (/^add /.test(effectText)) continue; // habilidad de maná: la lleva producedMana
       const tap = costStr.includes('{t}');
       const sac = /sacrifice ~/.test(costStr);
+      // Coste adicional "sacrifice N <tipo>" (que no sea la propia carta).
+      let sacExtra = null;
+      const se = costStr.match(/sacrifice (a|an|two|three)? ?([a-z ]+?)$/);
+      if (se && !sac) sacExtra = { n: parseNum(se[1] ?? 1), what: se[2].trim().replace(/s$/, '') };
       const mana = parseManaCost(costStr.replace(/\{t\}/g, ''));
       const ops = parseEffectOps(effectText, script.unknown);
       const sorceryOnly = /activate only as a sorcery/.test(text);
       const fromGraveyard = ops.some((op) => op.op === 'gyToHand' || op.op === 'gyToBattlefield');
-      if (ops.length) script.activated.push({ mana, tap, sac, ops, sorceryOnly, fromGraveyard });
+      if (ops.length) script.activated.push({ mana, tap, sac, sacExtra, ops, sorceryOnly, fromGraveyard });
       continue;
     }
     if (/^\{t\}: add/.test(l) || /^\{t\}, (tap|sacrifice)/.test(l)) continue;
@@ -600,6 +634,8 @@ export function opsValue(ops) {
       case 'sacSelfThen': v += opsValue(op.ops) * 0.3; break;
       case 'tapSelfThen': v += opsValue(op.ops) * 0.6; break;
       case 'blinkReturn': v -= 1.5; break; // vuelve al final: removal temporal
+      case 'untapYours': v += 1; break;
+      case 'discover': v += op.n * 0.5; break;
       case 'impulse': v += 1.4; break;
       case 'monarch': v += 2.5; break;
       case 'discardHandEach': v += 2; break;

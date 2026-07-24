@@ -191,9 +191,13 @@ export class Game {
     }
     if (this.over) return;
 
-    // Robar.
+    // Robar (más "cada jugador roba una carta adicional", tipo Howling Mine).
     this.phase = 'draw';
-    this.drawCards(p, 1);
+    let extraDraws = 0;
+    for (const q of this.alivePlayers()) {
+      extraDraws += q.battlefield.filter((c) => c.script?.eachDrawExtra).length;
+    }
+    this.drawCards(p, 1 + extraDraws);
     if (this.over) return;
 
     // Primera fase principal.
@@ -548,9 +552,23 @@ export class Game {
       targets = await this.pickTargetsFor(p, perm, targetedOps);
       if (targets === null) throw new Error('sin objetivos legales');
     }
+    // Coste adicional: sacrificar otros permanentes.
+    let extraVictims = [];
+    if (ability.sacExtra) {
+      const match = (c) =>
+        (ability.sacExtra.what.includes('creature') && c.isCreature) ||
+        (ability.sacExtra.what.includes('artifact') && c.isArtifact) ||
+        (ability.sacExtra.what.includes('land') && c.isLand) ||
+        (ability.sacExtra.what.includes('permanent'));
+      extraVictims = p.battlefield.filter((c) => c !== perm && match(c))
+        .sort((a, b) => a.cmc - b.cmc)
+        .slice(0, ability.sacExtra.n);
+      if (extraVictims.length < ability.sacExtra.n) throw new Error('sin permanentes que sacrificar');
+    }
     this.paySources(payment);
     if (ability.tap) perm.tapped = true;
     this.log(`${p.name} activa ${perm.name}.`);
+    for (const v of extraVictims) this.removeFromBattlefield(v, 'sacrificado');
     if (ability.sac) this.removeFromBattlefield(perm, 'sacrificado');
     await this.resolveOps(ability.ops, { source: perm, controller: p, targets: targets ?? [], xValue: 0 });
     this.checkState();
@@ -1011,11 +1029,48 @@ export class Game {
           if (!top) break;
           if (top.hasType(op.type) || top.hasSubtype(op.type)) {
             p.library.shift();
+            if (op.dest === 'battlefield' && top.isPermanentType) {
+              this.log(`${p.name} revela ${top.name} y la pone en el campo de batalla.`);
+              this.putOnBattlefield(top, p);
+            } else {
+              top.zone = 'hand';
+              p.hand.push(top);
+              this.log(`${p.name} revela ${top.name} y la pone en su mano.`);
+            }
+          } else if (op.elseHand) {
+            p.library.shift();
             top.zone = 'hand';
             p.hand.push(top);
-            this.log(`${p.name} revela ${top.name} y la pone en su mano.`);
+            this.log(`${p.name} revela ${top.name}: a su mano.`);
           } else {
             this.log(`${p.name} revela ${top.name}: se queda arriba.`);
+          }
+          break;
+        }
+        case 'untapYours': {
+          for (const c of p.creatures()) c.tapped = false;
+          this.log(`${p.name} endereza sus criaturas.`);
+          break;
+        }
+        case 'discover': {
+          const exiled = [];
+          let hit = null;
+          while (p.library.length) {
+            const c = p.library.shift();
+            if (!c.isLand && c.cmc <= op.n) { hit = c; break; }
+            exiled.push(c);
+          }
+          this.shuffle(exiled);
+          p.library.push(...exiled);
+          if (hit) {
+            this.log(`Descubrir: ${p.name} lanza ${hit.name} gratis.`);
+            hit.zone = 'stack';
+            let dTargets = [];
+            if (hit.script.targets.length) {
+              dTargets = await this.pickTargetsFor(p, hit, hit.script.targets);
+              if (dTargets === null) { this.moveToGraveyard(hit, null); break; }
+            }
+            await this.resolveSpell(p, hit, dTargets, 0);
           }
           break;
         }
@@ -1056,7 +1111,7 @@ export class Game {
           const chosen = new Set();
           for (let i = 0; i < op.n; i++) {
             const candidates = this.legalTargets({ kind: 'creature' }, p)
-              .filter((c) => c !== ctx.source && !chosen.has(c));
+              .filter((c) => (op.allowSelf || c !== ctx.source) && !chosen.has(c));
             if (!candidates.length) break;
             const pick = await p.controller.chooseTarget(this, ctx.source, op, candidates);
             if (!pick || pick instanceof Player) break;
