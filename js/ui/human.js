@@ -52,6 +52,13 @@ export class HumanController {
     return this.ui.chooseCardsDialog(label ?? `Elige ${n} carta(s)`, cards, n);
   }
 
+  async choosePayTimes(game, card, maxTimes, label) {
+    const buttons = [];
+    for (let i = 0; i <= maxTimes; i++) buttons.push({ label: `${i}`, value: i, primary: i === maxTimes });
+    const res = await this.ui.dialog({ title: label ?? `¿Cuántas veces pagas el coste de ${card.name}?`, buttons });
+    return res ?? 0;
+  }
+
   async scryDecision(game, cards) {
     const top = []; const bottom = [];
     for (const c of cards) {

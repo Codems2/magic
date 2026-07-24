@@ -416,6 +416,27 @@ export class Game {
         this.putOnBattlefield(card, p);
         if (card.script.entersTapped) card.tapped = true;
       }
+      // Escuadrón: paga el coste extra N veces para crear N copias.
+      if (card.script.squad && card.isCreature) {
+        let max = 0;
+        while (max < 3 && solvePayment(
+          { generic: card.script.squad.generic * (max + 1), pips: Array(max + 1).fill(card.script.squad.pips).flat(), x: 0 },
+          manaSources(p, this))) max++;
+        const times = max > 0 ? await p.controller.choosePayTimes(this, card, max, 'Escuadrón: ¿cuántas copias pagas?') : 0;
+        for (let i = 0; i < times; i++) {
+          const payment = solvePayment(card.script.squad, manaSources(p, this));
+          if (!payment) break;
+          this.paySources(payment);
+          const tok = makeToken({
+            name: card.data.name, pt: card.basePT(),
+            colors: card.data.colors, keywords: card.data.keywords,
+          }, p, this.turn);
+          tok.data.typeLine = card.data.typeLine;
+          tok.script = buildScript(tok.data);
+          this.putOnBattlefield(tok, p);
+          this.log(`Escuadrón: copia de ${card.name}.`);
+        }
+      }
       if (card.script.entersCounters) {
         const n = card.script.entersCounters === 'x' ? xValue : card.script.entersCounters;
         card.counters += n;
@@ -454,7 +475,9 @@ export class Game {
   }
 
   async activateAbility(p, perm, ability, { targets = null } = {}) {
-    if (perm.zone !== 'battlefield') throw new Error('permanente fuera del campo');
+    if (ability.fromGraveyard) {
+      if (perm.zone !== 'graveyard') throw new Error('la carta no está en el cementerio');
+    } else if (perm.zone !== 'battlefield') throw new Error('permanente fuera del campo');
     if (ability.tap && (perm.tapped || (perm.isCreature && perm.summoningSick && !perm.hasKeyword('haste', this)))) {
       throw new Error('no puede girarse');
     }
@@ -556,6 +579,16 @@ export class Game {
   }
 
   num(op, ctx) { return op.n === 'x' ? ctx.xValue : op.n; }
+
+  // Cuenta "por cada X que controlas" (o cada oponente).
+  countFor(p, what) {
+    if (what === 'opponent') return this.opponentsOf(p).length;
+    if (what === 'creature') return p.creatures().length;
+    if (what === 'land') return p.lands().length;
+    if (what === 'artifact') return p.battlefield.filter((c) => c.isArtifact).length;
+    if (what === 'enchantment') return p.battlefield.filter((c) => c.isEnchantment).length;
+    return p.creatures().filter((c) => c.hasSubtype(what)).length;
+  }
 
   async resolveOps(ops, ctx) {
     for (const op of ops) {
@@ -908,6 +941,70 @@ export class Game {
           this.log(`${p.name} puebla: copia de ${best.name}.`);
           break;
         }
+        case 'fight': {
+          const t = takeTarget();
+          if (t instanceof CardInstance && ctx.source.zone === 'battlefield') {
+            this.log(`${ctx.source.name} lucha contra ${t.name}.`);
+            const sp = ctx.source.power(this);
+            this.damageCreature(t, sp, ctx.source);
+            this.damageCreature(ctx.source, t.power(this), t);
+          }
+          break;
+        }
+        case 'fightSel': {
+          const t = takeTarget();
+          if (t instanceof CardInstance) ctx._fighter = t;
+          break;
+        }
+        case 'fightVs': {
+          const t = takeTarget();
+          const f = ctx._fighter;
+          if (t instanceof CardInstance && f && f.zone === 'battlefield') {
+            this.log(`${f.name} lucha contra ${t.name}.`);
+            const fp = f.power(this);
+            this.damageCreature(t, fp, f);
+            this.damageCreature(f, t.power(this), t);
+          }
+          break;
+        }
+        case 'pounce': {
+          const t = takeTarget();
+          if (t instanceof CardInstance && ctx.source.zone === 'battlefield') {
+            this.damageCreature(t, ctx.source.power(this), ctx.source);
+          }
+          break;
+        }
+        case 'drawPer': {
+          const n = this.countFor(p, op.what);
+          if (n > 0) this.drawCards(p, n);
+          break;
+        }
+        case 'gainLifePer': {
+          const n = op.n * this.countFor(p, op.what);
+          if (n > 0) { p.life += n; this.log(`${p.name} gana ${n} vidas (${p.life}).`); }
+          break;
+        }
+        case 'gyToHand': {
+          const c = ctx.source;
+          const g = c.owner.graveyard;
+          if (g.includes(c)) {
+            g.splice(g.indexOf(c), 1);
+            c.zone = 'hand'; c.owner.hand.push(c);
+            this.log(`${c.owner.name} devuelve ${c.name} del cementerio a su mano.`);
+          }
+          break;
+        }
+        case 'gyToBattlefield': {
+          const c = ctx.source;
+          const g = c.owner.graveyard;
+          if (g.includes(c)) {
+            g.splice(g.indexOf(c), 1);
+            this.putOnBattlefield(c, p);
+            if (op.tapped) c.tapped = true;
+            this.log(`${c.name} vuelve del cementerio al campo de batalla.`);
+          }
+          break;
+        }
         case 'energy': {
           p.energy += op.n;
           this.log(`${p.name} obtiene ${op.n} de energía (⚡${p.energy}).`);
@@ -1170,6 +1267,26 @@ export class Game {
       attacker.attacking = defender;
       if (!attacker.hasKeyword('vigilance', this)) attacker.tapped = true;
     }
+    // Miríada: copias atacando a cada otro oponente.
+    for (const d of [...valid]) {
+      if (!(d.attacker.data.keywords || []).includes('Myriad')) continue;
+      for (const q of this.opponentsOf(attackerP)) {
+        if (q === d.defender) continue;
+        const tok = makeToken({
+          name: d.attacker.data.name, pt: d.attacker.basePT(),
+          colors: d.attacker.data.colors, keywords: d.attacker.data.keywords,
+        }, attackerP, this.turn);
+        tok.data.typeLine = d.attacker.data.typeLine;
+        tok.script = buildScript(tok.data);
+        this.putOnBattlefield(tok, attackerP);
+        tok.summoningSick = false;
+        tok.tapped = true;
+        tok.attacking = q;
+        tok._myriad = true;
+        valid.push({ attacker: tok, defender: q });
+        this.log(`Miríada: copia de ${d.attacker.name} ataca a ${q.name}.`);
+      }
+    }
     const byDefender = new Map();
     for (const d of valid) {
       if (!byDefender.has(d.defender)) byDefender.set(d.defender, []);
@@ -1248,7 +1365,12 @@ export class Game {
     dealCombat('first');
     if (!this.over) dealCombat('normal');
     this.checkState();
-    for (const q of this.players) for (const c of q.battlefield) { c.attacking = null; c.blocking = null; }
+    for (const q of this.players) {
+      for (const c of [...q.battlefield]) {
+        c.attacking = null; c.blocking = null;
+        if (c._myriad) this.removeFromBattlefield(c, 'se exilia (miríada)');
+      }
+    }
   }
 
   combatDamageFromAttacker(atk, blkrs) {

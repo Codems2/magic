@@ -86,6 +86,22 @@ function parseSentence(s) {
     return [{ op: 'distribute', n: parseNum(m[1]) }];
   if ((m = s.match(/^monstrosity (\w+)/))) return [{ op: 'counters', n: parseNum(m[1]), scope: 'self' }];
   if ((m = s.match(/^you get ((?:\{e\})+)/))) return [{ op: 'energy', n: m[1].match(/\{e\}/g).length }];
+  if (/^(?:~|it) fights? target creature/.test(s))
+    return [{ op: 'fight', target: { kind: 'creature' }, targeted: true }];
+  if (/^target creature you control fights target creature/.test(s))
+    return [
+      { op: 'fightSel', target: { kind: 'creature', controller: 'you' }, targeted: true },
+      { op: 'fightVs', target: { kind: 'creature', controller: 'opponent' }, targeted: true },
+    ];
+  if (/^~ deals damage equal to its power to target creature/.test(s))
+    return [{ op: 'pounce', target: { kind: 'creature' }, targeted: true }];
+  if ((m = s.match(/^draw a card for each ([a-z' ]+?)(?: you control)?$/)))
+    return [{ op: 'drawPer', what: m[1].trim().replace(/s$/, '') }];
+  if ((m = s.match(/^(?:you )?gain (\w+) life for each ([a-z' ]+?)(?: you control)?$/)))
+    return [{ op: 'gainLifePer', n: parseNum(m[1]), what: m[2].trim().replace(/s$/, '') }];
+  if (/^return ~ from your graveyard to your hand$/.test(s)) return [{ op: 'gyToHand' }];
+  if ((m = s.match(/^return ~ from your graveyard to the battlefield( tapped)?$/)))
+    return [{ op: 'gyToBattlefield', tapped: !!m[1] }];
 
   if (/^counter target .*spell/.test(s)) return [{ op: 'counterSpell' }];
 
@@ -310,6 +326,15 @@ export function buildScript(card) {
     if (/^improvise$/.test(l)) { script.improvise = true; continue; }
     if (/^delve$/.test(l)) { script.delve = true; continue; }
     if (/^rebound$/.test(l)) { script.rebound = true; continue; }
+    if ((m = l.match(/^squad \{(.+?)\}/))) { script.squad = parseManaCost(`{${m[1]}}`); continue; }
+    if ((m = l.match(/^level up (\{.+?\})+/))) {
+      // Aproximación: subir de nivel = contador +1/+1 (a velocidad de conjuro).
+      const cost = parseManaCost(l.replace('level up ', ''));
+      script.activated.push({ mana: cost, tap: false, sac: false, sorceryOnly: true, ops: [{ op: 'counters', n: 1, scope: 'self' }] });
+      continue;
+    }
+    if (/^level \d/.test(l)) continue; // bloques de niveles: aproximados arriba
+    if (/^\d+\/\d+/.test(l)) continue; // líneas de fuerza/resistencia de niveles
 
     // Inicio de combate en tu turno (con condiciones comunes).
     if ((m = l.match(/^(?:lieutenant — )?at the beginning of combat on your turn, (.+)/))) {
@@ -411,7 +436,8 @@ export function buildScript(card) {
       const mana = parseManaCost(costStr.replace(/\{t\}/g, ''));
       const ops = parseEffectOps(effectText, script.unknown);
       const sorceryOnly = /activate only as a sorcery/.test(text);
-      if (ops.length) script.activated.push({ mana, tap, sac, ops, sorceryOnly });
+      const fromGraveyard = ops.some((op) => op.op === 'gyToHand' || op.op === 'gyToBattlefield');
+      if (ops.length) script.activated.push({ mana, tap, sac, ops, sorceryOnly, fromGraveyard });
       continue;
     }
     if (/^\{t\}: add/.test(l) || /^\{t\}, (tap|sacrifice)/.test(l)) continue;
@@ -466,6 +492,11 @@ export function opsValue(ops) {
       case 'coin': v += opsValue(op.win) * 0.5; break;
       case 'manaPay': v += opsValue(op.ops) * 0.5; break;
       case 'lootDiscard': v += opsValue(op.ops) * 0.7; break;
+      case 'fight': case 'pounce': case 'fightVs': v += 2.5; break;
+      case 'drawPer': v += 3; break;
+      case 'gainLifePer': v += 1; break;
+      case 'gyToHand': v += 1.5; break;
+      case 'gyToBattlefield': v += 2.5; break;
       case 'impulse': v += 1.4; break;
       case 'monarch': v += 2.5; break;
       case 'discardHandEach': v += 2; break;

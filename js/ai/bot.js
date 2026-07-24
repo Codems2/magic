@@ -304,6 +304,16 @@ export class BotController {
 
   bestActivation(game) {
     const p = this.player;
+    // Recursión desde el cementerio.
+    for (const card of p.graveyard) {
+      for (const ab of card.script?.activated || []) {
+        if (!ab.fromGraveyard || this._activatedThisTurn.has(card.id)) continue;
+        if (this.cardValue(card, game) < 2.5) continue;
+        if (!solvePayment(ab.mana, manaSources(p, game))) continue;
+        this._activatedThisTurn.add(card.id);
+        return { type: 'activate', permanent: card, ability: ab };
+      }
+    }
     for (const perm of p.battlefield) {
       if (this._activatedThisTurn.has(perm.id)) continue;
       for (const ab of perm.script?.activated || []) {
@@ -327,7 +337,7 @@ export class BotController {
 
   async chooseTarget(game, source, op, candidates) {
     const p = this.player;
-    const beneficial = ['pump', 'counters', 'support', 'distribute'].includes(op.op);
+    const beneficial = ['pump', 'counters', 'support', 'distribute', 'fightSel'].includes(op.op);
     if (beneficial) {
       const own = candidates.filter((t) => !(t instanceof Player) && t.controller === p);
       if (own.length) return own.sort((a, b) => this.cardValue(b, game) - this.cardValue(a, game))[0];
@@ -351,6 +361,8 @@ export class BotController {
   }
 
   async chooseX(game, card, maxX) { return Math.min(maxX, 10); }
+
+  async choosePayTimes(game, card, maxTimes) { return maxTimes; }
 
   async chooseCards(game, cards, n) {
     const needLand = this.player.lands().length < 4;
