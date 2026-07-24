@@ -102,6 +102,12 @@ function parseSentence(s) {
   if (/^return ~ from your graveyard to your hand$/.test(s)) return [{ op: 'gyToHand' }];
   if ((m = s.match(/^return ~ from your graveyard to the battlefield( tapped)?$/)))
     return [{ op: 'gyToBattlefield', tapped: !!m[1] }];
+  if ((m = s.match(/^put a land card from your hand onto the battlefield( tapped)?/)))
+    return [{ op: 'landFromHand', tapped: !!m[1] }];
+  if (/^you may play an additional land this turn/.test(s)) return [{ op: 'extraLandTurn' }];
+  if (/^untap that creature$/.test(s)) return [{ op: 'untapLast' }];
+  if ((m = s.match(/^reveal the top card of your library\.? if it's an? ([a-z]+) card, put it into your hand/)))
+    return [{ op: 'topFilter', type: m[1] }];
 
   if (/^counter target .*spell/.test(s)) return [{ op: 'counterSpell' }];
 
@@ -234,6 +240,11 @@ export function parseEffectOps(text, unknown) {
     ops.push({ op: 'coin', win: parseEffectOps(m[1], unknown), lose: m[2] ? parseEffectOps(m[2], unknown) : [] });
     text = text.replace(m[0], '');
   }
+  // Aproximación residual: "mira las N primeras cartas" sin plantilla conocida → adivinar N.
+  if ((m = text.match(/look at the top (\w+) cards of your library\.?/))) {
+    ops.push({ op: 'scry', n: parseNum(m[1]) });
+    text = text.replace(m[0], '');
+  }
   const sentences = text.split(/(?<=\.)\s+|, then /i);
   for (const sentence of sentences) {
     const parsed = parseSentence(sentence);
@@ -277,12 +288,12 @@ export function buildScript(card) {
   text = text
     .replace(/\([^)]*\)/g, '') // recordatorios
     .toLowerCase()
-    .replace(/\bthis (creature|artifact|enchantment|permanent|land|equipment|vehicle|token)\b/g, '~')
+    .replace(/\bthis (creature|artifact|enchantment|permanent|land|equipment|vehicle|token|aura)\b/g, '~')
     .replace(/ enters the battlefield/g, ' enters');
 
   const typeLine = (card.typeLine || '').toLowerCase();
   const isSpell = typeLine.includes('instant') || typeLine.includes('sorcery');
-  let modalList = null; let modalDone = false;
+  let modalList = null; let modalNeed = 1; let modalTaken = 0;
 
   for (const line of text.split('\n')) {
     const l = line.trim();
@@ -297,19 +308,22 @@ export function buildScript(card) {
     }
     if ((mm = l.match(/^crew (\d+)/))) { script.crew = parseInt(mm[1], 10); continue; }
     if (/^you have no maximum hand size/.test(l)) { script.noMaxHand = true; continue; }
+    if (/^you may play an additional land on each of your turns/.test(l)) { script.extraLand = true; continue; }
 
-    // Modales: usar el primer modo interpretable.
-    if (/^choose (one|two|one or both|up to)/.test(l)) {
+    // Modales: usar los primeros N modos interpretables.
+    const modalM = l.match(/^choose (one|two|three|one or both|up to (?:one|two|three|\w+))/);
+    if (modalM) {
       modalList = isSpell ? script.castOps : script.etb;
-      modalDone = false;
+      modalNeed = /two|both/.test(modalM[1]) ? 2 : /three/.test(modalM[1]) ? 3 : 1;
+      modalTaken = 0;
       continue;
     }
     if (l.startsWith('•')) {
-      if (modalList && !modalDone) {
+      if (modalList && modalTaken < modalNeed) {
         const ops = parseEffectOps(l.replace(/^•\s*/, ''), []);
         if (ops.length) {
           modalList.push(...ops);
-          modalDone = true;
+          modalTaken++;
         }
       }
       continue;
@@ -384,7 +398,8 @@ export function buildScript(card) {
       script.etb.push(...ops); script.attack.push(...ops); continue;
     }
     if ((m = l.match(/^when(?:ever)? ~ enters, (.+)/))) {
-      if (/^choose (one|two|up to)/.test(m[1])) { modalList = script.etb; modalDone = false; continue; }
+      const mo = m[1].match(/^choose (one|two|up to)/);
+      if (mo) { modalList = script.etb; modalNeed = /two/.test(mo[1]) ? 2 : 1; modalTaken = 0; continue; }
       script.etb.push(...parseEffectOps(m[1], script.unknown)); continue;
     }
     if ((m = l.match(/^when(?:ever)? ~ dies, (.+)/))) {
@@ -405,10 +420,10 @@ export function buildScript(card) {
     if ((m = l.match(/^equip \{(.+?)\}/)) || (m = l.match(/^equip (\d+)/))) {
       script.equipCost = parseManaCost(`{${m[1]}}`); continue;
     }
-    // Estáticas de equipo/aura.
-    if ((m = l.match(/^(?:equipped|enchanted) creature gets ([+-]\d+)\/([+-]\d+)(?: and has (.+?))?(?:\.|$)/))) {
+    // Estáticas de equipo/aura (tolerante con texto extra tras el +N/+N).
+    if ((m = l.match(/^(?:equipped|enchanted) creature gets ([+-]\d+)\/([+-]\d+)(.*)$/))) {
       script.attachPT = [parseInt(m[1], 10), parseInt(m[2], 10)];
-      if (m[3]) script.grantsKeywords.push(...kwList(m[3]));
+      script.grantsKeywords.push(...kwList(m[3] || ''));
       continue;
     }
     if ((m = l.match(/^(?:equipped|enchanted) creature has (.+?)(?:\.|$)/))) {
@@ -497,6 +512,9 @@ export function opsValue(ops) {
       case 'gainLifePer': v += 1; break;
       case 'gyToHand': v += 1.5; break;
       case 'gyToBattlefield': v += 2.5; break;
+      case 'landFromHand': v += 2; break;
+      case 'extraLandTurn': v += 1.5; break;
+      case 'topFilter': v += 1; break;
       case 'impulse': v += 1.4; break;
       case 'monarch': v += 2.5; break;
       case 'discardHandEach': v += 2; break;

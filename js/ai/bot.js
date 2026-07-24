@@ -114,7 +114,7 @@ export class BotController {
     this.resetTurnMemory(game);
 
     // 1. Jugar tierra.
-    if (p.landsPlayedThisTurn < 1) {
+    if (p.landsPlayedThisTurn < game.maxLands(p)) {
       const land = this.pickLand(game);
       if (land) return { type: 'playLand', card: land };
     }

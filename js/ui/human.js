@@ -82,7 +82,7 @@ export class HumanController {
     const p = this.player;
     const out = [];
     for (const c of p.hand) {
-      if (c.isLand) { if (p.landsPlayedThisTurn < 1) out.push(c); continue; }
+      if (c.isLand) { if (p.landsPlayedThisTurn < game.maxLands(p)) out.push(c); continue; }
       if (solvePayment(c.parsedCost, sourcesFor(p, game, c), 0)) out.push(c);
     }
     for (const c of p.command) {

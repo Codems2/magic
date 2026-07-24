@@ -293,8 +293,12 @@ export class Game {
     this.log(`${p.name} tripula ${vehicle.name} con ${crew.map((c) => c.name).join(', ')}.`);
   }
 
+  maxLands(p) {
+    return 1 + p.battlefield.filter((c) => c.script?.extraLand).length;
+  }
+
   playLand(p, card) {
-    if (p.landsPlayedThisTurn >= 1) throw new Error('ya jugó tierra');
+    if (p.landsPlayedThisTurn >= this.maxLands(p)) throw new Error('ya jugó tierra');
     if (!card.isLand || card.zone !== 'hand') throw new Error('no es una tierra en mano');
     p.hand.splice(p.hand.indexOf(card), 1);
     this.putOnBattlefield(card, p);
@@ -594,7 +598,11 @@ export class Game {
     for (const op of ops) {
       if (this.over) return;
       const p = ctx.controller;
-      const takeTarget = () => (op.targeted || op.target?.targeted) ? ctx.targets.shift() : null;
+      const takeTarget = () => {
+        const t = (op.targeted || op.target?.targeted) ? ctx.targets.shift() : null;
+        if (t) ctx._lastTarget = t;
+        return t;
+      };
       switch (op.op) {
         case 'draw': {
           const n = this.num(op, ctx);
@@ -816,6 +824,40 @@ export class Game {
           break;
         }
         case 'untapSelf': ctx.source.tapped = false; break;
+        case 'untapLast': {
+          const t = ctx._lastTarget;
+          if (t instanceof CardInstance && t.zone === 'battlefield') { t.tapped = false; this.log(`${t.name} se endereza.`); }
+          break;
+        }
+        case 'landFromHand': {
+          const land = p.hand.filter((c) => c.isLand)
+            .sort((a, b) => (b.data.producedMana?.length ?? 0) - (a.data.producedMana?.length ?? 0))[0];
+          if (land) {
+            p.hand.splice(p.hand.indexOf(land), 1);
+            this.putOnBattlefield(land, p);
+            if (op.tapped) land.tapped = true;
+            this.log(`${p.name} pone ${land.name} en juego desde su mano.`);
+          }
+          break;
+        }
+        case 'extraLandTurn': {
+          p.landsPlayedThisTurn = Math.max(0, p.landsPlayedThisTurn - 1);
+          this.log(`${p.name} puede jugar una tierra adicional este turno.`);
+          break;
+        }
+        case 'topFilter': {
+          const top = p.library[0];
+          if (!top) break;
+          if (top.hasType(op.type) || top.hasSubtype(op.type)) {
+            p.library.shift();
+            top.zone = 'hand';
+            p.hand.push(top);
+            this.log(`${p.name} revela ${top.name} y la pone en su mano.`);
+          } else {
+            this.log(`${p.name} revela ${top.name}: se queda arriba.`);
+          }
+          break;
+        }
         case 'regrow': {
           const matches = p.graveyard.filter((c) => c.isCreature).slice(-op.n);
           for (const c of matches) {
