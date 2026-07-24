@@ -199,7 +199,8 @@ export class Game {
       this.drawCards(p, 1);
       if (this.over) return;
     }
-    if (p.hand.length > 7) {
+    const noMax = p.battlefield.some((c) => c.script?.noMaxHand);
+    if (p.hand.length > 7 && !noMax) {
       const toDiscard = await p.controller.discardTo(this, p.hand.length - 7);
       for (const c of toDiscard) this.moveToGraveyard(c, 'descarta');
     }
@@ -543,6 +544,22 @@ export class Game {
           this.shuffle(rest);
           p.library.push(...rest);
           this.log(`${p.name} mira ${cards.length} carta(s) y se queda ${chosen.length}.`);
+          break;
+        }
+        case 'digPlay': {
+          const cards = p.library.splice(0, Math.min(op.look, p.library.length));
+          if (!cards.length) break;
+          const perms = cards.filter((c) => c.isPermanentType && !c.isLand);
+          const chosen = perms.length
+            ? await p.controller.chooseCards(this, perms, 1, 'Elige una carta para poner en el campo de batalla')
+            : [];
+          if (chosen.length) {
+            this.log(`${p.name} pone ${chosen[0].name} en el campo de batalla.`);
+            this.putOnBattlefield(chosen[0], p);
+          }
+          const rest = cards.filter((c) => c !== chosen[0]);
+          this.shuffle(rest);
+          p.library.push(...rest);
           break;
         }
         case 'impulse': {
@@ -956,6 +973,16 @@ export class Game {
       this.log(`${c.name} ${verb}: vuelve a la zona de mando.`);
       return;
     }
+    // Undying: vuelve al campo con un contador +1/+1 si no tenía.
+    if (verb === 'muere' && c.isCreature && c.counters === 0 && !c.isToken &&
+        (c.data.keywords || []).includes('Undying')) {
+      c.damage = 0;
+      c.cleanupEndOfTurn();
+      this.putOnBattlefield(c, c.owner);
+      c.counters = 1;
+      this.log(`${c.name} regresa con un contador +1/+1 (indomable).`);
+      return;
+    }
     if (c.isToken) { this.log(`La ficha ${c.name} ${verb}.`); return; }
     c.zone = 'graveyard';
     c.damage = 0; c.counters = 0; c.cleanupEndOfTurn?.();
@@ -1215,7 +1242,7 @@ export class Game {
 
   // Versión síncrona para disparos de muerte simples (sin decisiones interactivas).
   resolveOpsSync(ops, ctx) {
-    const interactive = new Set(['scry', 'discard', 'support', 'distribute', 'dig']);
+    const interactive = new Set(['scry', 'discard', 'support', 'distribute', 'dig', 'digPlay']);
     const safe = ops.filter((op) => !op.targeted && !op.target?.targeted && !interactive.has(op.op));
     if (safe.length) this.resolveOps(safe, ctx);
   }

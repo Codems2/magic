@@ -8,6 +8,8 @@ const KNOWN_KEYWORDS = [
   'flying', 'trample', 'vigilance', 'haste', 'deathtouch', 'lifelink',
   'first strike', 'double strike', 'menace', 'reach', 'hexproof',
   'indestructible', 'defender', 'flash', 'ward',
+  // implementadas en el motor por otra vía (combate, ETB, lanzamiento)
+  'fear', 'intimidate', 'shadow', 'horsemanship', 'prowess', 'evolve', 'undying',
 ];
 
 // ---- especificaciones de objetivo ----------------------------------------
@@ -187,6 +189,14 @@ export function parseEffectOps(text, unknown) {
     ops.push({ op: 'dig', look: parseNum(m[1]), take: parseNum(m[2]) });
     text = text.replace(m[0], '');
   }
+  if ((m = text.match(/(?:look at|reveal) the top (\w+) cards? of your library\.?\s*(?:you may )?put (?:up to (\w+) |a |an |one )?[a-z' ]*?cards? from among them into your hand[^.]*\./))) {
+    ops.push({ op: 'dig', look: parseNum(m[1]), take: parseNum(m[2] ?? 1) });
+    text = text.replace(m[0], '');
+  }
+  if ((m = text.match(/(?:look at|reveal) the top (\w+) cards? of your library\.?\s*(?:you may )?put (?:that card|one of them|a [a-z' ]*?card from among them) onto the battlefield[^.]*\./))) {
+    ops.push({ op: 'digPlay', look: parseNum(m[1]) });
+    text = text.replace(m[0], '');
+  }
   if ((m = text.match(/exile the top card of your library\.?\s*(?:until end of turn, )?you may (?:play|cast) (?:that card|it)[^.]*\./))) {
     ops.push({ op: 'impulse', n: 1 });
     text = text.replace(m[0], '');
@@ -238,7 +248,7 @@ export function buildScript(card) {
 
   const typeLine = (card.typeLine || '').toLowerCase();
   const isSpell = typeLine.includes('instant') || typeLine.includes('sorcery');
-  let modal = false; let modalDone = false;
+  let modalList = null; let modalDone = false;
 
   for (const line of text.split('\n')) {
     const l = line.trim();
@@ -252,14 +262,19 @@ export function buildScript(card) {
       script.entersCounters = mm[1] === 'x' ? 'x' : parseNum(mm[1]); continue;
     }
     if ((mm = l.match(/^crew (\d+)/))) { script.crew = parseInt(mm[1], 10); continue; }
+    if (/^you have no maximum hand size/.test(l)) { script.noMaxHand = true; continue; }
 
     // Modales: usar el primer modo interpretable.
-    if (/^choose (one|two|one or both|up to)/.test(l)) { modal = true; continue; }
+    if (/^choose (one|two|one or both|up to)/.test(l)) {
+      modalList = isSpell ? script.castOps : script.etb;
+      modalDone = false;
+      continue;
+    }
     if (l.startsWith('•')) {
-      if (modal && !modalDone) {
+      if (modalList && !modalDone) {
         const ops = parseEffectOps(l.replace(/^•\s*/, ''), []);
         if (ops.length) {
-          (isSpell ? script.castOps : script.etb).push(...ops);
+          modalList.push(...ops);
           modalDone = true;
         }
       }
@@ -312,6 +327,7 @@ export function buildScript(card) {
       script.etb.push(...ops); script.attack.push(...ops); continue;
     }
     if ((m = l.match(/^when(?:ever)? ~ enters, (.+)/))) {
+      if (/^choose (one|two|up to)/.test(m[1])) { modalList = script.etb; modalDone = false; continue; }
       script.etb.push(...parseEffectOps(m[1], script.unknown)); continue;
     }
     if ((m = l.match(/^when(?:ever)? ~ dies, (.+)/))) {
@@ -412,6 +428,7 @@ export function opsValue(ops) {
       case 'amass': v += op.n * 1.2; break;
       case 'populate': v += 1.5; break;
       case 'dig': v += op.take * 1.4; break;
+      case 'digPlay': v += 3; break;
       case 'impulse': v += 1.4; break;
       case 'monarch': v += 2.5; break;
       case 'discardHandEach': v += 2; break;
