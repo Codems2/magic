@@ -143,6 +143,10 @@ export class BotController {
   pickLand(game) {
     const p = this.player;
     const lands = p.hand.filter((c) => c.isLand);
+    // "Puedes jugar tierras desde tu cementerio".
+    if (p.battlefield.some((c) => c.script?.landsFromGY)) {
+      lands.push(...p.graveyard.filter((c) => c.isLand));
+    }
     if (!lands.length) return null;
     // Preferir tierras que entran sin girar y aportan colores que faltan.
     const have = new Set();

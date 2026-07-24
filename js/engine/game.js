@@ -327,8 +327,10 @@ export class Game {
 
   playLand(p, card) {
     if (p.landsPlayedThisTurn >= this.maxLands(p)) throw new Error('ya jugó tierra');
-    if (!card.isLand || card.zone !== 'hand') throw new Error('no es una tierra en mano');
-    p.hand.splice(p.hand.indexOf(card), 1);
+    const fromGY = card.zone === 'graveyard' && p.battlefield.some((c) => c.script?.landsFromGY);
+    if (!card.isLand || (card.zone !== 'hand' && !fromGY)) throw new Error('no es una tierra jugable');
+    if (fromGY) p.graveyard.splice(p.graveyard.indexOf(card), 1);
+    else p.hand.splice(p.hand.indexOf(card), 1);
     this.putOnBattlefield(card, p);
     p.landsPlayedThisTurn++;
     this.log(`${p.name} juega ${card.name}.`);
@@ -511,6 +513,18 @@ export class Game {
       }
     } else {
       await this.resolveOps(card.script.castOps, { source: card, controller: p, targets: targets.slice(), xValue });
+      // "Cópialo por cada vez que hayas lanzado a tu comandante".
+      if (card.script.copyPerCmdCast) {
+        const copies = Math.min(5, p.command.concat(p.battlefield.filter((c) => c.isCommander))
+          .reduce((n, c) => n + c.commanderCasts, 0));
+        for (let i = 0; i < copies; i++) {
+          this.log(`Copia ${i + 1} de ${card.name}.`);
+          await this.resolveOps(card.script.castOps, { source: card, controller: p, targets: [], xValue });
+        }
+      }
+      // Registro para efectos de copia tipo Fork (aproximados sin pila).
+      this._lastSpell ??= new Map();
+      this._lastSpell.set(p, card);
       // Rebound: se exilia y se vuelve a lanzar gratis en tu próximo mantenimiento.
       if (card.script.rebound && !card._rebounded) {
         card._rebounded = true;
@@ -1050,6 +1064,28 @@ export class Game {
         case 'untapYours': {
           for (const c of p.creatures()) c.tapped = false;
           this.log(`${p.name} endereza sus criaturas.`);
+          break;
+        }
+        case 'copySelfPerCmd': {
+          if (ctx._noCopy) break;
+          const copies = Math.min(5, p.command.concat(p.battlefield.filter((c) => c.isCommander))
+            .reduce((n, c) => n + c.commanderCasts, 0));
+          const opsNoCopy = ctx.source.script.castOps.filter((o) => o.op !== 'copySelfPerCmd');
+          for (let i = 0; i < copies; i++) {
+            this.log(`Copia ${i + 1} de ${ctx.source.name}.`);
+            await this.resolveOps(opsNoCopy, { ...ctx, targets: [], _noCopy: true });
+          }
+          break;
+        }
+        case 'copyLastSpell': {
+          const last = this._lastSpell?.get(p);
+          if (last && last !== ctx.source && last.script.castOps.length) {
+            this.log(`${p.name} copia ${last.name}.`);
+            const targetedOps = last.script.castOps.filter((o) => o.targeted || o.target?.targeted);
+            let tgs = [];
+            if (targetedOps.length) tgs = (await this.pickTargetsFor(p, last, targetedOps)) ?? [];
+            await this.resolveOps(last.script.castOps, { source: last, controller: p, targets: tgs, xValue: 0 });
+          }
           break;
         }
         case 'discover': {

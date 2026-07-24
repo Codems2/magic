@@ -55,7 +55,8 @@ function parseSentence(s) {
   s = s.trim().toLowerCase().replace(/\.$/, '').replace(/^you may /, '').replace(/^then /, '');
   if (!s) return [];
   // Ruido sin efecto en el simulador.
-  if (/^shuffle$|^(?:it|they) can't be regenerated$|^it's still a land$|^activate only|^exile ~$|^(?:it|they) gains? haste(?: until end of turn)?$|^untap up to \w+ lands?$|^regenerate ~$|^you may choose new targets|^put the rest on the bottom of your library|^shuffle your library$|^then shuffle$|^do this only once each turn$|^if you search your library this way, shuffle$|^(?:reveal|look at) the top card of your library$/.test(s)) return [];
+  // Ojo: "you may" ya está recortado, así que las reglas van sin ese prefijo.
+  if (/^shuffle$|^(?:it|they) can't be regenerated$|^it's still a land$|^activate only|^exile ~$|^(?:it|they) gains? haste(?: until end of turn)?$|^untap up to \w+ lands?$|^regenerate ~$|^choose new targets|^put the rest on the bottom of your library|^shuffle your library$|^then shuffle$|^do this only once each turn$|^if you search your library this way, shuffle$|^(?:reveal|look at) the top card of your library$|^play with the top card of your library revealed$|^if that spell would be put into (?:a|your) graveyard(?: this turn)?, exile it instead$/.test(s)) return [];
   let m;
 
   if ((m = s.match(/^(?:you )?mills? (\w+) cards?$/))) return [{ op: 'mill', n: parseNum(m[1]), who: 'you' }];
@@ -118,6 +119,8 @@ function parseSentence(s) {
   if ((m = s.match(/^backup (\w+)/))) return [{ op: 'support', n: parseNum(m[1]), allowSelf: true }];
   if (/^untap those creatures$/.test(s)) return [{ op: 'untapYours' }];
   if ((m = s.match(/^discover (\w+)/))) return [{ op: 'discover', n: parseNum(m[1]) }];
+  if (/^copy target instant or sorcery spell(?: you control)?/.test(s)) return [{ op: 'copyLastSpell' }];
+  if (/^when you cast ~, copy it for each time you've cast your commander/.test(s)) return [{ op: 'copySelfPerCmd' }];
   if ((m = s.match(/^reveal the top card of your library\.? if it's an? ([a-z]+) card, put it onto the battlefield\.? otherwise, put it into your hand/)))
     return [{ op: 'topFilter', type: m[1], dest: 'battlefield', elseHand: true }];
   if ((m = s.match(/^put (a|an|one|two|three|\w+) (charge|oil|stun) counters? on ~$/)))
@@ -362,6 +365,10 @@ export function buildScript(card) {
     if (/^you may play an additional land on each of your turns/.test(l)) { script.extraLand = true; continue; }
     if (/^at the beginning of each player's draw step, that player draws an additional card/.test(l)) {
       script.eachDrawExtra = true; continue;
+    }
+    if (/^you may play lands from your graveyard/.test(l)) { script.landsFromGY = true; continue; }
+    if (/^when you cast ~, copy it for each time you've cast your commander/.test(l)) {
+      script.copyPerCmdCast = true; continue;
     }
 
     // Modales: usar los primeros N modos interpretables.
