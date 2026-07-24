@@ -206,6 +206,14 @@ export function parseEffectOps(text, unknown) {
     ops.push({ op: 'energyPay', n: m[1].match(/\{e\}/g).length, ops: parseEffectOps(m[2], unknown) });
     text = text.replace(m[0], '');
   }
+  if ((m = text.match(/you may pay \{(\d+)\}\.?\s*if you do, ([^.]+\.)/))) {
+    ops.push({ op: 'manaPay', n: parseInt(m[1], 10), ops: parseEffectOps(m[2], unknown) });
+    text = text.replace(m[0], '');
+  }
+  if ((m = text.match(/you may discard a card\.?\s*if you do, ([^.]+\.)/))) {
+    ops.push({ op: 'lootDiscard', ops: parseEffectOps(m[1], unknown) });
+    text = text.replace(m[0], '');
+  }
   if ((m = text.match(/flip a coin\.?\s*if you win the flip, ([^.]+\.)(?:\s*if you lose the flip, ([^.]+\.))?/))) {
     ops.push({ op: 'coin', win: parseEffectOps(m[1], unknown), lose: m[2] ? parseEffectOps(m[2], unknown) : [] });
     text = text.replace(m[0], '');
@@ -385,7 +393,7 @@ export function buildScript(card) {
     }
 
     // Anthems y estáticas de grupo.
-    if ((m = l.match(/^(other )?([a-z' ]*?)(?:creatures?|permanents?) you control (?:get|have) ([+-]\d+\/[+-]\d+)?(?: and (?:have|gain) )?(.*?)(?:\.|$)/))) {
+    if ((m = l.match(/^(other )?([a-z' ]*?)(?:creatures?|permanents?) you control(?: of the chosen type)? (?:get|have) ([+-]\d+\/[+-]\d+)?(?: and (?:have|gain) )?(.*?)(?:\.|$)/))) {
       const bonus = { other: !!m[1], subtype: m[2].trim() || null, pt: [0, 0], keywords: [] };
       if (m[3]) { const [p, t] = m[3].split('/'); bonus.pt = [parseInt(p, 10), parseInt(t, 10)]; }
       bonus.keywords = kwList(m[4] || '');
@@ -456,6 +464,8 @@ export function opsValue(ops) {
       case 'energy': v += op.n * 0.5; break;
       case 'energyPay': v += opsValue(op.ops) * 0.6; break;
       case 'coin': v += opsValue(op.win) * 0.5; break;
+      case 'manaPay': v += opsValue(op.ops) * 0.5; break;
+      case 'lootDiscard': v += opsValue(op.ops) * 0.7; break;
       case 'impulse': v += 1.4; break;
       case 'monarch': v += 2.5; break;
       case 'discardHandEach': v += 2; break;

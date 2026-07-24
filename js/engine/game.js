@@ -921,6 +921,23 @@ export class Game {
           }
           break;
         }
+        case 'manaPay': {
+          const cost = { generic: op.n, pips: [], x: 0 };
+          const payment = solvePayment(cost, manaSources(p, this));
+          if (payment) {
+            this.paySources(payment);
+            this.log(`${p.name} paga {${op.n}}.`);
+            await this.resolveOps(op.ops, ctx);
+          }
+          break;
+        }
+        case 'lootDiscard': {
+          if (!p.hand.length) break;
+          const picked = await p.controller.discardTo(this, 1);
+          for (const c of picked) this.moveToGraveyard(c, 'descarta');
+          if (picked.length) await this.resolveOps(op.ops, ctx);
+          break;
+        }
         case 'coin': {
           const win = this.rng() < 0.5;
           this.log(`${p.name} lanza una moneda: ${win ? 'gana' : 'pierde'}.`);
@@ -1329,7 +1346,7 @@ export class Game {
 
   // Versión síncrona para disparos de muerte simples (sin decisiones interactivas).
   resolveOpsSync(ops, ctx) {
-    const interactive = new Set(['scry', 'discard', 'support', 'distribute', 'dig', 'digPlay']);
+    const interactive = new Set(['scry', 'discard', 'support', 'distribute', 'dig', 'digPlay', 'lootDiscard']);
     const safe = ops.filter((op) => !op.targeted && !op.target?.targeted && !interactive.has(op.op));
     if (safe.length) this.resolveOps(safe, ctx);
   }
