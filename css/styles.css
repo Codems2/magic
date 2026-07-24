@@ -107,6 +107,7 @@ button.primary:disabled { opacity: .4; cursor: default; }
   position: relative; border-radius: 6px; cursor: default; flex-shrink: 0;
   transition: transform .08s;
   border: 2px solid transparent;
+  background: var(--panel2); /* visible mientras carga la imagen */
 }
 .card img { display: block; border-radius: 5px; width: 100%; height: 100%; object-fit: cover; }
 .card .noimg {
@@ -148,6 +149,57 @@ button.primary:disabled { opacity: .4; cursor: default; }
 #preview .ptext {
   background: var(--panel); border-radius: 10px; padding: 10px; font-size: .82rem;
   box-shadow: 0 8px 30px rgba(0,0,0,.7); white-space: pre-wrap;
+}
+
+#logToggle {
+  display: none; background: var(--panel2); color: var(--text);
+  border: 1px solid #46557a; border-radius: 6px; padding: 6px 10px; cursor: pointer;
+}
+
+/* ---- vista previa táctil (pulsación larga) ---- */
+#previewModal {
+  position: fixed; inset: 0; background: rgba(5,8,14,.85); z-index: 200;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+#previewModal img { max-width: min(92vw, 340px); max-height: 82vh; border-radius: 14px; }
+#previewModal .ptext {
+  background: var(--panel); border-radius: 10px; padding: 14px; font-size: .95rem;
+  max-width: 92vw; max-height: 80vh; overflow-y: auto; white-space: pre-wrap;
+}
+
+/* ---- móvil / pantallas estrechas ---- */
+@media (max-width: 900px) {
+  #topbar { flex-wrap: wrap; gap: 6px; padding: 6px 8px; }
+  #turnInfo { font-size: .85rem; }
+  #promptText { flex-basis: 100%; order: 3; font-size: .9rem; }
+  #promptButtons button { padding: 10px 14px; }
+  #logToggle { display: inline-block; margin-left: auto; }
+
+  #opponents { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .opp { flex: 0 0 auto; min-width: 230px; }
+
+  #center { flex-direction: column; padding: 0 6px; gap: 6px; }
+  #log { display: none; width: auto; height: 150px; flex: none; order: 2; }
+  body.show-log #log { display: block; }
+  #playerBoard { order: 1; min-height: 120px; }
+
+  .card.board-card { width: 76px; height: 106px; }
+  .card.hand-card { width: 108px; height: 151px; }
+  .card.hand-card:hover { transform: none; }
+  #hand { min-height: 165px; padding: 8px 8px 14px; -webkit-overflow-scrolling: touch; }
+  #playerBar { flex-wrap: wrap; gap: 8px; padding: 4px 8px; font-size: .9rem; }
+
+  #preview { display: none; } /* en táctil: pulsación larga → modal */
+  .dialog { max-width: 94vw; padding: 16px; }
+  .dialog button { padding: 12px 20px; }
+}
+
+@media (max-width: 480px) {
+  .opp { min-width: 200px; }
+  .card.mini { width: 30px; height: 42px; }
+  #setup { padding: 20px 10px; }
+  #setup h1 { font-size: 1.5rem; }
+  .deck-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 }
 
 /* ---- overlay (mulligan, scry, final) ---- */

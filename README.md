@@ -14,6 +14,9 @@ python3 -m http.server 8000
 ```
 
 Abre <http://localhost:8000>, elige tu mazo, el número de bots (1–3) y juega.
+Funciona también en **móvil** (diseño adaptable): toca para jugar cartas,
+mantén pulsada cualquier carta para verla en grande y usa el botón 📜 para
+mostrar u ocultar el registro de la partida.
 
 - **Fase principal**: haz clic en una carta de la mano (o en tu comandante en
   la zona de mando) para jugarla; el maná se paga automáticamente girando

@@ -7,6 +7,9 @@ const $ = (id) => document.getElementById(id);
 // URLs de imagen que fallaron (sin conexión a Scryfall): se muestra texto.
 const failedImages = new Set();
 
+// Dispositivos táctiles: sin hover, la vista previa va por pulsación larga.
+const IS_TOUCH = window.matchMedia?.('(hover: none)').matches ?? false;
+
 export class UI {
   constructor() {
     this.game = null;
@@ -20,6 +23,8 @@ export class UI {
     this.game = game;
     this.human = human;
     $('log').innerHTML = '';
+    const toggle = $('logToggle');
+    if (toggle) toggle.onclick = () => document.body.classList.toggle('show-log');
   }
 
   // ---- selección genérica ------------------------------------------------
@@ -271,9 +276,42 @@ export class UI {
     const imgEl = div.querySelector('img');
     if (imgEl) imgEl.onerror = () => { failedImages.add(img); imgEl.remove(); div.insertAdjacentHTML('afterbegin', fallback); };
 
-    div.onmouseenter = () => this.showPreview(card);
-    div.onmouseleave = () => this.hidePreview();
+    if (IS_TOUCH) {
+      // Pulsación larga (450 ms) → vista previa a pantalla completa.
+      let timer = null; let longPressed = false;
+      div.addEventListener('touchstart', () => {
+        longPressed = false;
+        timer = setTimeout(() => { longPressed = true; this.showPreviewModal(card); }, 450);
+      }, { passive: true });
+      const cancel = () => clearTimeout(timer);
+      div.addEventListener('touchmove', cancel, { passive: true });
+      div.addEventListener('touchend', (e) => {
+        cancel();
+        if (longPressed) { e.preventDefault(); return; }
+        // Toque corto en carta no seleccionable → vista previa.
+        if (!div.classList.contains('selectable')) this.showPreviewModal(card);
+      });
+    } else {
+      div.onmouseenter = () => this.showPreview(card);
+      div.onmouseleave = () => this.hidePreview();
+    }
     return div;
+  }
+
+  showPreviewModal(card) {
+    document.getElementById('previewModal')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'previewModal';
+    const text = `<div class="ptext"><b>${card.name}</b>  ${card.data.manaCost ?? ''}\n${card.data.typeEs ?? card.typeLine}\n\n${card.data.textEs ?? card.oracleText}</div>`;
+    const img = card.data.image;
+    if (img && !failedImages.has(img)) {
+      modal.innerHTML = `<img src="${img}" alt="${card.name}">`;
+      modal.querySelector('img').onerror = () => { failedImages.add(img); modal.innerHTML = text; };
+    } else {
+      modal.innerHTML = text;
+    }
+    modal.onclick = () => modal.remove();
+    document.body.appendChild(modal);
   }
 
   showPreview(card) {
