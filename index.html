@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador de Magic: Commander</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="setup" class="screen">
+    <h1>⚔️ Simulador de Commander</h1>
+    <p class="subtitle">Mazos preconstruidos reales (MTGJSON) con cartas de Scryfall. Juega contra bots.</p>
+    <div class="setup-row">
+      <label>Rivales (bots):
+        <select id="botCount">
+          <option value="1">1 bot (duelo)</option>
+          <option value="2">2 bots (3 jugadores)</option>
+          <option value="3" selected>3 bots (mesa de 4)</option>
+        </select>
+      </label>
+    </div>
+    <h2>Elige tu mazo</h2>
+    <div id="deckList" class="deck-grid">Cargando mazos…</div>
+    <button id="startBtn" class="primary" disabled>Comenzar partida</button>
+  </div>
+
+  <div id="game" class="screen hidden">
+    <div id="topbar">
+      <span id="turnInfo"></span>
+      <span id="promptText"></span>
+      <span id="promptButtons"></span>
+    </div>
+    <div id="table">
+      <div id="opponents"></div>
+      <div id="center">
+        <div id="playerBoard"></div>
+        <div id="log"></div>
+      </div>
+      <div id="playerBar"></div>
+      <div id="hand"></div>
+    </div>
+    <div id="preview"></div>
+    <div id="overlay" class="hidden"></div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
