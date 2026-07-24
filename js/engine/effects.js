@@ -82,6 +82,7 @@ function parseSentence(s) {
     return [{ op: 'support', n: parseNum(m[1]) }];
   if ((m = s.match(/^distribute (\w+) \+1\/\+1 counters? among/)))
     return [{ op: 'distribute', n: parseNum(m[1]) }];
+  if ((m = s.match(/^monstrosity (\w+)/))) return [{ op: 'counters', n: parseNum(m[1]), scope: 'self' }];
 
   if (/^counter target .*spell/.test(s)) return [{ op: 'counterSpell' }];
 
@@ -218,7 +219,8 @@ export function buildScript(card) {
     castOps: [], etb: [], dies: [], attack: [], upkeep: [], endStep: [],
     statics: [], activated: [], attachPT: null, grantsKeywords: [],
     equipCost: null, unknown: [], combatHit: [], entersTapped: false, selfKeywords: [],
-    entersCounters: 0, crew: null,
+    entersCounters: 0, crew: null, allyEtb: [], allyDies: [], eachUpkeep: [], eachEnd: [],
+    convoke: false, cascade: false,
   };
   const name = card.name.split(' // ')[0];
   const shortName = name.split(',')[0];
@@ -269,6 +271,34 @@ export function buildScript(card) {
     if (words.every((w) => KNOWN_KEYWORDS.includes(w.trim()) || /^ward \{/.test(w.trim()))) continue;
 
     let m;
+    if (/^convoke$/.test(l)) { script.convoke = true; continue; }
+    if (/^cascade$/.test(l)) { script.cascade = true; continue; }
+    if (/^ravenous$/.test(l)) { script.entersCounters = 'x'; continue; }
+
+    // Disparos "aliados" (tribales): otra criatura tuya entra o muere.
+    const normSub = (w) => {
+      const s2 = w.trim().replace(/s$/, '');
+      return s2 === 'creature' || s2 === 'permanent' ? null : s2;
+    };
+    if ((m = l.match(/^whenever (~ or )?a(?:n|nother)? ([a-z' ]+?) you control enters(?: the battlefield)?, (.+)/))) {
+      script.allyEtb.push({ subtype: normSub(m[2]), includeSelf: !!m[1], ops: parseEffectOps(m[3], script.unknown) });
+      continue;
+    }
+    if ((m = l.match(/^whenever a ([a-z']+) enters the battlefield under your control, (.+)/))) {
+      script.allyEtb.push({ subtype: normSub(m[1]), includeSelf: true, ops: parseEffectOps(m[2], script.unknown) });
+      continue;
+    }
+    if ((m = l.match(/^whenever (~ or )?a(?:n|nother)? ([a-z' ]+?)( you control)? dies, (.+)/))) {
+      script.allyDies.push({ subtype: normSub(m[2]), includeSelf: !!m[1], yoursOnly: !!m[3], ops: parseEffectOps(m[4], script.unknown) });
+      continue;
+    }
+    if ((m = l.match(/^at the beginning of each (?:player's )?upkeep, (.+)/))) {
+      script.eachUpkeep.push(...parseEffectOps(m[1], script.unknown)); continue;
+    }
+    if ((m = l.match(/^at the beginning of each (?:player's )?end step, (.+)/))) {
+      script.eachEnd.push(...parseEffectOps(m[1], script.unknown)); continue;
+    }
+
     // Disparadas.
     if ((m = l.match(/^whenever ~ deals combat damage to a player, (.+)/))) {
       script.combatHit.push({ scope: 'self', ops: parseEffectOps(m[1], script.unknown) }); continue;
@@ -385,6 +415,7 @@ export function opsValue(ops) {
       case 'impulse': v += 1.4; break;
       case 'monarch': v += 2.5; break;
       case 'discardHandEach': v += 2; break;
+      case 'reanimateAll': v += 4; break;
       case 'scry': v += op.n * 0.4; break;
       case 'mill': v += op.n * 0.3; break;
       case 'discard': v += op.n * (op.who === 'eachOpponent' ? 1.5 : 0.8); break;

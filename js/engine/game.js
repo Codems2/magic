@@ -2,7 +2,7 @@
 
 import { CardInstance, makeToken, resetIds } from './cards.js';
 import { buildScript } from './effects.js';
-import { manaSources, solvePayment, maxAffordableX } from './mana.js';
+import { manaSources, solvePayment, maxAffordableX, sourcesFor } from './mana.js';
 
 // RNG con semilla para partidas reproducibles.
 export function mulberry32(seed) {
@@ -152,6 +152,14 @@ export class Game {
     for (const c of [...p.battlefield]) {
       if (c.script.upkeep.length) await this.resolveTriggered(c, c.script.upkeep, 'mantenimiento');
     }
+    // "Al comienzo de cada mantenimiento" (permanentes de cualquier jugador).
+    for (const q of this.alivePlayers()) {
+      for (const c of [...q.battlefield]) {
+        if (c.script.eachUpkeep?.length) {
+          this.resolveOpsSync(c.script.eachUpkeep, { source: c, controller: q, targets: [], xValue: 0 });
+        }
+      }
+    }
     if (this.over) return;
 
     // Robar.
@@ -178,6 +186,13 @@ export class Game {
     this.phase = 'end';
     for (const c of [...p.battlefield]) {
       if (c.script.endStep.length) await this.resolveTriggered(c, c.script.endStep, 'paso final');
+    }
+    for (const q of this.alivePlayers()) {
+      for (const c of [...q.battlefield]) {
+        if (c.script.eachEnd?.length) {
+          this.resolveOpsSync(c.script.eachEnd, { source: c, controller: q, targets: [], xValue: 0 });
+        }
+      }
     }
     if (this.monarch === p && p.alive) {
       this.log(`👑 ${p.name} roba por ser el monarca.`);
@@ -281,7 +296,7 @@ export class Game {
     const cost = fromCommand ? this.commanderCost(card) : card.parsedCost;
     if (cost.x && !xValue) xValue = await p.controller.chooseX(this, card, maxAffordableX(cost, p, this));
 
-    const payment = solvePayment(cost, manaSources(p, this), xValue);
+    const payment = solvePayment(cost, sourcesFor(p, this, card), xValue);
     if (!payment) throw new Error(`no puede pagar ${card.name}`);
 
     // Elegir objetivos del hechizo.
@@ -301,6 +316,15 @@ export class Game {
     const tax = fromCommand && card.commanderCasts > 1 ? ` (impuesto ${(card.commanderCasts - 1) * 2})` : '';
     this.log(`${p.name} lanza ${card.name}${tax}${xValue ? ` con X=${xValue}` : ''}.`);
 
+    // Prowess: hechizos que no son de criatura animan a tus criaturas.
+    if (!card.isCreature) {
+      for (const c of p.creatures()) {
+        if ((c.data.keywords || []).includes('Prowess')) {
+          c.tempPT = [c.tempPT[0] + 1, c.tempPT[1] + 1];
+        }
+      }
+    }
+
     // Ventana de respuesta: contrahechizos de los demás.
     const countered = await this.responseWindow(p, card);
     if (countered) {
@@ -308,7 +332,30 @@ export class Game {
       this.moveToGraveyard(card, null);
       return;
     }
+    if (card.script.cascade) await this.doCascade(p, card);
     await this.resolveSpell(p, card, targets ?? [], xValue);
+  }
+
+  // Cascada: exilia hasta hallar un hechizo más barato y lánzalo gratis.
+  async doCascade(p, spell) {
+    const exiled = [];
+    let hit = null;
+    while (p.library.length) {
+      const c = p.library.shift();
+      if (!c.isLand && c.cmc < spell.cmc) { hit = c; break; }
+      exiled.push(c);
+    }
+    this.shuffle(exiled);
+    p.library.push(...exiled);
+    if (!hit) return;
+    this.log(`Cascada: ${p.name} lanza ${hit.name} gratis.`);
+    hit.zone = 'stack';
+    let targets = [];
+    if (hit.script.targets.length) {
+      targets = await this.pickTargetsFor(p, hit, hit.script.targets);
+      if (targets === null) { this.moveToGraveyard(hit, null); return; }
+    }
+    await this.resolveSpell(p, hit, targets, 0);
   }
 
   async responseWindow(caster, spell) {
@@ -563,12 +610,12 @@ export class Game {
         }
         case 'token': {
           const n = this.num(op, ctx);
+          this.log(`${p.name} crea ${n} ficha(s) de ${op.name} ${op.pt[0]}/${op.pt[1]}.`);
           for (let i = 0; i < n; i++) {
             const tok = makeToken(op, p, this.turn);
             tok.script = buildScript(tok.data);
-            p.battlefield.push(tok);
+            this.putOnBattlefield(tok, p);
           }
-          this.log(`${p.name} crea ${n} ficha(s) de ${op.name} ${op.pt[0]}/${op.pt[1]}.`);
           break;
         }
         case 'treasure': {
@@ -762,7 +809,7 @@ export class Game {
             const tok = makeToken({ name: op.kind, pt: [0, 0], types: 'Artifact', producedMana: spec.producedMana ?? null }, p, this.turn);
             tok.data.oracleText = spec.text;
             tok.script = buildScript(tok.data);
-            p.battlefield.push(tok);
+            this.putOnBattlefield(tok, p);
           }
           this.log(`${p.name} crea ${n} ficha(s) de ${op.kind}.`);
           break;
@@ -787,7 +834,7 @@ export class Game {
             army = makeToken({ name: 'Zombie Army', pt: [0, 0], colors: ['B'] }, p, this.turn);
             army.data.typeLine = 'Token Creature — Zombie Army';
             army.script = buildScript(army.data);
-            p.battlefield.push(army);
+            this.putOnBattlefield(army, p);
             this.log(`${p.name} crea una ficha de Ejército zombie.`);
           }
           army.counters += op.n;
@@ -804,7 +851,7 @@ export class Game {
           }, p, this.turn);
           copy.data.typeLine = best.data.typeLine;
           copy.script = buildScript(copy.data);
-          p.battlefield.push(copy);
+          this.putOnBattlefield(copy, p);
           this.log(`${p.name} puebla: copia de ${best.name}.`);
           break;
         }
@@ -883,11 +930,27 @@ export class Game {
     }
   }
 
+  // Disparos "otra criatura (tuya) muere".
+  fireAllyDies(dead, controller) {
+    for (const q of this.alivePlayers()) {
+      for (const perm of [...q.battlefield]) {
+        for (const tr of perm.script?.allyDies || []) {
+          if (perm === dead && !tr.includeSelf) continue;
+          if (tr.yoursOnly && controller !== q) continue;
+          if (tr.subtype && !dead.hasSubtype(tr.subtype)) continue;
+          this.log(`Se dispara ${perm.name} (muere ${dead.name}).`);
+          this.resolveOpsSync(tr.ops, { source: perm, controller: q, targets: [], xValue: 0 });
+        }
+      }
+    }
+  }
+
   removeFromBattlefield(c, verb) {
     if (c.zone !== 'battlefield') return;
     this.detachAll(c);
     const p = c.controller;
     p.battlefield.splice(p.battlefield.indexOf(c), 1);
+    if (c.isCreature && (verb === 'muere' || verb === 'sacrificado')) this.fireAllyDies(c, p);
     if (c.isCommander) {
       c.zone = 'command'; c.damage = 0; c.owner.command.push(c);
       this.log(`${c.name} ${verb}: vuelve a la zona de mando.`);
@@ -922,6 +985,28 @@ export class Game {
     card.summoningSick = card.isCreature || card.isVehicle;
     card.enteredTurn = this.turn;
     p.battlefield.push(card);
+    this.fireEnterTriggers(card, p);
+  }
+
+  // Disparos por la entrada de una criatura: "otra criatura/tribu tuya entra" y evolucionar.
+  fireEnterTriggers(card, p) {
+    if (!card.isCreature) return;
+    this._etbDepth = (this._etbDepth || 0) + 1;
+    if (this._etbDepth > 5) { this._etbDepth--; return; } // corta bucles de fichas
+    for (const perm of [...p.battlefield]) {
+      for (const tr of perm.script?.allyEtb || []) {
+        if (card === perm && !tr.includeSelf) continue;
+        if (tr.subtype && !card.hasSubtype(tr.subtype)) continue;
+        this.log(`Se dispara ${perm.name} (entra ${card.name}).`);
+        this.resolveOpsSync(tr.ops, { source: perm, controller: p, targets: [], xValue: 0 });
+      }
+      if (perm !== card && perm.isCreature && (perm.data.keywords || []).includes('Evolve') &&
+          (card.power(this) > perm.power(this) || card.toughness(this) > perm.toughness(this))) {
+        perm.counters += 1;
+        this.log(`${perm.name} evoluciona (+1/+1).`);
+      }
+    }
+    this._etbDepth--;
   }
 
   drawCards(p, n) {

@@ -1,7 +1,7 @@
 // Controlador del jugador humano: traduce las decisiones del motor a
 // interacciones de la interfaz (selecciones y diálogos).
 
-import { canPay, solvePayment, manaSources } from '../engine/mana.js';
+import { canPay, solvePayment, manaSources, sourcesFor } from '../engine/mana.js';
 import { Player } from '../engine/game.js';
 
 export class HumanController {
@@ -76,8 +76,7 @@ export class HumanController {
     const out = [];
     for (const c of p.hand) {
       if (c.isLand) { if (p.landsPlayedThisTurn < 1) out.push(c); continue; }
-      const cost = c.parsedCost;
-      if (canPay(cost, p, game, 0) || (cost.x && canPay(cost, p, game, 0))) out.push(c);
+      if (solvePayment(c.parsedCost, sourcesFor(p, game, c), 0)) out.push(c);
     }
     for (const c of p.command) {
       if (canPay(game.commanderCost(c), p, game, 0)) out.push(c);

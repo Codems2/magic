@@ -2,7 +2,7 @@
 // combate calculado, removal oportuno y política multijugador (atacar al líder).
 
 import { opsValue } from '../engine/effects.js';
-import { manaSources, solvePayment, canPay, maxAffordableX } from '../engine/mana.js';
+import { manaSources, solvePayment, canPay, maxAffordableX, sourcesFor } from '../engine/mana.js';
 import { Player } from '../engine/game.js';
 
 export class BotController {
@@ -28,8 +28,11 @@ export class BotController {
     }
     if (s) {
       v += opsValue(s.castOps) + opsValue(s.etb) + opsValue(s.attack) * 1.5 +
-           opsValue(s.upkeep) * 2 + opsValue(s.dies) * 0.5;
+           opsValue(s.upkeep) * 2 + opsValue(s.dies) * 0.5 + opsValue(s.eachUpkeep || []) * 2;
       for (const tr of s.combatHit || []) v += opsValue(tr.ops) * 1.2;
+      for (const tr of s.allyEtb || []) v += opsValue(tr.ops) * 1.5;
+      for (const tr of s.allyDies || []) v += opsValue(tr.ops);
+      if (s.entersCounters) v += s.entersCounters === 'x' ? 2 : s.entersCounters;
       for (const st of s.statics) v += (st.pt[0] + st.pt[1]) * 1.5 + st.keywords.length;
       for (const ab of s.activated) v += opsValue(ab.ops) * 0.7;
       if (s.attachPT) v += (s.attachPT[0] + s.attachPT[1]) * 0.5;
@@ -164,7 +167,8 @@ export class BotController {
       if (card.isLand) continue;
       if (instantOnly && !(card.isInstant || card.hasKeyword('flash', game))) continue;
       const cost = card.zone === 'command' ? game.commanderCost(card) : card.parsedCost;
-      if (!canPay(cost, p, game, cost.x ? 1 : 0) && !(cost.x && canPay(cost, p, game, 0))) continue;
+      const srcs = sourcesFor(p, game, card);
+      if (!solvePayment(cost, srcs, cost.x ? 1 : 0) && !(cost.x && solvePayment(cost, srcs, 0))) continue;
       // Conjuros sin efecto simulado: no malgastar.
       if ((card.isInstant || card.isSorcery) && !card.script.castOps.length) continue;
       // Objetivos requeridos disponibles.

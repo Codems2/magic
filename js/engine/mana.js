@@ -24,6 +24,19 @@ export function manaSources(player, game) {
   return out;
 }
 
+// Convocar: las criaturas sin girar pueden pagar {1} o maná de su color.
+export function convokeSources(player, game) {
+  return player.creatures()
+    .filter((c) => !c.tapped)
+    .map((c) => ({ perm: c, colors: (c.data.colors?.length ? c.data.colors : ['C']), convoke: true }));
+}
+
+export function sourcesFor(player, game, card) {
+  const out = manaSources(player, game);
+  if (card?.script?.convoke) out.push(...convokeSources(player, game));
+  return out;
+}
+
 // Resuelve qué fuentes girar para pagar un coste { generic, pips, x } con
 // xValue elegido. Devuelve la lista de fuentes o null si no alcanza.
 // Estrategia: pips de color primero (fuentes con menos opciones primero),
@@ -42,8 +55,9 @@ export function solvePayment(cost, sources, xValue = 0) {
     for (let i = 0; i < pool.length; i++) {
       const src = pool[i];
       if (!src.colors.some((c) => options.includes(c))) continue;
-      // Preferir la fuente menos flexible (menos colores).
-      if (src.colors.length < bestScore) { bestScore = src.colors.length; bestIdx = i; }
+      // Preferir la fuente menos flexible; las criaturas (convocar) al final.
+      const score = src.colors.length + (src.convoke ? 10 : 0);
+      if (score < bestScore) { bestScore = score; bestIdx = i; }
     }
     if (bestIdx === -1) return null;
     used.push(pool.splice(bestIdx, 1)[0]);
@@ -52,8 +66,8 @@ export function solvePayment(cost, sources, xValue = 0) {
   let genericNeeded = cost.generic + cost.x * xValue;
   // Para el genérico, gastar primero las fuentes más flexibles/incoloras.
   pool.sort((a, b) => {
-    const aC = a.colors.includes('C') && a.colors.length === 1 ? -1 : a.colors.length;
-    const bC = b.colors.includes('C') && b.colors.length === 1 ? -1 : b.colors.length;
+    const aC = (a.colors.includes('C') && a.colors.length === 1 ? -1 : a.colors.length) + (a.convoke ? 100 : 0);
+    const bC = (b.colors.includes('C') && b.colors.length === 1 ? -1 : b.colors.length) + (b.convoke ? 100 : 0);
     return aC - bC;
   });
   while (genericNeeded > 0) {
