@@ -1,10 +1,63 @@
-// Bot heurístico para One Piece TCG (versión F2; se refina en F4).
+// Bot heurístico para One Piece TCG (versión F3; se refina en F4).
 // Todas las decisiones devuelven JSON plano con ids de carta.
+
+import { abilitiesOf, opsValue } from '../engine/effects.js';
 
 export class BotController {
   constructor(name) {
     this.name = name;
     this.player = null;
+  }
+
+  // Valor aproximado de una carta en mano (para descartes).
+  handValue(c) {
+    let v = (c.data.power ?? 0) / 2000 + (c.cost ?? 0) * 0.3;
+    for (const ab of c.script?.abilities ?? []) v += opsValue(ab.ops) * 0.5;
+    return v;
+  }
+
+  async chooseTarget(game, { purpose, candidateIds, optional }) {
+    const p = this.player;
+    const cands = candidateIds.map((id) => game.byId(id)).filter(Boolean);
+    if (!cands.length) return null;
+    const own = cands.filter((c) => c.owner === p);
+    const enemy = cands.filter((c) => c.owner !== p);
+    switch (purpose) {
+      case 'ko': case 'bounce': case 'tuckBottom': case 'rest':
+        return enemy.sort((a, b) => (b.data.power ?? 0) - (a.data.power ?? 0))[0]?.id ?? null;
+      case 'giveDon': case 'grantNoBlocker':
+        // Al líder por defecto (flexible para atacar o defender).
+        return (own.find((c) => c.isLeader) ?? own[0])?.id ?? null;
+      case 'powerUp': {
+        // En batalla: al defensor; si no, al líder.
+        return (own.find((c) => c.isLeader) ?? own.sort((a, b) => (b.data.power ?? 0) - (a.data.power ?? 0))[0])?.id ?? null;
+      }
+      case 'unrest': case 'recover':
+        return own.sort((a, b) => (b.data.power ?? 0) - (a.data.power ?? 0))[0]?.id ?? null;
+      default:
+        return (own[0] ?? cands[0])?.id ?? null;
+    }
+  }
+
+  async discardFromHand(game, n) {
+    return this.player.hand.slice()
+      .sort((a, b) => this.handValue(a) - this.handValue(b))
+      .slice(0, n)
+      .map((c) => c.id);
+  }
+
+  async triggerDecision(game, { cardId }) {
+    // Los triggers de los starter decks son siempre beneficiosos.
+    return true;
+  }
+
+  async payOptionalCost(game, { cardId, when }) {
+    const card = game.byId(cardId);
+    const ab = abilitiesOf(card, when)[0];
+    if (!ab) return false;
+    // Paga si el efecto vale más que el coste aproximado.
+    const costWeight = (ab.cost?.donReturn ?? 0) * 0.8 + (ab.cost?.trashHand ?? 0) * 0.7 + (ab.cost?.donRest ?? 0) * 0.4;
+    return opsValue(ab.ops) > costWeight;
   }
 
   async mulligan(game, handIds) {
@@ -33,7 +86,31 @@ export class BotController {
       return action;
     }
 
-    // 2. Escenario si hay hueco de DON.
+    // 2. Eventos [Main] útiles (removal, robo, rampa de DON).
+    for (const ev of p.hand.filter((c) => c.isEvent && c.cost <= p.donActive)) {
+      const main = abilitiesOf(ev, 'main')[0];
+      if (!main || !game.canPayAbilityCost(p, ev, main.cost)) continue;
+      const hasKo = main.ops.some((o) => o.op === 'ko' || o.op === 'bounce');
+      const oppHasTargets = game.opponentOf(p).characters.length > 0;
+      if (hasKo && !oppHasTargets) continue;
+      if (opsValue(main.ops) >= 1.5) return { type: 'playEvent', cardId: ev.id };
+    }
+
+    // 3. Habilidades [Activate: Main] (líder, personajes, escenario).
+    for (const c of [p.leader, ...p.characters, p.stage].filter(Boolean)) {
+      const ab = abilitiesOf(c, 'activateMain')[0];
+      if (!ab) continue;
+      if (ab.once && c._activatedTurn === game.turn) continue;
+      if (ab.donX && c.givenDon < ab.donX) continue;
+      if (!game.canPayAbilityCost(p, c, ab.cost)) continue;
+      // Da DON girados solo si los hay; endereza líder solo con ataque hecho.
+      if (ab.ops.some((o) => o.op === 'giveRestedDon') && p.donRested === 0) continue;
+      if (ab.ops.some((o) => o.op === 'unrestSelf') && !c.rested) continue;
+      const costWeight = (ab.cost?.donRest ?? 0) * 0.5 + (ab.cost?.donReturn ?? 0) * 0.9 + (ab.cost?.trashHand ?? 0) * 0.8;
+      if (opsValue(ab.ops) > costWeight) return { type: 'activate', cardId: c.id };
+    }
+
+    // 4. Escenario si hay hueco de DON.
     const stage = p.hand.find((c) => c.isStage && c.cost <= p.donActive);
     if (stage && !p.stage) return { type: 'playStage', cardId: stage.id };
 

@@ -36,22 +36,26 @@ export class CardInstance {
   get hasBanish() { return this.hasKeyword('Banish'); }
   get hasTrigger() { return this.text.includes('[Trigger]'); }
 
-  // Poder efectivo (los DON dados solo cuentan en el turno de su controlador).
+  // Poder efectivo: base + DON dados (en tu turno) + bonos temporales + estáticas.
   power(game) {
     const base = this.data.power ?? 0;
     const donBonus = game && game.activePlayer === this.owner ? this.givenDon * 1000 : 0;
-    return base + donBonus + this.tempPower;
+    const staticBonus = game?.staticPowerFor ? game.staticPowerFor(this) : 0;
+    return base + donBonus + this.tempPower + staticBonus;
   }
 
   canAttack(game) {
     if (this.rested) return false;
     if (this.isLeader) return true;
     if (!this.isCharacter || this.zone !== 'characters') return false;
-    return !this.summonedThisTurn || this.hasRush;
+    const rush = this.hasRush || this._tempKw?.has('Rush') || game?.staticKeyword?.(this, 'Rush');
+    return !this.summonedThisTurn || rush;
   }
 
   cleanupEndOfTurn() {
     this.tempPower = 0;
     this.summonedThisTurn = false;
+    this._tempKw?.clear();
+    this._noBlockerTurn = 0;
   }
 }
