@@ -13,13 +13,14 @@ export class CardInstance {
     this.rested = false;         // girada
     this.givenDon = 0;           // DON!! dados (cada uno +1000 en tu turno)
     this.tempPower = 0;          // bonos hasta fin de turno / de batalla
+    this.tempCost = 0;           // reducción de coste temporal (negativa)
     this.enteredTurn = 0;        // control de "no ataca el turno que entra"
     this.summonedThisTurn = false;
   }
 
   get name() { return this.data.name; }
   get type() { return this.data.type; }       // Leader | Character | Event | Stage
-  get cost() { return this.data.cost ?? 0; }
+  get cost() { return Math.max(0, (this.data.cost ?? 0) + this.tempCost); }
   get color() { return this.data.color; }
   get counterValue() { return this.data.counter ?? 0; }
   get text() { return this.data.text ?? ''; }
@@ -54,6 +55,7 @@ export class CardInstance {
 
   cleanupEndOfTurn() {
     this.tempPower = 0;
+    this.tempCost = 0;
     this.summonedThisTurn = false;
     this._tempKw?.clear();
     this._noBlockerTurn = 0;

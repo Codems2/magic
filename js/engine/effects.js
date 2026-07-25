@@ -73,9 +73,52 @@ function parseOps(text, unknown) {
     ops.push({ op: 'deckToLife', n: 1 });
     text = text.replace(mm[0], '');
   }
-  if ((mm = text.match(/^if your leader has the \{([^}]+)\} type,\s*(.+)$/i))) {
-    ops.push({ op: 'ifLeaderType', type: mm[1], ops: parseOps(mm[2], unknown) });
+  if ((mm = text.match(/^if your leader has the (?:\{([^}]+)\}|["“]([^"”]+)["”]) type,\s*(.+)$/i))) {
+    ops.push({ op: 'ifLeaderType', type: mm[1] ?? mm[2], ops: parseOps(mm[3], unknown) });
     return ops;
+  }
+  // Condicionales de estado con un efecto interior.
+  if ((mm = text.match(/^if your opponent has (\d+) or less life cards?,\s*(.+)$/i))) {
+    ops.push({ op: 'ifOppLife', max: parseInt(mm[1], 10), ops: parseOps(mm[2], unknown) });
+    return ops;
+  }
+  if ((mm = text.match(/^if you have (?:a character|(\d+) or more characters?) with (?:a )?(?:base )?cost of (\d+) or (more|less),?\s*(.+)$/i))) {
+    ops.push({ op: 'ifYouHaveChar', count: mm[1] ? parseInt(mm[1], 10) : 1, cost: parseInt(mm[2], 10), dir: mm[3], ops: parseOps(mm[4], unknown) });
+    return ops;
+  }
+  if ((mm = text.match(/^if you have (\d+) or more don!! cards? on your field,\s*(.+)$/i))) {
+    ops.push({ op: 'ifDon', min: parseInt(mm[1], 10), ops: parseOps(mm[2], unknown) });
+    return ops;
+  }
+  // Revelar y jugar la carta revelada si cumple (varias plantillas).
+  if ((mm = text.match(/reveal (?:up to )?1 cards? from the top of your deck[.,;]? and play up to 1 (.+?) card with a cost of (\d+)(?: or less)?( rested)?/i))) {
+    ops.push({ op: 'revealPlay', filter: parseFilter(mm[1] + ' card'), maxCost: parseInt(mm[2], 10), rested: !!mm[3] });
+    text = text.replace(mm[0], '');
+  } else if ((mm = text.match(/reveal (?:up to )?1 cards? from the top of your deck[.,;]?\s*(?:if (?:it|that card) is (?:an? )?(.+?)(?: with (?:a )?cost of (\d+)(?: or less)?)?,?\s*)?(?:you may )?play (?:up to 1 |it|that card)/i))) {
+    ops.push({ op: 'revealPlay', filter: mm[1] ? parseFilter(mm[1]) : {}, maxCost: mm[2] ? parseInt(mm[2], 10) : null });
+    text = text.replace(mm[0], '');
+  }
+  // Poner una carta de la mano en lo alto de tu Vida (boca abajo).
+  if ((mm = text.match(/(?:reveal up to 1 |add up to 1 )?(.+?) from your hand and add it to the top of your life cards?(?: face-down)?/i))) {
+    ops.push({ op: 'handToLife', filter: parseFilter(mm[1]) });
+    text = text.replace(mm[0], '');
+  }
+  // Revelar la carta superior (informativo) cuando no hay más instrucción.
+  if ((mm = text.match(/^reveal 1 card from the top of your deck\.?$/i))) {
+    text = text.replace(mm[0], '');
+  }
+  // Añadir carta de la parte superior de tu Vida a la mano.
+  if ((mm = text.match(/(?:reveal|add) (?:up to )?1 cards? from the top of your life cards?[.,;]?\s*(?:add (?:it|that card) to your hand)?/i))) {
+    ops.push({ op: 'lifeToHand', n: 1 });
+    text = text.replace(mm[0], '');
+  }
+  // Mirar/reordenar las cartas de vida (informativo en el simulador).
+  if ((mm = text.match(/^look at all your life cards\.?/i))) {
+    text = text.replace(mm[0], '');
+  }
+  if ((mm = text.match(/(?:add|place) up to (\d+) cards? from the top of your deck to the top of your life/i))) {
+    ops.push({ op: 'deckToLife', n: n(mm[1]) });
+    text = text.replace(mm[0], '');
   }
   // Frases separadas por ". " / "; " / ", then " / ". Then,".
   const sentences = text.split(/(?<=\.)\s+|;\s*|,\s*then\s+/i).map((s) => s.trim()).filter(Boolean);
@@ -103,12 +146,27 @@ function parseOps(text, unknown) {
       continue;
     }
 
-    // — poder —
-    if ((m = l.match(/^up to (\d+) (?:of your )?(?:\{[^}]+\} type )?leader or character cards?(?: on your field)?(?: other than this card)? gains? \+(\d+) power during this (turn|battle)/))) {
-      ops.push({ op: 'powerUp', n: parseInt(m[2], 10), targets: n(m[1]), duration: m[3], other: l.includes('other than this card') });
+    // — poder — (duración: "during this turn/battle" o "until the end of ... turn")
+    s = s.replace(/^if you do,?\s*/i, ''); const l2 = s.toLowerCase();
+    const DUR = '(?:during this (?:turn|battle)|until the end of (?:your |this |the )?(?:next )?turn)';
+    if ((m = l2.match(new RegExp(`^up to (\\d+) (?:of your )?(?:\\w+ )?(?:\\{[^}]+\\} type |["“][^"”]+["”] type )?(?:leader or character cards?|leader|character cards?)(?: on your field)?(?: other than this card)? gains? \\+(\\d+) power ${DUR}`)))) {
+      ops.push({ op: 'powerUp', n: parseInt(m[2], 10), targets: n(m[1]), other: l2.includes('other than this card') });
       continue;
     }
-    if ((m = l.match(/^this (?:character|leader|card) gains \+(\d+) power(?: during this turn)?$/))) {
+    if ((m = l2.match(new RegExp(`^give up to (\\d+) of your opponent'?s characters? -(\\d+) power ${DUR}`)))) {
+      ops.push({ op: 'powerDown', n: parseInt(m[2], 10), targets: n(m[1]) });
+      continue;
+    }
+    if ((m = l2.match(/^give up to (\d+) of your opponent'?s characters? -(\d+) cost during this turn/))) {
+      ops.push({ op: 'costDown', n: parseInt(m[2], 10), targets: n(m[1]) });
+      continue;
+    }
+    // Buff de palabra clave a un grupo: "up to N of your <tipo> gains [Kw] ...".
+    if ((m = l2.match(/^up to (\d+) of your (?:\{[^}]+\}|["“][^"”]+["”]|[\w ]+?) (?:type )?(?:leader or character cards?|characters?) gains? \[([\w ]+)\]/))) {
+      ops.push({ op: 'grantKeywordGroup', kw: m[2], targets: n(m[1]) });
+      continue;
+    }
+    if ((m = l.match(/^this (?:character|leader|card) gains \+(\d+) power(?: (?:during this turn|until the end of (?:your |this )?turn))?$/))) {
       ops.push({ op: 'powerSelf', n: parseInt(m[1], 10) });
       continue;
     }
@@ -126,7 +184,7 @@ function parseOps(text, unknown) {
     }
 
     // — eliminación / control —
-    if ((m = l.match(/^ko up to (\d+) of your opponent'?s( rested)? (?:\[blocker\] )?characters? with (?:(\d+) power or less|a cost of (\d+) or less)/))) {
+    if ((m = l.match(/^ko up to (\d+) of your opponent'?s( rested)? (?:\[blocker\] )?characters?(?: with (?:(\d+) power or less|a cost of (\d+) or less))?/))) {
       ops.push({
         op: 'ko', targets: n(m[1]), restedOnly: !!m[2],
         maxPower: m[3] ? parseInt(m[3], 10) : null,
@@ -211,13 +269,15 @@ function parseOps(text, unknown) {
 // ---- costes internos ("(2)", "DON!! -1", "trash 1 card...", "rest this") --
 
 function parseCost(text) {
-  const cost = { donRest: 0, donReturn: 0, trashHand: 0, restSelf: false, optional: true };
+  const cost = { donRest: 0, donReturn: 0, trashHand: 0, restSelf: false, trashSelf: false, optional: true };
   const l = text.toLowerCase();
   let m;
   if ((m = l.match(/\((\d+)\)/))) cost.donRest = parseInt(m[1], 10);
+  else if ((m = l.match(/rest (\d+) of your don!! cards?/))) cost.donRest = parseInt(m[1], 10);
   if ((m = l.match(/don!!\s*[-−](\d+)/))) cost.donReturn = parseInt(m[1], 10);
   if ((m = l.match(/trash (\d+) cards? from your hand/))) cost.trashHand = n(m[1]);
-  if (/rest this (?:card|stage)/.test(l)) cost.restSelf = true;
+  if (/rest this (?:card|stage|character)/.test(l)) cost.restSelf = true;
+  if (/trash this character/.test(l)) cost.trashSelf = true;
   return cost;
 }
 
@@ -300,7 +360,7 @@ export function buildScript(card) {
     // El coste va antes de ':' solo si contiene marcadores de coste reales.
     if (colon !== -1) {
       const head = body.slice(0, colon);
-      if (/\(\d+\)|don!!\s*[-−]\d+|trash \d+ card|rest this/i.test(head)) {
+      if (/\(\d+\)|don!!\s*[-−]\d+|trash \d+ card|rest this|rest \d+ of your don!!|trash this character/i.test(head)) {
         ab.cost = parseCost(head);
         body = body.slice(colon + 1).trim();
       }
@@ -335,6 +395,12 @@ export function opsValue(ops) {
       case 'tutorTop': case 'trashToHand': v += 1.5; break;
       case 'lifeToHand': v += op.n * 1.2; break;
       case 'deckToLife': v += op.n * 1.5; break;
+      case 'powerDown': v += op.n / 1500 + 0.5; break;
+      case 'costDown': v += op.n * 0.4; break;
+      case 'revealPlay': v += 2; break;
+      case 'grantKeywordGroup': v += op.targets * 0.8; break;
+      case 'handToLife': v += 0.8; break;
+      case 'ifOppLife': case 'ifYouHaveChar': case 'ifDon': v += opsValue(op.ops) * 0.7; break;
       case 'playFromZone': case 'playSelf': v += 2.5; break;
       case 'noBlocker': case 'grantNoBlocker': v += 1; break;
       case 'gainKeyword': v += 1; break;

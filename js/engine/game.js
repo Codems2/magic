@@ -262,6 +262,8 @@ export class Game {
     return true;
   }
 
+  effectiveTrashHand(p, cost) { return cost?.trashHand ?? 0; }
+
   async payAbilityCost(p, source, cost) {
     if (!cost) return;
     if (cost.donRest) { p.donActive -= cost.donRest; p.donRested += cost.donRest; }
@@ -284,6 +286,7 @@ export class Game {
       }
     }
     if (cost.restSelf) source.rested = true;
+    if (cost.trashSelf) this.trashCard(source);
   }
 
   async playEvent(p, { cardId }) {
@@ -514,6 +517,70 @@ export class Game {
           p.library.push(...seen);
           break;
         }
+        case 'powerDown': {
+          for (let i = 0; i < (op.targets ?? 1); i++) {
+            const cands = opp.characters.filter((c) => c.power(this) > -5000);
+            if (!cands.length) break;
+            const targetId = await p.controller.chooseTarget(this, {
+              purpose: 'powerDown', candidateIds: cands.map((c) => c.id), optional: true,
+            });
+            const t = this.byId(targetId);
+            if (t && t.owner === opp) {
+              t.tempPower -= op.n;
+              this.log(`${t.name} pierde ${op.n} de poder (${t.power(this)}).`);
+            }
+          }
+          break;
+        }
+        case 'costDown': {
+          for (let i = 0; i < (op.targets ?? 1); i++) {
+            const cands = opp.characters;
+            if (!cands.length) break;
+            const targetId = await p.controller.chooseTarget(this, {
+              purpose: 'costDown', candidateIds: cands.map((c) => c.id), optional: true,
+            });
+            const t = this.byId(targetId);
+            if (t && t.owner === opp) {
+              t.tempCost -= op.n;
+              this.log(`${t.name} reduce su coste en ${op.n} (${t.cost}).`);
+            }
+          }
+          break;
+        }
+        case 'ifOppLife': {
+          if (opp.life.length <= op.max) await this.resolveOps(op.ops, ctx);
+          break;
+        }
+        case 'ifYouHaveChar': {
+          const ok = p.characters.filter((c) =>
+            op.dir === 'more' ? (c.data.cost ?? 0) >= op.cost : (c.data.cost ?? 0) <= op.cost).length >= op.count;
+          if (ok) await this.resolveOps(op.ops, ctx);
+          break;
+        }
+        case 'ifDon': {
+          if (p.donActive + p.donRested >= op.min) await this.resolveOps(op.ops, ctx);
+          break;
+        }
+        case 'revealPlay': {
+          if (!p.library.length) break;
+          const c = p.library[0];
+          const okType = (!op.filter?.cardType || c.type === op.filter.cardType) &&
+            (op.maxCost === null || c.cost <= op.maxCost) &&
+            (!op.filter?.types || op.filter.types.some((t) => (c.data.subTypes ?? []).some((s) => s.toLowerCase().includes(t.toLowerCase()))));
+          this.log(`${p.name} revela ${c.name}.`);
+          if (okType && c.isCharacter && p.characters.length < 5) {
+            p.library.shift();
+            c.zone = 'characters'; c.rested = false; c.summonedThisTurn = true;
+            p.characters.push(c);
+            this.log(`${p.name} pone en juego ${c.name} gratis.`);
+            await this.runTaggedAbilities(c, 'onPlay');
+          } else {
+            p.library.shift();
+            c.zone = 'hand'; p.hand.push(c);
+            this.log(`${p.name} añade ${c.name} a su mano.`);
+          }
+          break;
+        }
         case 'lifeToHand': {
           for (let i = 0; i < op.n && p.life.length; i++) {
             const c = p.life.shift();
@@ -529,6 +596,20 @@ export class Game {
             c.zone = 'life';
             p.life.unshift(c);
             this.log(`${p.name} pone la carta superior del mazo en su Vida (${p.life.length}).`);
+          }
+          break;
+        }
+        case 'handToLife': {
+          const f = op.filter ?? {};
+          const cand = p.hand.find((c) =>
+            (!f.cardType || c.type === f.cardType) &&
+            (f.maxCost === undefined || c.cost <= f.maxCost) &&
+            (f.power === undefined || (c.data.power ?? -1) === f.power));
+          if (cand) {
+            p.hand.splice(p.hand.indexOf(cand), 1);
+            cand.zone = 'life';
+            p.life.unshift(cand);
+            this.log(`${p.name} pone ${cand.name} en lo alto de su Vida (${p.life.length}).`);
           }
           break;
         }
@@ -609,6 +690,21 @@ export class Game {
         case 'gainKeyword': {
           (ctx.source._tempKw ??= new Set()).add(op.kw);
           this.log(`${ctx.source.name} gana [${op.kw}] este turno.`);
+          break;
+        }
+        case 'grantKeywordGroup': {
+          for (let i = 0; i < (op.targets ?? 1); i++) {
+            const cands = p.board().filter((c) => !c._tempKw?.has(op.kw));
+            if (!cands.length) break;
+            const targetId = await p.controller.chooseTarget(this, {
+              purpose: 'powerUp', candidateIds: cands.map((c) => c.id), optional: true,
+            });
+            const t = this.byId(targetId);
+            if (t && t.owner === p) {
+              (t._tempKw ??= new Set()).add(op.kw);
+              this.log(`${t.name} gana [${op.kw}].`);
+            }
+          }
           break;
         }
         case 'ifLeaderType': {
