@@ -74,37 +74,36 @@ button.primary:disabled { opacity: .4; cursor: default; }
 #log .trn { color: var(--gold); font-weight: 700; }
 
 /* ---- tapete (disposición oficial de OPTCG) ---- */
-.mat {
-  display: grid; gap: 6px 10px; align-items: center;
-  grid-template-columns: auto 1fr auto auto;
-  grid-template-areas:
-    "name  chars   chars  piles"
-    "life  leader  stage  piles"
-    "life  cost    cost   piles";
+/* Estructura estable con flex: columnas laterales de ancho fijo (vidas /
+   pilas) y una columna central que no empuja el resto. */
+.mat { display: flex; gap: 10px; align-items: stretch; }
+.matCol { flex: 0 0 auto; display: flex; flex-direction: column; gap: 5px; justify-content: center; }
+.matCenter {
+  flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px;
 }
-/* El oponente se refleja: su área de personajes baja hacia la línea central. */
-.mat.opp {
-  grid-template-areas:
-    "piles cost    cost   name"
-    "piles leader  stage  life"
-    "piles chars   chars  life";
-}
-.nameBar { display: flex; align-items: center; gap: 8px; font-size: .9rem; color: var(--dim); }
+/* El oponente se refleja verticalmente: su coste arriba, sus personajes
+   abajo (junto a la línea de batalla central). */
+.mat.opp .matCenter { flex-direction: column-reverse; }
+
+.leaderRow { display: flex; align-items: center; gap: 8px; }
+.nameBar { display: flex; align-items: center; gap: 8px; font-size: .9rem; color: var(--dim); margin-left: auto; }
 .nameBar b { color: var(--text); }
 .lifeBadge { color: var(--accent); font-weight: 800; font-size: 1.05rem; }
 .handChip { font-size: .82rem; }
 
 .zone {
   position: relative; border: 1px dashed rgba(147,160,184,.28); border-radius: 8px;
-  padding: 14px 6px 6px; min-height: 92px; display: flex; gap: 5px; align-items: center;
+  padding: 15px 6px 5px; display: flex; gap: 5px; align-items: center;
 }
 .zone::before {
   content: attr(data-label); position: absolute; top: 2px; left: 8px;
   font-size: .58rem; letter-spacing: .04em; color: var(--dim); text-transform: uppercase;
+  white-space: nowrap;
 }
-.charZone { justify-content: flex-start; }
-.leaderZone, .stageZone { justify-content: center; }
-.costZone { flex-wrap: wrap; gap: 3px; min-height: 60px; }
+/* Personajes: 5 huecos fijos; si algo se desborda, scroll horizontal interno. */
+.charZone { justify-content: flex-start; overflow-x: auto; min-height: 108px; }
+.leaderZone, .stageZone { justify-content: center; flex: 0 0 auto; min-height: 108px; }
+.costZone { flex-wrap: wrap; gap: 3px 4px; min-height: 56px; align-content: flex-start; }
 
 .slot {
   width: 62px; height: 86px; border: 1px dashed rgba(147,160,184,.2); border-radius: 6px;
@@ -133,7 +132,7 @@ button.primary:disabled { opacity: .4; cursor: default; }
 .pile-don { background: repeating-linear-gradient(45deg, #4a3a08, #4a3a08 6px, #5c4809 6px, #5c4809 12px); }
 .pile-trash { background: #221722; }
 .pile-life {
-  grid-area: life; width: 66px; height: 92px;
+  width: 66px; height: 92px;
   background: repeating-linear-gradient(45deg, #5a1420, #5a1420 6px, #6e1a28 6px, #6e1a28 12px);
 }
 .pileCount { position: relative; font-size: 1.2rem; font-weight: 800; color: #fff; text-shadow: 0 1px 3px #000; }
@@ -215,7 +214,10 @@ button.primary:disabled { opacity: .4; cursor: default; }
   body.show-log #log { display: block; }
   #table { overflow-y: auto; }
   #oppArea, #selfArea { overflow-x: auto; }
-  .mat { grid-template-columns: auto 1fr auto auto; }
+  .mat { gap: 6px; }
+  .nameBar { font-size: .78rem; gap: 5px; }
+  .charZone { min-height: 82px; }
+  .leaderZone, .stageZone { min-height: 82px; }
   .card { width: 52px; height: 73px; }
   .card.hand-card { width: 78px; height: 109px; }
   .card.leaderCard { width: 60px; height: 84px; }

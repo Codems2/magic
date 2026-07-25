@@ -47,6 +47,8 @@ export class CardInstance {
 
   canAttack(game) {
     if (this.rested) return false;
+    // Nadie puede atacar durante el primer turno de la partida.
+    if (game && game.turn <= 1) return false;
     if (this.isLeader) return true;
     if (!this.isCharacter || this.zone !== 'characters') return false;
     const rush = this.hasRush || this._tempKw?.has('Rush') || game?.staticKeyword?.(this, 'Rush');

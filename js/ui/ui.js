@@ -148,17 +148,14 @@ export class UI {
     const mat = document.createElement('div');
     mat.className = 'mat' + (isOpp ? ' opp' : '');
 
-    // Barra de identidad del jugador.
-    const nameBar = document.createElement('div');
-    nameBar.className = 'nameBar';
-    nameBar.style.gridArea = 'name';
-    nameBar.innerHTML = `<b>${p.name}</b><span class="lifeBadge">❤ ${p.life.length}</span>
-      <span class="handChip">✋ ${p.hand.length}</span>`;
+    // Columna izquierda: pila de vidas.
+    const leftCol = document.createElement('div');
+    leftCol.className = 'matCol';
+    leftCol.appendChild(this.pileEl('Vidas', p.life.length, 'life'));
 
-    // Zona de personajes (la línea de batalla).
+    // Zona de personajes (la línea de batalla): siempre 5 huecos fijos.
     const chars = document.createElement('div');
     chars.className = 'zone charZone';
-    chars.style.gridArea = 'chars';
     chars.dataset.label = 'Área de personajes';
     for (let i = 0; i < 5; i++) {
       if (p.characters[i]) chars.appendChild(this.cardEl(p.characters[i], {}));
@@ -166,24 +163,28 @@ export class UI {
     }
 
     // Líder + escenario.
+    const leaderRow = document.createElement('div');
+    leaderRow.className = 'leaderRow';
     const leaderZone = document.createElement('div');
     leaderZone.className = 'zone leaderZone';
-    leaderZone.style.gridArea = 'leader';
     leaderZone.dataset.label = 'Líder';
     leaderZone.appendChild(this.cardEl(p.leader, { leader: true }));
-
     const stageZone = document.createElement('div');
     stageZone.className = 'zone stageZone';
-    stageZone.style.gridArea = 'stage';
     stageZone.dataset.label = 'Escenario';
     if (p.stage) stageZone.appendChild(this.cardEl(p.stage, {}));
     else stageZone.appendChild(this.slotEl());
+    // Barra de identidad, junto al líder.
+    const nameBar = document.createElement('div');
+    nameBar.className = 'nameBar';
+    nameBar.innerHTML = `<b>${p.name}</b><span class="lifeBadge">❤ ${p.life.length}</span>
+      <span class="handChip">✋ ${p.hand.length} · 📚 ${p.library.length}</span>`;
+    leaderRow.append(leaderZone, stageZone, nameBar);
 
     // Área de coste: cartas DON!! en juego (activas / giradas).
     const cost = document.createElement('div');
     cost.className = 'zone costZone';
-    cost.style.gridArea = 'cost';
-    cost.dataset.label = `Área de coste · DON!! ${p.donActive} activos / ${p.donRested} girados`;
+    cost.dataset.label = `Coste · DON!! ${p.donActive} activos / ${p.donRested} girados`;
     const totalDon = p.donActive + p.donRested;
     for (let i = 0; i < totalDon; i++) {
       const tok = document.createElement('div');
@@ -193,16 +194,19 @@ export class UI {
     }
     if (totalDon === 0) cost.appendChild(this.slotEl('sin DON!!'));
 
-    // Pilas laterales: vidas, mazo, mazo de DON!!, descarte.
-    const life = this.pileEl('Vidas', p.life.length, 'life', 'life');
-    const piles = document.createElement('div');
-    piles.className = 'pileCol';
-    piles.style.gridArea = 'piles';
-    piles.appendChild(this.pileEl('Mazo', p.library.length, 'deck'));
-    piles.appendChild(this.pileEl('DON!!', p.donDeck, 'don'));
-    piles.appendChild(this.pileEl('Descarte', p.trash.length, 'trash', 'trash', p.trash[p.trash.length - 1]));
+    // Columna central: personajes (línea de batalla) → líder → coste.
+    const center = document.createElement('div');
+    center.className = 'matCenter';
+    center.append(chars, leaderRow, cost);
 
-    mat.append(nameBar, chars, leaderZone, stageZone, cost, life, piles);
+    // Columna derecha: mazo, mazo de DON!!, descarte.
+    const rightCol = document.createElement('div');
+    rightCol.className = 'matCol';
+    rightCol.appendChild(this.pileEl('Mazo', p.library.length, 'deck'));
+    rightCol.appendChild(this.pileEl('DON!!', p.donDeck, 'don'));
+    rightCol.appendChild(this.pileEl('Descarte', p.trash.length, 'trash', null, p.trash[p.trash.length - 1]));
+
+    mat.append(leftCol, center, rightCol);
     root.appendChild(mat);
   }
 
