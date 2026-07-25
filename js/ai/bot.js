@@ -16,7 +16,7 @@ export class BotController {
     return v;
   }
 
-  async chooseTarget(game, { purpose, candidateIds, optional }) {
+  async chooseTarget(game, { purpose, candidateIds, optional, battle = null }) {
     const p = this.player;
     const cands = candidateIds.map((id) => game.byId(id)).filter(Boolean);
     if (!cands.length) return null;
@@ -30,6 +30,12 @@ export class BotController {
         return (own.find((c) => c.isLeader) ?? own[0])?.id ?? null;
       case 'powerUp': {
         // En batalla: al defensor; si no, al líder.
+        if (battle?.defenderId) {
+          const def = cands.find((c) => c.id === battle.defenderId);
+          if (def) return def.id;
+          const leader = own.find((c) => c.isLeader);
+          if (leader) return leader.id;
+        }
         return (own.find((c) => c.isLeader) ?? own.sort((a, b) => (b.data.power ?? 0) - (a.data.power ?? 0))[0])?.id ?? null;
       }
       case 'unrest': case 'recover':
@@ -117,85 +123,180 @@ export class BotController {
     return this.combatOrPass(game);
   }
 
+  // Estima cuánto counter puede oponer el rival a un golpe (sin mirar su mano).
+  counterEstimate(game, hittingLeader) {
+    const opp = game.opponentOf(this.player);
+    // Defiende más cuanto menos vida le queda y más mano tiene.
+    const urgency = hittingLeader ? Math.max(0, 4 - opp.life.length) : 1;
+    const capacity = Math.min(opp.hand.length, 2 + Math.floor(urgency / 2)) * 1200;
+    return Math.min(capacity, urgency * 1500);
+  }
+
+  // ¿Vamos ganando la carrera? Ajusta agresividad.
+  raceScore(game) {
+    const p = this.player;
+    const opp = game.opponentOf(p);
+    const board = (q) => q.characters.reduce((n, c) => n + (c.data.power ?? 0), 0);
+    return (p.life.length - opp.life.length) * 2000 + (board(p) - board(opp)) / 2;
+  }
+
   combatOrPass(game) {
     const p = this.player;
     const opp = game.opponentOf(p);
 
-    // 3. Atacar con lo rentable (estimando el counter del rival por su mano).
-    const attackers = [p.leader, ...p.characters].filter((c) => c && c.canAttack(game));
-    const counterRisk = Math.min(opp.hand.length, 2) * 1000; // estimación, no mira la mano
+    const attackers = [...p.characters, p.leader].filter((c) => c && c.canAttack(game));
     for (const atk of attackers) {
-      // Dar DON sobrante al atacante antes de pegar.
-      const target = this.pickTarget(game, atk, counterRisk);
-      if (!target) continue;
-      const need = (target.card ? target.card.power(game) : opp.leader.power(game)) + counterRisk;
-      let power = atk.power(game);
-      if (power < need && p.donActive > 0) {
-        const give = Math.min(p.donActive, Math.ceil((need - power) / 1000));
-        if (give > 0 && power + give * 1000 >= need) {
-          return { type: 'giveDon', cardId: atk.id, n: give };
-        }
+      const plan = this.planAttack(game, atk);
+      if (!plan) continue;
+      // Asigna DON antes de pegar si el golpe se queda corto pero es alcanzable.
+      if (plan.donNeeded > 0 && p.donActive >= plan.donNeeded) {
+        return { type: 'giveDon', cardId: atk.id, n: plan.donNeeded };
       }
-      return { type: 'attack', attackerId: atk.id, targetId: target.id };
+      if (plan.donNeeded === 0) {
+        return { type: 'attack', attackerId: atk.id, targetId: plan.targetId };
+      }
     }
     return { type: 'pass' };
   }
 
-  pickTarget(game, atk, counterRisk) {
-    const opp = game.opponentOf(this.player);
+  // Devuelve {targetId, donNeeded} o null si no hay ataque rentable.
+  planAttack(game, atk) {
+    const p = this.player;
+    const opp = game.opponentOf(p);
     const power = atk.power(game);
-    // KO gratis a personajes girados valiosos.
-    const rested = opp.characters.filter((c) => c.rested && power >= c.power(game));
-    const good = rested.sort((a, b) => (b.data.power ?? 0) - (a.data.power ?? 0))[0];
-    if (good && (good.data.power ?? 0) >= 4000) return { id: good.id, card: good };
-    // Si no, presiona al líder cuando el golpe puede entrar.
-    if (power >= opp.leader.power(game)) return { id: 'leader', card: null };
-    if (good) return { id: good.id, card: good };
+    const spareDon = p.donActive;
+    const abilityBonus = (c) => (c.script?.abilities ?? []).reduce((n, a) => n + opsValue(a.ops), 0);
+
+    // Opción A: KO a un personaje girado (valor = poder + habilidades).
+    const restedTargets = opp.characters.filter((c) => c.rested)
+      .map((c) => ({
+        card: c,
+        value: (c.data.power ?? 0) / 1000 + abilityBonus(c),
+        need: c.power(game) + this.counterEstimate(game, false),
+      }))
+      .filter((t) => t.value >= 3.5)
+      .sort((a, b) => b.value - a.value);
+    for (const t of restedTargets) {
+      const deficit = Math.max(0, t.need - power);
+      const don = Math.ceil(deficit / 1000);
+      if (don <= spareDon && don <= 2) return { targetId: t.card.id, donNeeded: don };
+    }
+
+    // Opción B: golpe al líder. Atacar drena counters del rival: casi siempre
+    // es correcto si igualas su poder base; el DON extra solo busca superar
+    // el margen de counter esperado cuando sale barato.
+    const leaderBase = opp.leader.power(game);
+    if (power >= leaderBase) {
+      const margin = this.counterEstimate(game, true);
+      const extra = Math.min(
+        Math.ceil(margin / 1000),
+        opp.life.length <= 1 ? spareDon : Math.min(spareDon, 2),
+      );
+      return { targetId: 'leader', donNeeded: Math.max(0, extra) };
+    }
+    // Se queda corto: súbelo con DON si es barato (1-2).
+    const deficit = leaderBase - power;
+    const don = Math.ceil(deficit / 1000);
+    if (don <= Math.min(spareDon, 2)) return { targetId: 'leader', donNeeded: don };
+
+    // Opción C: KO fácil aunque valga poco (mejor que no atacar).
+    const easy = opp.characters.filter((c) => c.rested && power >= c.power(game))
+      .sort((a, b) => (b.data.power ?? 0) - (a.data.power ?? 0))[0];
+    if (easy) return { targetId: easy.id, donNeeded: 0 };
+
     return null;
   }
 
   async chooseBlocker(game, { attackerId, targetId, blockerIds }) {
     const p = this.player;
     const attacker = game.byId(attackerId);
-    // Bloquea si el ataque va al líder con pocas vidas, o salva a un personaje valioso.
     const atkPower = attacker.power(game);
     const candidates = blockerIds.map((id) => game.byId(id));
-    // Prefiere un bloqueador que sobreviva; si no, el más barato.
     const survivor = candidates.filter((b) => b.power(game) > atkPower)
       .sort((a, b) => a.cost - b.cost)[0];
     const cheapest = candidates.slice().sort((a, b) => a.cost - b.cost)[0];
+    const counterPotential = p.hand.reduce((n, c) => n + (c.counterValue ?? 0), 0);
+
     if (targetId === 'leader') {
-      if (p.life.length <= 2) return (survivor ?? cheapest).id;
+      // Golpe potencialmente letal: bloquea siempre.
+      const lethal = p.life.length === 0 || (attacker.hasDoubleAttack && p.life.length <= 1);
+      if (lethal) return (survivor ?? cheapest).id;
+      // Vidas bajas: bloquea salvo que el counter salga barato.
+      if (p.life.length <= 2) {
+        const deficit = atkPower - p.leader.power(game);
+        if (deficit > 2000 || counterPotential < deficit + 1000) return (survivor ?? cheapest).id;
+        return null;
+      }
+      // Con vida de sobra solo bloquea gratis (el bloqueador sobrevive).
       if (survivor) return survivor.id;
-      if (p.life.length <= 3 && attacker.hasDoubleAttack) return cheapest.id;
+      if (attacker.hasDoubleAttack && p.life.length <= 3) return cheapest.id;
       return null;
     }
     const target = game.byId(targetId);
-    if (target && (target.data.power ?? 0) >= 5000 && survivor) return survivor.id;
+    const targetValue = (target?.data.power ?? 0) / 1000 +
+      (target?.script?.abilities ?? []).reduce((n, a) => n + opsValue(a.ops), 0);
+    if (targetValue >= 5 && survivor) return survivor.id;
+    if (targetValue >= 7 && cheapest && cheapest.cost <= 2) return cheapest.id;
     return null;
   }
 
   async counterStep(game, { attackerId, targetId, attackPower, targetPower }) {
     const p = this.player;
     const deficit = attackPower - targetPower;
-    if (deficit < 0) return []; // ya no entra
+    if (deficit < 0) return { discardIds: [], eventIds: [] };
     const isLeader = targetId === 'leader';
-    // ¿Merece la pena counterear? Líder con vidas bajas o personaje valioso.
-    const worth = isLeader
-      ? (p.life.length <= 3 || game.byId(attackerId)?.hasDoubleAttack)
-      : (game.byId(targetId)?.data.power ?? 0) >= 5000;
-    if (!worth) return [];
-    // Selecciona counters de mano justos para superar el déficit.
-    const counters = p.hand.filter((c) => c.counterValue > 0)
-      .sort((a, b) => a.counterValue - b.counterValue || a.cost - b.cost);
-    const chosen = [];
-    let sum = 0;
-    for (const c of counters) {
-      if (sum > deficit) break;
-      chosen.push(c.id);
-      sum += c.counterValue;
+    const attacker = game.byId(attackerId);
+    const lethal = isLeader && (p.life.length === 0 || (attacker?.hasDoubleAttack && p.life.length <= 1));
+
+    // ¿Merece defender? Solo intercambios eficientes: la mano es tempo.
+    // Letal: siempre. Vidas 1-2: si sale barato. Personajes: solo joyas baratas de salvar.
+    let worth;
+    if (lethal) worth = true;
+    else if (isLeader) {
+      worth = (p.life.length <= 1) ||
+        (p.life.length === 2 && deficit <= 1000) ||
+        (attacker?.hasDoubleAttack && p.life.length <= 3 && deficit <= 2000);
+    } else {
+      const t = game.byId(targetId);
+      const tv = (t?.data.power ?? 0) / 1000 +
+        (t?.script?.abilities ?? []).reduce((n, a) => n + opsValue(a.ops), 0);
+      worth = tv >= 5 && deficit <= 1000;
     }
-    // Si ni con todo alcanza, no desperdicies mano.
-    return sum > deficit ? chosen : [];
+    if (!worth) return { discardIds: [], eventIds: [] };
+
+    // No pagues defensas imposibles o carísimas (salvo letal).
+    const maxSpend = lethal ? 99 : deficit <= 1000 ? 2 : p.life.length <= 1 ? 3 : 2;
+
+    // 1. Eventos [Counter] primero: suelen dar +2000/+4000 por una sola carta.
+    const eventIds = [];
+    let bonus = 0;
+    for (const ev of p.hand.filter((c) => c.isEvent)) {
+      const ab = abilitiesOf(ev, 'counter')[0];
+      if (!ab) continue;
+      if (ev.cost > p.donActive || !game.canPayAbilityCost(p, ev, ab.cost)) continue;
+      const evBonus = ab.ops.filter((o) => o.op === 'powerUp').reduce((n, o) => n + o.n, 0);
+      if (bonus > deficit) break;
+      if (evBonus > 0 || opsValue(ab.ops) >= 1.5) {
+        eventIds.push(ev.id);
+        bonus += evBonus;
+      }
+      if (eventIds.length >= 1) break; // uno por batalla es casi siempre lo correcto
+    }
+
+    // 2. Descartes con counter, de menor a mayor valor de carta, hasta superar.
+    const counters = p.hand.filter((c) => c.counterValue > 0 && !eventIds.includes(c.id))
+      .sort((a, b) => this.handValue(a) - this.handValue(b));
+    const discardIds = [];
+    for (const c of counters) {
+      if (bonus > deficit) break;
+      if (discardIds.length + eventIds.length >= maxSpend) break;
+      discardIds.push(c.id);
+      bonus += c.counterValue;
+    }
+    if (bonus <= deficit) {
+      // No alcanza: solo tira la mano si era letal (para forzar el último punto).
+      return lethal ? { discardIds, eventIds } : { discardIds: [], eventIds: [] };
+    }
+    return { discardIds, eventIds };
   }
 }
