@@ -17,8 +17,17 @@ simulador de Magic: Commander construido antes en este repositorio
   muy plantillado; mucho más tratable que el oráculo de Magic).
 - Interfaz web estática (sin build), en español, jugable en escritorio y móvil.
 
-Fuera de alcance en v1: multijugador humano, formatos por parejas, cartas
-promocionales sueltas, reglas de torneo (mulligan competitivo exacto, etc.).
+Fuera de alcance en v1 (pero **planificado para fases posteriores**): el
+**multijugador humano 1v1 online** — ver fases F7–F9. La arquitectura de v1
+se decide ya pensando en ello (ver §4b) para que añadirlo no exija reescribir
+el motor.
+
+Idioma: el texto de las cartas irá **en inglés** — One Piece TCG no tiene
+edición en español, así que no hay fuente que localizar (la interfaz sí será
+en español).
+
+Fuera de alcance total: formatos por parejas, cartas promocionales sueltas,
+reglas de torneo (tiempos, sideboard, etc.).
 
 ## 2. Fuentes de datos (verificadas)
 
@@ -109,6 +118,35 @@ Diferencias clave a favor: sin pila ni prioridad, un solo recurso (DON),
 combate secuencial simple, texto corto y etiquetado, 1v1 (bots más fáciles
 de hacer buenos).
 
+## 4b. Decisiones de v1 que preparan el multijugador online
+
+El multijugador llega en F7–F9, pero estas cuatro decisiones se toman desde
+la F2 porque cuestan casi nada ahora y evitan una reescritura después:
+
+1. **Toda decisión de jugador pasa por la interfaz de controlador**
+   (`mulligan`, `mainAction`, `declareBlock`, `counterStep`…). Un rival
+   humano remoto será solo otro controlador (`RemoteController`) que recibe
+   sus decisiones por WebSocket — igual que hoy el bot y la UI local son
+   intercambiables.
+2. **Acciones serializables**: las decisiones se expresan como JSON plano
+   referenciando cartas **por id** (`{type:'attack', attackerId, targetId}`),
+   nunca por referencia de objeto. Así viajan por la red tal cual.
+3. **Aleatoriedad determinista**: todo el azar (barajar, monedas) sale del
+   RNG con semilla del motor. Dos réplicas con la misma semilla y la misma
+   secuencia de acciones producen la misma partida (lockstep verificable).
+4. **Motor sin DOM**: ya corre headless en Node, así que el **servidor
+   autoritativo** de F8 ejecuta el mismo `js/engine/` sin cambios. El
+   servidor es quien conoce las zonas ocultas (manos, mazos, vidas boca
+   abajo) y a cada cliente solo le envía **su vista** de la partida.
+
+## 4c. Fases de multijugador (posteriores a v1)
+
+| Fase | Entregable |
+|---|---|
+| **F7. Refactor de red** | Acciones 100% serializables por id + vista filtrada del estado por jugador (`game.viewFor(player)`) + reproducción de partidas por log de acciones (replays gratis) |
+| **F8. Servidor autoritativo** | Node + WebSocket ejecutando el motor; salas por código (amigo vs amigo), reconexión, relojes de turno básicos; el cliente reutiliza la UI de F5 con un `RemoteController` |
+| **F9. Despliegue online** | El estático sigue en Vercel; el servidor WebSocket en un host con procesos persistentes (Fly.io/Railway/Render). Opcional: emparejamiento aleatorio y espectadores |
+
 ## 5. Fases y criterios de éxito
 
 | Fase | Entregable | Validación |
@@ -131,10 +169,13 @@ unitarios del parser, simulaciones headless sin crashes y commit/push.
    asumible incluso a mano).
 2. **Imágenes**: el CDN de TCGplayer sirve `_200w`; hay tamaños mayores pero
    conviene mantener el respaldo de texto que ya usamos en Magic.
-3. **Idioma**: el juego oficial en inglés es la fuente; no hay una API con
-   texto español equivalente a Scryfall. La UI será en español; el texto de
-   carta, en inglés (v1).
+3. **Idioma**: resuelto — no existe edición española de OPTCG, así que el
+   texto de carta queda en inglés de forma permanente y solo se localiza la
+   interfaz.
 4. **Erratas**: TCGCSV mezcla avisos de reimpresión en la descripción; el
    importador debe filtrarlos.
 5. **Counter del rival como decisión oculta**: el bot no debe "ver" la mano
    del humano al decidir ataques (usar estimaciones, no información real).
+6. **Multijugador**: los WebSockets persistentes no encajan en Vercel
+   serverless → el servidor de F8 irá en un host aparte; y la información
+   oculta obliga a que el árbitro sea el servidor, nunca el cliente rival.
