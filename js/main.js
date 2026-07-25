@@ -18,11 +18,14 @@ function watchableBot(delay = 350) {
   return bot;
 }
 
+// Evita servir datos cacheados por el navegador o la CDN tras una actualización.
+const noCache = { cache: 'no-cache' };
+
 async function main() {
-  const index = await (await fetch('data/decks/index.json')).json();
+  const index = await (await fetch('data/decks/index.json', noCache)).json();
   const decks = {};
   await Promise.all(index.map(async (d) => {
-    decks[d.slug] = await (await fetch(`data/decks/${d.slug}.json`)).json();
+    decks[d.slug] = await (await fetch(`data/decks/${d.slug}.json`, noCache)).json();
   }));
 
   let mySlug = null;
