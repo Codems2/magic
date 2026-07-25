@@ -56,21 +56,88 @@ button.primary:disabled { opacity: .4; cursor: default; }
 #logToggle { display: none; background: var(--panel2); color: var(--text); border: 1px solid #4a5e84; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
 
 #table { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-.side { padding: 6px 10px; }
-#midRow { flex: 1; display: flex; justify-content: flex-end; min-height: 40px; padding: 0 10px; }
+.side { padding: 4px 8px; }
+#oppArea { background: linear-gradient(#181f30, #141a29); border-bottom: 2px solid #2c3b57; }
+#selfArea { background: linear-gradient(#141a29, #181f30); border-top: 2px solid var(--accent); }
+#midRow {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 2px 10px; min-height: 22px;
+  background: repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(230,57,70,.18) 10px, rgba(230,57,70,.18) 20px);
+  border-block: 1px solid rgba(230,57,70,.35);
+}
+#midRow::before { content: '⚔ LÍNEA DE BATALLA ⚔'; color: var(--accent); font-size: .7rem; font-weight: 800; letter-spacing: 2px; }
 #log {
-  width: 300px; background: #131b2c; border-radius: 10px; padding: 8px;
-  overflow-y: auto; font-size: .8rem; color: #c4ccdb; line-height: 1.45; max-height: 100%;
+  position: fixed; right: 10px; top: 56px; width: 270px; max-height: 42vh;
+  background: rgba(19,27,44,.94); border: 1px solid #2c3b57; border-radius: 10px;
+  padding: 8px; overflow-y: auto; font-size: .78rem; color: #c4ccdb; line-height: 1.4; z-index: 30;
 }
 #log .trn { color: var(--gold); font-weight: 700; }
 
-.playerRow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.zoneLabel { color: var(--dim); font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; }
-.stats { display: flex; gap: 10px; align-items: center; font-size: .9rem; color: var(--dim); flex-wrap: wrap; }
-.stats b { color: var(--text); }
+/* ---- tapete (disposición oficial de OPTCG) ---- */
+.mat {
+  display: grid; gap: 6px 10px; align-items: center;
+  grid-template-columns: auto 1fr auto auto;
+  grid-template-areas:
+    "name  chars   chars  piles"
+    "life  leader  stage  piles"
+    "life  cost    cost   piles";
+}
+/* El oponente se refleja: su área de personajes baja hacia la línea central. */
+.mat.opp {
+  grid-template-areas:
+    "piles cost    cost   name"
+    "piles leader  stage  life"
+    "piles chars   chars  life";
+}
+.nameBar { display: flex; align-items: center; gap: 8px; font-size: .9rem; color: var(--dim); }
+.nameBar b { color: var(--text); }
 .lifeBadge { color: var(--accent); font-weight: 800; font-size: 1.05rem; }
-.donView { font-size: .95rem; letter-spacing: 1px; }
-.charRow { display: flex; gap: 6px; flex-wrap: wrap; min-height: 96px; align-items: center; }
+.handChip { font-size: .82rem; }
+
+.zone {
+  position: relative; border: 1px dashed rgba(147,160,184,.28); border-radius: 8px;
+  padding: 14px 6px 6px; min-height: 92px; display: flex; gap: 5px; align-items: center;
+}
+.zone::before {
+  content: attr(data-label); position: absolute; top: 2px; left: 8px;
+  font-size: .58rem; letter-spacing: .04em; color: var(--dim); text-transform: uppercase;
+}
+.charZone { justify-content: flex-start; }
+.leaderZone, .stageZone { justify-content: center; }
+.costZone { flex-wrap: wrap; gap: 3px; min-height: 60px; }
+
+.slot {
+  width: 62px; height: 86px; border: 1px dashed rgba(147,160,184,.2); border-radius: 6px;
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  color: var(--dim); font-size: .62rem; text-align: center;
+}
+
+/* DON!! como fichas del área de coste */
+.donTok {
+  width: 30px; height: 42px; border-radius: 5px; flex-shrink: 0;
+  background: linear-gradient(135deg, #f2b705, #b07d02); color: #2a1f02;
+  font-size: .5rem; font-weight: 800; display: flex; align-items: center; justify-content: center;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.25);
+}
+.donTok.rested { transform: rotate(90deg); filter: saturate(.5) brightness(.7); }
+
+/* pilas laterales */
+.pileCol { display: flex; flex-direction: column; gap: 5px; }
+.pile {
+  position: relative; width: 58px; height: 80px; border-radius: 6px; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 1px solid #2c3b57; overflow: hidden;
+}
+.pile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .5; }
+.pile-deck { background: repeating-linear-gradient(45deg, #1e2a45, #1e2a45 6px, #24314f 6px, #24314f 12px); }
+.pile-don { background: repeating-linear-gradient(45deg, #4a3a08, #4a3a08 6px, #5c4809 6px, #5c4809 12px); }
+.pile-trash { background: #221722; }
+.pile-life {
+  grid-area: life; width: 66px; height: 92px;
+  background: repeating-linear-gradient(45deg, #5a1420, #5a1420 6px, #6e1a28 6px, #6e1a28 12px);
+}
+.pileCount { position: relative; font-size: 1.2rem; font-weight: 800; color: #fff; text-shadow: 0 1px 3px #000; }
+.pileLabel { position: relative; font-size: .56rem; color: rgba(255,255,255,.8); text-transform: uppercase; letter-spacing: .03em; }
 
 /* ---- cartas ---- */
 .card {
@@ -144,12 +211,19 @@ button.primary:disabled { opacity: .4; cursor: default; }
   #topbar { flex-wrap: wrap; gap: 6px; }
   #promptText { flex-basis: 100%; order: 3; font-size: .9rem; }
   #logToggle { display: inline-block; margin-left: auto; }
-  #midRow { display: none; }
-  body.show-log #midRow { display: flex; }
-  #log { width: 100%; height: 140px; }
-  .card { width: 64px; height: 89px; }
-  .card.hand-card { width: 84px; height: 118px; }
-  .card.leaderCard { width: 74px; height: 103px; }
+  #log { display: none; position: fixed; inset: 56px 8px auto 8px; width: auto; max-height: 50vh; }
+  body.show-log #log { display: block; }
+  #table { overflow-y: auto; }
+  #oppArea, #selfArea { overflow-x: auto; }
+  .mat { grid-template-columns: auto 1fr auto auto; }
+  .card { width: 52px; height: 73px; }
+  .card.hand-card { width: 78px; height: 109px; }
+  .card.leaderCard { width: 60px; height: 84px; }
+  .slot { width: 50px; height: 70px; }
+  .pile { width: 46px; height: 64px; }
+  .pile-life { width: 52px; height: 73px; }
+  .donTok { width: 22px; height: 31px; }
+  .zone { min-height: 78px; padding: 12px 4px 4px; }
   #preview { display: none; }
   .dialog { max-width: 94vw; padding: 14px; }
   #promptButtons button { padding: 10px 14px; }

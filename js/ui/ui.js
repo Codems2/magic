@@ -140,25 +140,92 @@ export class UI {
     return `●${p.donActive} ◐${p.donRested} ▲${p.donGiven} · mazo ${p.donDeck}`;
   }
 
+  // Tapete con la disposición oficial de OPTCG. Para el oponente (arriba) se
+  // invierte el orden de filas, de modo que las áreas de personajes de ambos
+  // jugadores quedan enfrentadas en la línea de batalla central.
   renderSide(root, p, isOpp) {
     root.innerHTML = '';
-    const stats = document.createElement('div');
-    stats.className = 'stats';
-    stats.innerHTML = `
-      <b>${p.name}</b>
-      <span class="lifeBadge">❤ ${p.life.length}</span>
-      <span class="donView">DON ${this.donText(p)}</span>
-      <span>✋ ${p.hand.length} · 📚 ${p.library.length} · 🗑 ${p.trash.length}</span>`;
-    const row = document.createElement('div');
-    row.className = 'playerRow';
-    row.appendChild(this.cardEl(p.leader, { leader: true }));
-    if (p.stage) row.appendChild(this.cardEl(p.stage, {}));
+    const mat = document.createElement('div');
+    mat.className = 'mat' + (isOpp ? ' opp' : '');
+
+    // Barra de identidad del jugador.
+    const nameBar = document.createElement('div');
+    nameBar.className = 'nameBar';
+    nameBar.style.gridArea = 'name';
+    nameBar.innerHTML = `<b>${p.name}</b><span class="lifeBadge">❤ ${p.life.length}</span>
+      <span class="handChip">✋ ${p.hand.length}</span>`;
+
+    // Zona de personajes (la línea de batalla).
     const chars = document.createElement('div');
-    chars.className = 'charRow';
-    for (const c of p.characters) chars.appendChild(this.cardEl(c, {}));
-    row.appendChild(chars);
-    if (isOpp) { root.appendChild(stats); root.appendChild(row); }
-    else { root.appendChild(row); root.appendChild(stats); }
+    chars.className = 'zone charZone';
+    chars.style.gridArea = 'chars';
+    chars.dataset.label = 'Área de personajes';
+    for (let i = 0; i < 5; i++) {
+      if (p.characters[i]) chars.appendChild(this.cardEl(p.characters[i], {}));
+      else chars.appendChild(this.slotEl());
+    }
+
+    // Líder + escenario.
+    const leaderZone = document.createElement('div');
+    leaderZone.className = 'zone leaderZone';
+    leaderZone.style.gridArea = 'leader';
+    leaderZone.dataset.label = 'Líder';
+    leaderZone.appendChild(this.cardEl(p.leader, { leader: true }));
+
+    const stageZone = document.createElement('div');
+    stageZone.className = 'zone stageZone';
+    stageZone.style.gridArea = 'stage';
+    stageZone.dataset.label = 'Escenario';
+    if (p.stage) stageZone.appendChild(this.cardEl(p.stage, {}));
+    else stageZone.appendChild(this.slotEl());
+
+    // Área de coste: cartas DON!! en juego (activas / giradas).
+    const cost = document.createElement('div');
+    cost.className = 'zone costZone';
+    cost.style.gridArea = 'cost';
+    cost.dataset.label = `Área de coste · DON!! ${p.donActive} activos / ${p.donRested} girados`;
+    const totalDon = p.donActive + p.donRested;
+    for (let i = 0; i < totalDon; i++) {
+      const tok = document.createElement('div');
+      tok.className = 'donTok' + (i >= p.donActive ? ' rested' : '');
+      tok.textContent = 'DON';
+      cost.appendChild(tok);
+    }
+    if (totalDon === 0) cost.appendChild(this.slotEl('sin DON!!'));
+
+    // Pilas laterales: vidas, mazo, mazo de DON!!, descarte.
+    const life = this.pileEl('Vidas', p.life.length, 'life', 'life');
+    const piles = document.createElement('div');
+    piles.className = 'pileCol';
+    piles.style.gridArea = 'piles';
+    piles.appendChild(this.pileEl('Mazo', p.library.length, 'deck'));
+    piles.appendChild(this.pileEl('DON!!', p.donDeck, 'don'));
+    piles.appendChild(this.pileEl('Descarte', p.trash.length, 'trash', 'trash', p.trash[p.trash.length - 1]));
+
+    mat.append(nameBar, chars, leaderZone, stageZone, cost, life, piles);
+    root.appendChild(mat);
+  }
+
+  slotEl(label = '') {
+    const d = document.createElement('div');
+    d.className = 'slot';
+    if (label) d.textContent = label;
+    return d;
+  }
+
+  pileEl(label, count, kind, area = null, topCard = null) {
+    const d = document.createElement('div');
+    d.className = `pile pile-${kind}`;
+    if (area) d.style.gridArea = area;
+    if (kind === 'trash' && topCard?.data.image && !failedImages.has(topCard.data.image)) {
+      d.innerHTML = `<img src="${topCard.data.image}" alt="descarte">`;
+    }
+    d.innerHTML += `<span class="pileCount">${count}</span><span class="pileLabel">${label}</span>`;
+    if (kind === 'trash' && topCard) {
+      d.onmouseenter = () => this.showPreview(topCard);
+      d.onmouseleave = () => { $('preview').innerHTML = ''; };
+    }
+    return d;
   }
 
   renderHand(me) {
