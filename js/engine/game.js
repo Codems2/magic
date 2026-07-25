@@ -47,10 +47,11 @@ export class Player {
 }
 
 export class Game {
-  constructor(configs, { seed = 42, onLog = null, maxTurns = 60 } = {}) {
+  constructor(configs, { seed = 42, onLog = null, onAnimate = null, maxTurns = 60 } = {}) {
     resetIds();
     this.rng = mulberry32(seed);
     this.onLog = onLog;
+    this.onAnimate = onAnimate;   // hook opcional para animaciones de la UI
     this.maxTurns = maxTurns;
     this.turn = 0;
     this.phase = 'setup';
@@ -794,6 +795,7 @@ export class Game {
 
     attacker.rested = true;
     this.log(`⚔ ${attacker.name} (${attacker.power(this)}) ataca a ${target.name} (${target.power(this)}).`);
+    if (this.onAnimate) await this.onAnimate({ type: 'attack', attackerId: attacker.id, targetId: target.id });
 
     // [When Attacking] (con condición [DON!! xN]); puede vetar bloqueadores.
     const battle = { noBlocker: null };

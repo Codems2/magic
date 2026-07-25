@@ -8,10 +8,11 @@ import { HumanController } from './ui/human.js';
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Bot con pausas para que la partida se pueda seguir.
-function watchableBot(delay = 350) {
+// Bot con pausas para que la partida se pueda seguir con calma.
+function watchableBot() {
   const bot = new BotController('Bot');
-  for (const method of ['mainAction', 'chooseBlocker', 'counterStep']) {
+  const delays = { mainAction: 750, chooseBlocker: 650, counterStep: 650, triggerDecision: 500 };
+  for (const [method, delay] of Object.entries(delays)) {
     const orig = bot[method].bind(bot);
     bot[method] = async (...args) => { await sleep(delay); return orig(...args); };
   }
@@ -71,6 +72,7 @@ async function startGame(myDeck, botDeck) {
   const game = new Game(configs, {
     seed: (Math.random() * 2 ** 31) | 0,
     onLog: (msg) => { ui.logLine(msg); ui.render(); },
+    onAnimate: (ev) => (ev.type === 'attack' ? ui.animateAttack(ev) : Promise.resolve()),
   });
   ui.bind(game, human);
   ui.render();

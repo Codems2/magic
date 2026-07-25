@@ -3,6 +3,7 @@
 const $ = (id) => document.getElementById(id);
 const failedImages = new Set();
 const IS_TOUCH = window.matchMedia?.('(hover: none)').matches ?? false;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export class UI {
   constructor() {
@@ -238,14 +239,51 @@ export class UI {
     for (const c of me.hand) cont.appendChild(this.cardEl(c, { hand: true }));
   }
 
+  // Flecha de ataque con pausa, para poder seguir el combate.
+  async animateAttack({ attackerId, targetId }) {
+    const fx = $('fxLayer');
+    const aEl = document.querySelector(`[data-cid="${attackerId}"]`);
+    const tEl = document.querySelector(`[data-cid="${targetId}"]`);
+    if (!aEl || !tEl || !fx) { await sleep(250); return; }
+
+    aEl.classList.add('fx-attacker');
+    tEl.classList.add('fx-target');
+
+    const a = aEl.getBoundingClientRect();
+    const t = tEl.getBoundingClientRect();
+    const x1 = a.left + a.width / 2, y1 = a.top + a.height / 2;
+    const x2 = t.left + t.width / 2, y2 = t.top + t.height / 2;
+    fx.setAttribute('viewBox', `0 0 ${innerWidth} ${innerHeight}`);
+    fx.style.display = 'block';
+    fx.innerHTML = `
+      <defs>
+        <marker id="ah" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#f5c542"/>
+        </marker>
+      </defs>
+      <line x1="${x1}" y1="${y1}" x2="${x1}" y2="${y1}" stroke="#f5c542" stroke-width="5"
+            stroke-linecap="round" marker-end="url(#ah)" filter="drop-shadow(0 0 6px #e63946)">
+        <animate attributeName="x2" to="${x2}" dur="0.28s" fill="freeze"/>
+        <animate attributeName="y2" to="${y2}" dur="0.28s" fill="freeze"/>
+      </line>`;
+
+    await sleep(750);
+    fx.innerHTML = '';
+    fx.style.display = 'none';
+    aEl.classList.remove('fx-attacker');
+    tEl.classList.remove('fx-target');
+  }
+
   cardEl(card, { leader = false, hand = false }) {
     const div = document.createElement('div');
     if (!card) return div;
     div.className = 'card' + (leader ? ' leaderCard' : '') + (hand ? ' hand-card' : '');
+    div.dataset.cid = card.id;
+    div.dataset.color = (card.color || '').split(' ')[0].toLowerCase();
     if (card.rested) div.classList.add('rested');
 
     const img = card.data.image;
-    const fallback = `<div class="noimg"><b>${card.name}</b><br>${card.type} ${card.data.power ?? ''}</div>`;
+    const fallback = `<div class="noimg"><b>${card.name}</b><br><span class="noimg-type">${card.type}</span>${card.data.power != null ? `<br>${card.data.power}` : ''}</div>`;
     if (img && !failedImages.has(img)) div.innerHTML = `<img src="${img}" alt="${card.name}" loading="lazy">`;
     else div.innerHTML = fallback;
 
