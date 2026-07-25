@@ -1,0 +1,318 @@
+{
+ "slug": "st-03",
+ "id": "ST-03",
+ "name": "Starter Deck 3: The Seven Warlords of The Sea",
+ "leader": {
+  "id": "ST03-001",
+  "name": "Crocodile",
+  "type": "Leader",
+  "color": "Blue",
+  "cost": null,
+  "power": 5000,
+  "counter": null,
+  "life": 5,
+  "attribute": "Special",
+  "subTypes": [
+   "Baroque Works The Seven Warlords of the Sea"
+  ],
+  "rarity": "L",
+  "text": "[Activate: Main] [Once Per Turn] DON!! -4 (You may return the specified number of DON!! cards from your field to your DON!! deck.): Return up to 1 Character with a cost of 5 or less to the owner's hand.",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST03-001.jpg",
+  "count": 1
+ },
+ "cards": [
+  {
+   "id": "ST03-002",
+   "name": "Edward Weevil",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 3,
+   "power": 5000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "The Seven Warlords of the Sea"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST03-002.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST03-003",
+   "name": "Crocodile",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 5,
+   "power": 6000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Baroque Works The Seven Warlords of the Sea"
+   ],
+   "rarity": "SR",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [DON!! x1] [On Block] Place up to 1 Character with a cost of 2 or less at the bottom of the owner's deck.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST03-003.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST03-004",
+   "name": "Gecko Moria",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 4,
+   "power": 5000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "The Seven Warlords of the Sea Thriller Bark Pirates"
+   ],
+   "rarity": "C",
+   "text": "[On Play] Add up to 1 \"The Seven Warlords of the Sea\" or \"Thriller Bark Pirates\" type Character with a cost of 4 or less than [Gecko Moria] from your trash to your hand.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST03-004.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST03-005",
+   "name": "Dracule Mihawk",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 4,
+   "power": 5000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "The Seven Warlords of the Sea"
+   ],
+   "rarity": "C",
+   "text": "[DON!! x1] [When Attacking] Draw 2 cards and trash 2 cards from your hand.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST03-005.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST03-006",
+   "name": "Jinbe",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 2,
+   "power": 4000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Fish-Man The Seven Warlords of the Sea The Sun Pirates"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST03-006.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST03-007",
+   "name": "Sentomaru",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 3,
+   "power": 4000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Navy"
+   ],
+   "rarity": "C",
+   "text": "[DON!! x1] [Activate: Main] [Once Per Turn] (2) (You may rest the specified number of DON!! cards in your cost area.): Play up to 1 [Pacifista] with a cost of 4 or less from your deck, then shuffle your deck.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST03-007.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST03-008",
+   "name": "Trafalgar Law",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 1,
+   "power": 1000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Heart Pirates The Seven Warlords of the Sea"
+   ],
+   "rarity": "C",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST03-008.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST03-009",
+   "name": "Donquixote Doflamingo",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 7,
+   "power": 7000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Donquixote Pirates The Seven Warlords of the Sea"
+   ],
+   "rarity": "SR",
+   "text": "[On Play] Return up to 1 Character with a cost of 7 or less to the owner's hand.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST03-009.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST03-010",
+   "name": "Bartholomew Kuma",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 2,
+   "power": 3000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Revolutionary Army The Seven Warlords of the Sea"
+   ],
+   "rarity": "C",
+   "text": "[On Play] Look at 3 cards from the top of your deck and return them to the top or bottom of the deck in any order. [Trigger] Play this card.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST03-010.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST03-011",
+   "name": "Buggy",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 1,
+   "power": 3000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Buggy's Delivery The Seven Warlords of the Sea"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST03-011.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST03-012",
+   "name": "Pacifista",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 4,
+   "power": 6000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Biological Weapon Navy"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST03-012.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST03-013",
+   "name": "Boa Hancock",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 3,
+   "power": 1000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Kuja Pirates The Seven Warlords of the Sea"
+   ],
+   "rarity": "C",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [Trigger] Play this card.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST03-013.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST03-014",
+   "name": "Marshall.D.Teach",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 4,
+   "power": 4000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Blackbeard Pirates The Seven Warlords of the Sea"
+   ],
+   "rarity": "C",
+   "text": "[On Play] Return up to 1 Character with a cost of 3 or less to the owner's hand.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST03-014.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST03-015",
+   "name": "Sables",
+   "type": "Event",
+   "color": "Blue",
+   "cost": 4,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Baroque Works The Seven Warlords of the Sea"
+   ],
+   "rarity": "C",
+   "text": "[Main] Return up to 1 Character with a cost of 7 or less to the owner's hand. [Trigger] Activate this card's [Main] effect.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST03-015.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST03-016",
+   "name": "Thrust Pad Cannon",
+   "type": "Event",
+   "color": "Blue",
+   "cost": 2,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Revolutionary Army The Seven Warlords of the Sea"
+   ],
+   "rarity": "C",
+   "text": "[Counter] Return up to 1 Character with a cost of 3 or less to the owner's hand. [Trigger] Activate this card's [Counter] effect.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST03-016.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST03-017",
+   "name": "Love-Love Mellow",
+   "type": "Event",
+   "color": "Blue",
+   "cost": 2,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Kuja Pirates The Seven Warlords of the Sea"
+   ],
+   "rarity": "C",
+   "text": "[Counter] Up to 1 of your Leader or Character cards gains +4000 power during this battle. Then, draw 1 card if you have 3 or less cards in your hand.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST03-017.jpg",
+   "count": 2
+  }
+ ],
+ "quantitiesExact": false,
+ "sources": {
+  "deck": "https://optcgapi.com/api/decks/ST-03/",
+  "catalog": "https://optcgapi.com/api/allDecks/"
+ }
+}

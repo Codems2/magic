@@ -1,0 +1,38 @@
+[
+ {
+  "slug": "st-01",
+  "id": "ST-01",
+  "name": "Starter Deck 1: Straw Hat Crew",
+  "leader": "Monkey.D.Luffy",
+  "color": "Red",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST01-001.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-02",
+  "id": "ST-02",
+  "name": "Starter Deck 2: Worst Generation",
+  "leader": "Eustass\"Captain\"Kid",
+  "color": "Green",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST02-001.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-03",
+  "id": "ST-03",
+  "name": "Starter Deck 3: The Seven Warlords of The Sea",
+  "leader": "Crocodile",
+  "color": "Blue",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST03-001.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-04",
+  "id": "ST-04",
+  "name": "Starter Deck 4: Animal Kingdom Pirates",
+  "leader": "Kaido",
+  "color": "Purple",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST04-001.jpg",
+  "quantitiesExact": false
+ }
+]

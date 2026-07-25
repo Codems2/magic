@@ -1,0 +1,318 @@
+{
+ "slug": "st-02",
+ "id": "ST-02",
+ "name": "Starter Deck 2: Worst Generation",
+ "leader": {
+  "id": "ST02-001",
+  "name": "Eustass\"Captain\"Kid",
+  "type": "Leader",
+  "color": "Green",
+  "cost": null,
+  "power": 5000,
+  "counter": null,
+  "life": 5,
+  "attribute": "Special",
+  "subTypes": [
+   "Kid Pirates Supernovas"
+  ],
+  "rarity": "L",
+  "text": "[Activate: Main] [Once Per Turn] (3) (You may rest the specified number of DON!! cards in your cost area.) You may trash 1 card from your hand: Set this Leader as active.",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST02-001.jpg",
+  "count": 1
+ },
+ "cards": [
+  {
+   "id": "ST02-002",
+   "name": "Vito",
+   "type": "Character",
+   "color": "Green",
+   "cost": 3,
+   "power": 5000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Ranged",
+   "subTypes": [
+    "Firetank Pirates"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST02-002.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST02-003",
+   "name": "Urouge",
+   "type": "Character",
+   "color": "Green",
+   "cost": 2,
+   "power": 3000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Fallen Monk Pirates Supernovas"
+   ],
+   "rarity": "C",
+   "text": "[DON!! x1] If you have 3 or more Characters, this card gains +2000 power.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST02-003.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST02-004",
+   "name": "Capone\"Gang\"Bege",
+   "type": "Character",
+   "color": "Green",
+   "cost": 1,
+   "power": 1000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Firetank Pirates Supernovas"
+   ],
+   "rarity": "C",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST02-004.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST02-005",
+   "name": "Killer",
+   "type": "Character",
+   "color": "Green",
+   "cost": 3,
+   "power": 3000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Kid Pirates Supernovas"
+   ],
+   "rarity": "C",
+   "text": "[On Play] K.O. up to 1 of your opponent's rested Characters with a cost of 3 or less. [Trigger] Play this card.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST02-005.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST02-006",
+   "name": "Koby",
+   "type": "Character",
+   "color": "Green",
+   "cost": 4,
+   "power": 6000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Navy"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST02-006.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST02-007",
+   "name": "Jewelry Bonney",
+   "type": "Character",
+   "color": "Green",
+   "cost": 1,
+   "power": 1000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Bonney Pirates Supernovas"
+   ],
+   "rarity": "C",
+   "text": "[Activate: Main] (1) (You may rest the specified number of DON!! cards in your cost area.) You may rest this card: Look at 5 cards from the top of your deck; reveal up to 1 \"Supernovas\" type card and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST02-007.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST02-008",
+   "name": "Scratchmen Apoo",
+   "type": "Character",
+   "color": "Green",
+   "cost": 2,
+   "power": 3000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Ranged",
+   "subTypes": [
+    "On-Air Pirates Supernovas"
+   ],
+   "rarity": "C",
+   "text": "[DON!! x1] [When Attacking] Rest up to 1 of your opponent's DON!! cards.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST02-008.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST02-009",
+   "name": "Trafalgar Law",
+   "type": "Character",
+   "color": "Green",
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Heart Pirates Supernovas"
+   ],
+   "rarity": "SR",
+   "text": "[On Play] Set up to 1 of your \"Supernovas\" or \"Heart Pirates\" type rested Characters with a cost of 5 or less as active.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST02-009.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST02-010",
+   "name": "Basil Hawkins",
+   "type": "Character",
+   "color": "Green",
+   "cost": 5,
+   "power": 6000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Hawkins Pirates Supernovas"
+   ],
+   "rarity": "C",
+   "text": "[DON!! x1] [Once Per Turn] [Your Turn] If this Character battles your opponent's Character, set this card as active.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST02-010.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST02-011",
+   "name": "Heat",
+   "type": "Character",
+   "color": "Green",
+   "cost": 2,
+   "power": 4000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Kid Pirates"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST02-011.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST02-012",
+   "name": "Bepo",
+   "type": "Character",
+   "color": "Green",
+   "cost": 1,
+   "power": 3000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Heart Pirates Minks"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST02-012.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST02-013",
+   "name": "Eustass\"Captain\"Kid",
+   "type": "Character",
+   "color": "Green",
+   "cost": 7,
+   "power": 7000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Kid Pirates Supernovas"
+   ],
+   "rarity": "SR",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [DON!! x1] [End of Your Turn] Set this card as active.  This card has been officially errata'd.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST02-013.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST02-014",
+   "name": "X.Drake",
+   "type": "Character",
+   "color": "Green",
+   "cost": 4,
+   "power": 5000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Drake Pirates Navy Supernovas"
+   ],
+   "rarity": "C",
+   "text": "[DON!! x1] [Your Turn] If this Character is rested, your \"Supernovas\" or \"Navy\" type Leaders and Characters gain +1000 power.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST02-014.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST02-015",
+   "name": "Scalpel",
+   "type": "Event",
+   "color": "Green",
+   "cost": 1,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Heart Pirates Supernovas"
+   ],
+   "rarity": "C",
+   "text": "[Counter] Up to 1 of your Leader or Character cards gains +2000 power during this battle. Then, set up to 1 of your DON!! cards as active. [Trigger] Set up to 2 of your DON!! cards as active.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST02-015.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST02-016",
+   "name": "Repel",
+   "type": "Event",
+   "color": "Green",
+   "cost": 2,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Kid Pirates Supernovas"
+   ],
+   "rarity": "C",
+   "text": "[Counter] Up to 1 of your Leader or Character cards gains +4000 power during this battle. Then, set up to 1 of your DON!! cards as active.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST02-016.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST02-017",
+   "name": "Straw Sword",
+   "type": "Event",
+   "color": "Green",
+   "cost": 2,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Hawkins Pirates Supernovas"
+   ],
+   "rarity": "C",
+   "text": "[Main] Rest up to 1 of your opponent's Characters.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST02-017.jpg",
+   "count": 2
+  }
+ ],
+ "quantitiesExact": false,
+ "sources": {
+  "deck": "https://optcgapi.com/api/decks/ST-02/",
+  "catalog": "https://optcgapi.com/api/allDecks/"
+ }
+}
