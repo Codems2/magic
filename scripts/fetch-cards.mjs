@@ -19,8 +19,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(ROOT, 'data', 'decks');
 
-// Mazos a importar (los cuatro originales monocolor: ideales para el motor v1).
-const DECKS = ['ST-01', 'ST-02', 'ST-03', 'ST-04'];
+// Mazos a importar: todos los del catálogo de OPTCG API (se descubren en tiempo
+// de ejecución). Puedes fijar una lista concreta pasándola por argumentos.
+const DECK_FILTER = process.argv.slice(2).filter((a) => /^ST-\d+$/i.test(a)).map((a) => a.toUpperCase());
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -55,74 +56,98 @@ function slimCard(c) {
   };
 }
 
-// Regla estándar de cantidades de los starter decks (validada con ST-01):
-// personajes de rareza C ×4, todo lo demás (no líder) ×2. Ajuste fino si no suma 50.
+// Cantidades por carta. La API da las cartas únicas pero no cuántas copias
+// lleva cada una. Se aplica la estructura habitual (personajes comunes ×4,
+// el resto ×2) y luego se ajusta a exactamente 50, respetando el máximo de 4
+// copias por carta (regla del juego). Si no hay tipos suficientes para 50
+// (mazos con datos incompletos), devuelve ok:false para omitir el mazo.
 function assignQuantities(cards) {
   const leader = cards.find((c) => c.type === 'Leader');
   const rest = cards.filter((c) => c !== leader);
+  if (!rest.length || rest.length * 4 < 50) return { ok: false, exact: false, total: 0 };
+
   for (const c of rest) c.count = (c.type === 'Character' && c.rarity === 'C') ? 4 : 2;
   let total = rest.reduce((n, c) => n + c.count, 0);
-  let exact = true;
-  // Ajuste: recorta o amplía sobre los ×4 hasta cuadrar 50.
-  const flex = rest.filter((c) => c.count === 4);
-  let guard = 40;
-  while (total !== 50 && guard-- > 0 && flex.length) {
-    const c = flex[guard % flex.length];
-    if (total > 50 && c.count > 1) { c.count--; total--; exact = false; }
-    else if (total < 50 && c.count < 4) { c.count++; total++; exact = false; }
-    else if (total < 50) { c.count++; total++; exact = false; }
+  const exactStart = total === 50;
+  let adjusted = false;
+
+  // Recorta desde las de mayor cantidad (mín. 1 copia).
+  let guard = 1000;
+  while (total > 50 && guard-- > 0) {
+    const c = rest.filter((x) => x.count > 1).sort((a, b) => b.count - a.count)[0];
+    if (!c) break;
+    c.count--; total--; adjusted = true;
+  }
+  // Amplía desde las de menor cantidad (máx. 4 copias).
+  guard = 1000;
+  while (total < 50 && guard-- > 0) {
+    const c = rest.filter((x) => x.count < 4).sort((a, b) => a.count - b.count)[0];
+    if (!c) break;
+    c.count++; total++; adjusted = true;
   }
   if (leader) leader.count = 1;
-  return { exact, total };
+  return { ok: total === 50, exact: exactStart && !adjusted, total };
 }
 
 async function main() {
   mkdirSync(OUT_DIR, { recursive: true });
   const catalog = await fetchJson('https://optcgapi.com/api/allDecks/');
+  const ids = (DECK_FILTER.length ? DECK_FILTER : catalog.map((d) => d.structure_deck_id))
+    .filter((id) => catalog.some((d) => d.structure_deck_id === id));
+  console.log(`Catálogo: ${catalog.length} mazos. A importar: ${ids.length}.`);
   const index = [];
+  let skipped = 0;
 
-  for (const id of DECKS) {
+  for (const id of ids) {
     const meta = catalog.find((d) => d.structure_deck_id === id);
-    console.log(`Importando ${id} — ${meta?.structure_deck_name ?? '(sin nombre)'}...`);
-    const raw = await fetchJson(`https://optcgapi.com/api/decks/${id}/`);
-    const cards = raw.map(slimCard).sort((a, b) => a.id.localeCompare(b.id));
+    try {
+      const raw = await fetchJson(`https://optcgapi.com/api/decks/${id}/`);
+      if (!Array.isArray(raw) || !raw.length) { console.warn(`  ${id}: sin datos, omitido`); skipped++; continue; }
+      const cards = raw.map(slimCard).sort((a, b) => a.id.localeCompare(b.id));
 
-    const leader = cards.find((c) => c.type === 'Leader');
-    if (!leader) { console.warn(`  ${id}: sin líder, omitido`); continue; }
-    const { exact, total } = assignQuantities(cards);
-    if (total !== 50) {
-      console.warn(`  ${id}: el mazo suma ${total} (esperados 50)`);
+      const leaders = cards.filter((c) => c.type === 'Leader');
+      const leader = leaders[0];
+      if (!leader) { console.warn(`  ${id}: sin líder, omitido`); skipped++; continue; }
+      // Algunos mazos EX/Ultra traen 2 líderes: se elige el primero, los demás
+      // pasan a ser cartas alternativas (no entran en las 50).
+      const deckCards = cards.filter((c) => c.type !== 'Leader');
+      const { ok, exact, total } = assignQuantities([leader, ...deckCards]);
+      if (!ok) { console.warn(`  ${id}: datos incompletos (${deckCards.length} tipos, ${total} cartas), omitido`); skipped++; continue; }
+
+      const slug = id.toLowerCase();
+      const out = {
+        slug, id,
+        name: meta?.structure_deck_name ?? id,
+        leader,
+        altLeaders: leaders.slice(1),
+        cards: deckCards,
+        quantitiesExact: exact,
+        sources: {
+          deck: `https://optcgapi.com/api/decks/${id}/`,
+          catalog: 'https://optcgapi.com/api/allDecks/',
+        },
+      };
+      writeFileSync(join(OUT_DIR, `${slug}.json`), JSON.stringify(out, null, 1));
+      index.push({
+        slug, id,
+        name: out.name,
+        leader: leader.name,
+        color: leader.color,
+        image: leader.image,
+        quantitiesExact: exact,
+      });
+      console.log(`  OK ${id}: ${leader.name} (${leader.color}) — ${deckCards.length} tipos, ${total} cartas${exact ? '' : ' *'}`);
+    } catch (err) {
+      console.warn(`  ${id}: error (${err.message}), omitido`);
+      skipped++;
     }
-
-    const slug = id.toLowerCase();
-    const out = {
-      slug,
-      id,
-      name: meta?.structure_deck_name ?? id,
-      leader,
-      cards: cards.filter((c) => c !== leader),
-      quantitiesExact: exact,
-      sources: {
-        deck: `https://optcgapi.com/api/decks/${id}/`,
-        catalog: 'https://optcgapi.com/api/allDecks/',
-      },
-    };
-    writeFileSync(join(OUT_DIR, `${slug}.json`), JSON.stringify(out, null, 1));
-    index.push({
-      slug,
-      id,
-      name: out.name,
-      leader: leader.name,
-      color: leader.color,
-      image: leader.image,
-      quantitiesExact: exact,
-    });
-    console.log(`  OK: líder ${leader.name} (${leader.color}), ${cards.length - 1} tipos + líder, ${total} cartas${exact ? '' : ' (cantidades ajustadas)'}`);
     await sleep(150);
   }
 
+  // Orden natural por número de mazo.
+  index.sort((a, b) => parseInt(a.id.replace(/\D/g, ''), 10) - parseInt(b.id.replace(/\D/g, ''), 10));
   writeFileSync(join(OUT_DIR, 'index.json'), JSON.stringify(index, null, 1));
-  console.log(`\nListo: ${index.length} mazos en data/decks/`);
+  console.log(`\nListo: ${index.length} mazos importados, ${skipped} omitidos, en data/decks/`);
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });

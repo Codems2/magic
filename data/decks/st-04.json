@@ -20,6 +20,7 @@
   "image": "https://optcgapi.com/media/static/Card_Images/ST04-001.jpg",
   "count": 1
  },
+ "altLeaders": [],
  "cards": [
   {
    "id": "ST04-002",
@@ -37,7 +38,7 @@
    "rarity": "C",
    "text": "[On Play] DON!! -1 (You may return the specified number of DON!! cards from your field to your DON!! deck.): Play up to 1 [Page One] card with a cost of 4 or less from your hand.",
    "image": "https://optcgapi.com/media/static/Card_Images/ST04-002.jpg",
-   "count": 4
+   "count": 3
   },
   {
    "id": "ST04-003",
@@ -91,7 +92,7 @@
    "rarity": "C",
    "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [On Play] DON!! -1 (You may return the specified number of DON!! cards from your field to your DON!! deck.): Draw 2 cards and trash 1 card from your hand.",
    "image": "https://optcgapi.com/media/static/Card_Images/ST04-005.jpg",
-   "count": 4
+   "count": 3
   },
   {
    "id": "ST04-006",
@@ -217,7 +218,7 @@
    "rarity": "C",
    "text": "NULL",
    "image": "https://optcgapi.com/media/static/Card_Images/ST04-012.jpg",
-   "count": 3
+   "count": 4
   },
   {
    "id": "ST04-013",
@@ -235,7 +236,7 @@
    "rarity": "C",
    "text": "NULL",
    "image": "https://optcgapi.com/media/static/Card_Images/ST04-013.jpg",
-   "count": 3
+   "count": 4
   },
   {
    "id": "ST04-014",

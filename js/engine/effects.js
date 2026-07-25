@@ -15,11 +15,31 @@ const TRIGGER_KEY = {
   'On Play': 'onPlay', 'When Attacking': 'whenAttacking',
   'Activate: Main': 'activateMain', 'Main': 'main', 'Counter': 'counter',
   'Trigger': 'trigger', 'On Block': 'onBlock', 'End of Your Turn': 'endOfTurn',
-  'On K.O.': 'onKO', "On Your Opponent's Attack": 'onOppAttack',
+  'On K.O.': 'onKO', 'On KO': 'onKO', "On Your Opponent's Attack": 'onOppAttack',
+  'On Your Opponent’s Attack': 'onOppAttack', 'DON!! x1': null,
 };
 
 const NUM = { one: 1, two: 2, three: 3, four: 4, five: 5 };
 const n = (w) => (/^\d+$/.test(w) ? parseInt(w, 10) : NUM[w?.toLowerCase()] ?? 1);
+
+// Criterio de búsqueda de una carta (por nombre, tipo/subtipo, poder o coste).
+function parseFilter(text) {
+  const f = {};
+  const l = text.toLowerCase();
+  let m;
+  // Nombres entre corchetes: [Sabo], [Ace], or [Luffy].
+  const names = [...text.matchAll(/\[([^\]]+)\]/g)].map((x) => x[1]).filter((x) => !/^(don!!|blocker|rush)/i.test(x));
+  if (names.length) f.names = names;
+  // Subtipos entre comillas o llaves.
+  const types = [...text.matchAll(/["“]([^"”]+)["”]|\{([^}]+)\}/g)].map((x) => x[1] ?? x[2]);
+  if (types.length) f.types = types;
+  if ((m = l.match(/with (\d+) power/))) f.power = parseInt(m[1], 10);
+  if ((m = l.match(/with a cost of (\d+) or less/))) f.maxCost = parseInt(m[1], 10);
+  if (/character card/.test(l)) f.cardType = 'Character';
+  else if (/event card/.test(l)) f.cardType = 'Event';
+  else if (/stage card/.test(l)) f.cardType = 'Stage';
+  return f;
+}
 
 // ---- efectos (frases → ops) ----------------------------------------------
 
@@ -31,8 +51,26 @@ function parseOps(text, unknown) {
     ops.push({ op: 'grantNoBlocker' });
     text = text.replace(mm[0], '');
   }
-  if ((mm = text.match(/look at (\d+) cards? from the top of your deck;?\s*reveal up to 1 (?:"([^"]+)"|\{([^}]+)\}) type card and add it to your hand/i))) {
-    ops.push({ op: 'tutorTop', n: n(mm[1]), type: mm[2] ?? mm[3] });
+  // Tutores "mira N cartas; revela 1 <criterio> y añádela a tu mano".
+  if ((mm = text.match(/(?:look at|reveal) (?:up to )?(\d+) cards? from the top of your deck[.,;]?\s*(?:reveal up to 1 |add up to 1 )?(.+?) (?:and add it to your hand|to your hand)/i))) {
+    ops.push({ op: 'tutorTop', n: n(mm[1]), filter: parseFilter(mm[2]) });
+    text = text.replace(mm[0], '');
+  } else if ((mm = text.match(/reveal 1 card from the top of your deck[.,;]?\s*(?:if it(?:'s| is) an? (.+?),?\s*)?(?:add (?:it|that card) to your hand|put (?:it|that card) into your hand)/i))) {
+    ops.push({ op: 'tutorTop', n: 1, filter: mm[1] ? parseFilter(mm[1]) : {} });
+    text = text.replace(mm[0], '');
+  }
+  // Manipulación de vidas: "añade 1 carta de tu Vida a la mano".
+  if ((mm = text.match(/add 1 card from the top or bottom of your life (?:cards |area )?to your hand/i))) {
+    ops.push({ op: 'lifeToHand', n: 1 });
+    text = text.replace(mm[0], '');
+  }
+  if ((mm = text.match(/add up to (\d+) cards? from the top of your life[^.]*?to (?:your|its owner'?s?) hand/i))) {
+    ops.push({ op: 'lifeToHand', n: n(mm[1]) });
+    text = text.replace(mm[0], '');
+  }
+  if ((mm = text.match(/(?:trash|place) the top card of your deck (?:into|at the top of) your life/i)) ||
+      (mm = text.match(/add the top card of your deck to your life/i))) {
+    ops.push({ op: 'deckToLife', n: 1 });
     text = text.replace(mm[0], '');
   }
   if ((mm = text.match(/^if your leader has the \{([^}]+)\} type,\s*(.+)$/i))) {
@@ -187,11 +225,18 @@ function parseCost(text) {
 
 export function buildScript(card) {
   const script = { abilities: [], unknown: [], donXStatics: [] };
-  // Quita recordatorios "(texto...)" pero conserva costes numéricos "(2)".
-  let text = (card.text ?? '').replace(/\((?=[^)]*[a-z])[^)]*\)/gi, ' ').replace(/\s+/g, ' ').trim();
+  // 1. Quita notas editoriales de la API (no son reglas de la carta):
+  //    disclaimers de reimpresión, comparativas de erratas, etc.
+  let text = (card.text ?? '')
+    .replace(/DISCLAIMER:[\s\S]*$/i, '')
+    .replace(/The main difference between this card and the original[\s\S]*$/i, '')
+    .replace(/This card has been officially errata'd\.?/i, '')
+    .replace(/This product page is for[\s\S]*$/i, '')
+    .trim();
+  // 2. Quita recordatorios "(texto...)" pero conserva costes numéricos "(2)".
+  text = text.replace(/\((?=[^)]*[a-z])[^)]*\)/gi, ' ').replace(/\s+/g, ' ').trim();
   if (!text || text === 'NULL') return script;
   text = text
-    .replace(/This card has been officially errata'd\.?/i, '')
     .replace(/K\.O\./g, 'KO')                                   // que el punto no rompa frases
     .replace(/this card's \[(Main|Counter)\] effect/g, "this card's $1 effect")
     .trim();
@@ -288,6 +333,8 @@ export function opsValue(ops) {
       case 'restTarget': case 'restOppDon': v += 1; break;
       case 'trashOppLife': v += 3; break;
       case 'tutorTop': case 'trashToHand': v += 1.5; break;
+      case 'lifeToHand': v += op.n * 1.2; break;
+      case 'deckToLife': v += op.n * 1.5; break;
       case 'playFromZone': case 'playSelf': v += 2.5; break;
       case 'noBlocker': case 'grantNoBlocker': v += 1; break;
       case 'gainKeyword': v += 1; break;

@@ -20,6 +20,7 @@
   "image": "https://optcgapi.com/media/static/Card_Images/ST01-001.jpg",
   "count": 1
  },
+ "altLeaders": [],
  "cards": [
   {
    "id": "ST01-002",
@@ -37,7 +38,7 @@
    "rarity": "C",
    "text": "[DON!! x2] [When Attacking] Your opponent cannot activate a [Blocker] Character that has 5000 or more power during this battle. [Trigger] Play this card.",
    "image": "https://optcgapi.com/media/static/Card_Images/ST01-002.jpg",
-   "count": 4
+   "count": 3
   },
   {
    "id": "ST01-003",
@@ -55,7 +56,7 @@
    "rarity": "C",
    "text": "NULL",
    "image": "https://optcgapi.com/media/static/Card_Images/ST01-003.jpg",
-   "count": 4
+   "count": 3
   },
   {
    "id": "ST01-004",
@@ -181,7 +182,7 @@
    "rarity": "C",
    "text": "NULL",
    "image": "https://optcgapi.com/media/static/Card_Images/ST01-010.jpg",
-   "count": 3
+   "count": 4
   },
   {
    "id": "ST01-011",
@@ -199,7 +200,7 @@
    "rarity": "C",
    "text": "[On Play] Give up to 2 rested DON!! cards to your Leader or 1 of your Characters.",
    "image": "https://optcgapi.com/media/static/Card_Images/ST01-011.jpg",
-   "count": 3
+   "count": 4
   },
   {
    "id": "ST01-012",

@@ -20,6 +20,7 @@
   "image": "https://optcgapi.com/media/static/Card_Images/ST02-001.jpg",
   "count": 1
  },
+ "altLeaders": [],
  "cards": [
   {
    "id": "ST02-002",
@@ -37,7 +38,7 @@
    "rarity": "C",
    "text": "NULL",
    "image": "https://optcgapi.com/media/static/Card_Images/ST02-002.jpg",
-   "count": 4
+   "count": 3
   },
   {
    "id": "ST02-003",
@@ -55,7 +56,7 @@
    "rarity": "C",
    "text": "[DON!! x1] If you have 3 or more Characters, this card gains +2000 power.",
    "image": "https://optcgapi.com/media/static/Card_Images/ST02-003.jpg",
-   "count": 4
+   "count": 3
   },
   {
    "id": "ST02-004",
@@ -73,7 +74,7 @@
    "rarity": "C",
    "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
    "image": "https://optcgapi.com/media/static/Card_Images/ST02-004.jpg",
-   "count": 4
+   "count": 3
   },
   {
    "id": "ST02-005",
@@ -109,7 +110,7 @@
    "rarity": "C",
    "text": "NULL",
    "image": "https://optcgapi.com/media/static/Card_Images/ST02-006.jpg",
-   "count": 3
+   "count": 4
   },
   {
    "id": "ST02-007",
@@ -127,7 +128,7 @@
    "rarity": "C",
    "text": "[Activate: Main] (1) (You may rest the specified number of DON!! cards in your cost area.) You may rest this card: Look at 5 cards from the top of your deck; reveal up to 1 \"Supernovas\" type card and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
    "image": "https://optcgapi.com/media/static/Card_Images/ST02-007.jpg",
-   "count": 3
+   "count": 4
   },
   {
    "id": "ST02-008",
@@ -145,7 +146,7 @@
    "rarity": "C",
    "text": "[DON!! x1] [When Attacking] Rest up to 1 of your opponent's DON!! cards.",
    "image": "https://optcgapi.com/media/static/Card_Images/ST02-008.jpg",
-   "count": 3
+   "count": 4
   },
   {
    "id": "ST02-009",

@@ -37,11 +37,17 @@ y victoria por golpe final o por quedarse sin mazo.
 
 `js/engine/effects.js` interpreta el texto etiquetado de OPTCG
 (`[On Play]`, `[When Attacking]`, `[Activate: Main]`, `[Main]`, `[Counter]`,
-`[Trigger]`, `[On Block]`, `[End of Your Turn]`), sus modificadores
-(`[DON!! xN]`, `[Once Per Turn]`, `[Your Turn]`) y costes internos (`(2)`,
-`DON!! -N`, descartar, girarse). Cubre el **100 %** de las cartas con texto de
-los cuatro starter decks importados. Lo que no reconozca queda registrado
-(no rompe la partida).
+`[Trigger]`, `[On Block]`, `[On K.O.]`, `[End of Your Turn]`), sus
+modificadores (`[DON!! xN]`, `[Once Per Turn]`, `[Your Turn]`) y costes
+internos (`(2)`, `DON!! -N`, descartar, girarse).
+
+Cobertura sobre las cartas con texto de los 25 mazos importados: los cuatro
+starter decks originales (ST-01 a ST-04) están al **100 %**; en el conjunto,
+~1 de cada 3 cartas se interpreta por completo y ~57 % ejecuta al menos su
+efecto principal. Los sets recientes traen cartas más complejas cuyo texto
+aún no está totalmente simulado — esas cartas se marcan con ⚠ en la interfaz
+y siguen siendo jugables (como cuerpos, sin su efecto). Lo no reconocido
+queda registrado y nunca rompe la partida.
 
 ## Los bots
 
@@ -59,12 +65,17 @@ counter esperado. Medido contra un bot de referencia: **100 %** de victorias.
 | Listas y datos de carta | [OPTCG API](https://optcgapi.com) (`/api/decks/<ID>/`) |
 | Imágenes | CDN de OPTCG API |
 
-Mazos importados: **ST-01** (Luffy, rojo), **ST-02** (Kid, verde), **ST-03**
-(Crocodile, azul), **ST-04** (Kaido, morado). Reimportar / añadir mazos
-(edita la lista `DECKS`):
+Mazos importados: **los 25 starter/ultra decks** que la API sirve completos
+(ST-01 a ST-30; los cuatro con datos incompletos en la API —ST-11, 15, 17,
+20— se omiten automáticamente). Las cantidades por carta se ajustan a
+exactamente 50 con la estructura estándar de los starter decks (máximo 4
+copias por carta) y se marcan con `quantitiesExact: false` cuando hubo ajuste.
+
+Reimportar todos, o solo algunos:
 
 ```bash
-node scripts/fetch-cards.mjs
+node scripts/fetch-cards.mjs            # todos los del catálogo
+node scripts/fetch-cards.mjs ST-01 ST-13   # solo los indicados
 ```
 
 ## Validación headless

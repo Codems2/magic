@@ -20,6 +20,7 @@
   "image": "https://optcgapi.com/media/static/Card_Images/ST03-001.jpg",
   "count": 1
  },
+ "altLeaders": [],
  "cards": [
   {
    "id": "ST03-002",
@@ -37,7 +38,7 @@
    "rarity": "C",
    "text": "NULL",
    "image": "https://optcgapi.com/media/static/Card_Images/ST03-002.jpg",
-   "count": 4
+   "count": 3
   },
   {
    "id": "ST03-003",
@@ -73,7 +74,7 @@
    "rarity": "C",
    "text": "[On Play] Add up to 1 \"The Seven Warlords of the Sea\" or \"Thriller Bark Pirates\" type Character with a cost of 4 or less than [Gecko Moria] from your trash to your hand.",
    "image": "https://optcgapi.com/media/static/Card_Images/ST03-004.jpg",
-   "count": 4
+   "count": 3
   },
   {
    "id": "ST03-005",
@@ -91,7 +92,7 @@
    "rarity": "C",
    "text": "[DON!! x1] [When Attacking] Draw 2 cards and trash 2 cards from your hand.",
    "image": "https://optcgapi.com/media/static/Card_Images/ST03-005.jpg",
-   "count": 4
+   "count": 3
   },
   {
    "id": "ST03-006",
@@ -127,7 +128,7 @@
    "rarity": "C",
    "text": "[DON!! x1] [Activate: Main] [Once Per Turn] (2) (You may rest the specified number of DON!! cards in your cost area.): Play up to 1 [Pacifista] with a cost of 4 or less from your deck, then shuffle your deck.",
    "image": "https://optcgapi.com/media/static/Card_Images/ST03-007.jpg",
-   "count": 3
+   "count": 4
   },
   {
    "id": "ST03-008",
@@ -145,7 +146,7 @@
    "rarity": "C",
    "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
    "image": "https://optcgapi.com/media/static/Card_Images/ST03-008.jpg",
-   "count": 3
+   "count": 4
   },
   {
    "id": "ST03-009",
@@ -181,7 +182,7 @@
    "rarity": "C",
    "text": "[On Play] Look at 3 cards from the top of your deck and return them to the top or bottom of the deck in any order. [Trigger] Play this card.",
    "image": "https://optcgapi.com/media/static/Card_Images/ST03-010.jpg",
-   "count": 3
+   "count": 4
   },
   {
    "id": "ST03-011",

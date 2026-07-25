@@ -492,7 +492,16 @@ export class Game {
         }
         case 'tutorTop': {
           const seen = p.library.splice(0, Math.min(op.n, p.library.length));
-          const hit = seen.find((c) => (c.data.subTypes ?? []).some((s) => s.toLowerCase().includes(op.type.toLowerCase())));
+          const f = op.filter ?? (op.type ? { types: [op.type] } : {});
+          const matches = (c) => {
+            if (f.names && !f.names.some((nm) => c.name.toLowerCase().includes(nm.toLowerCase()))) return false;
+            if (f.types && !f.types.some((t) => (c.data.subTypes ?? []).some((s) => s.toLowerCase().includes(t.toLowerCase())))) return false;
+            if (f.cardType && c.type !== f.cardType) return false;
+            if (f.power !== undefined && (c.data.power ?? -1) !== f.power) return false;
+            if (f.maxCost !== undefined && c.cost > f.maxCost) return false;
+            return true;
+          };
+          const hit = seen.find(matches);
           if (hit) {
             seen.splice(seen.indexOf(hit), 1);
             hit.zone = 'hand';
@@ -501,7 +510,26 @@ export class Game {
           } else {
             this.log(`${p.name} no encuentra nada al mirar ${seen.length} carta(s).`);
           }
+          this.shuffle(seen);
           p.library.push(...seen);
+          break;
+        }
+        case 'lifeToHand': {
+          for (let i = 0; i < op.n && p.life.length; i++) {
+            const c = p.life.shift();
+            c.zone = 'hand';
+            p.hand.push(c);
+            this.log(`${p.name} añade una carta de Vida a su mano. Le quedan ${p.life.length}.`);
+          }
+          break;
+        }
+        case 'deckToLife': {
+          for (let i = 0; i < op.n && p.library.length; i++) {
+            const c = p.library.shift();
+            c.zone = 'life';
+            p.life.unshift(c);
+            this.log(`${p.name} pone la carta superior del mazo en su Vida (${p.life.length}).`);
+          }
           break;
         }
         case 'peekReorder': {

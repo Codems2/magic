@@ -1,0 +1,281 @@
+{
+ "slug": "st-18",
+ "id": "ST-18",
+ "name": "Starter Deck 18: PURPLE Monkey.D.Luffy",
+ "leader": {
+  "id": "OP05-060",
+  "name": "Monkey.D.Luffy (OP05-060)",
+  "type": "Leader",
+  "color": "Purple",
+  "cost": null,
+  "power": 5000,
+  "counter": null,
+  "life": 5,
+  "attribute": "Strike",
+  "subTypes": [
+   "Straw Hat Crew"
+  ],
+  "rarity": "L",
+  "text": "[Activate: Main] [Once Per Turn] You may add 1 card from the top of your Life cards to your hand: If you have 0 or 3 or more DON!! cards on your field, add up to 1 DON!! card from your DON!! deck and set it as active.",
+  "image": "https://optcgapi.com/media/static/Card_Images/OP05-060_p3.jpg",
+  "count": 1
+ },
+ "altLeaders": [],
+ "cards": [
+  {
+   "id": "OP05-061",
+   "name": "Uso-Hachi (OP05-061)",
+   "type": "Character",
+   "color": "Purple",
+   "cost": 3,
+   "power": 4000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Ranged",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "UC",
+   "text": "[DON!! x1] [When Attacking] If you have 8 or more DON!! cards on your field, rest up to 1 of your opponent's Characters with a cost of 4 or less.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP05-061_r1.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP05-063",
+   "name": "O-Robi",
+   "type": "Character",
+   "color": "Purple",
+   "cost": 4,
+   "power": 5000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[On Play] If you have 8 or more DON!! cards on your field, K.O. up to 1 of your opponent's Characters with a cost of 3 or less.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP05-063_r1.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP05-066",
+   "name": "Jinbe",
+   "type": "Character",
+   "color": "Purple",
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Fish-Man Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\n\n[Opponent's Turn] If you have 10 DON!! cards on your field, this Character gains +1000 power.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP05-066_r1.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP05-067",
+   "name": "Zoro-Juurou (OP05-067)",
+   "type": "Character",
+   "color": "Purple",
+   "cost": 3,
+   "power": 4000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "R",
+   "text": "[When Attacking] If you have 3 or less Life cards, add up to 1 DON!! card from your DON!! deck and set it as active.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP05-067_r1.jpg",
+   "count": 3
+  },
+  {
+   "id": "OP05-068",
+   "name": "Chopa-Emon",
+   "type": "Character",
+   "color": "Purple",
+   "cost": 2,
+   "power": 3000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Wisdom",
+   "subTypes": [
+    "Animal Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[On Play] If you have 8 or more DON!! cards on your field, set up to 1 of your purple \"Straw Hat Crew\" type Characters with 6000 power or less as active.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP05-068_r1.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP05-070",
+   "name": "Fra-Nosuke",
+   "type": "Character",
+   "color": "Purple",
+   "cost": 5,
+   "power": 4000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "UC",
+   "text": "[DON!! x1] If you have 8 or more DON!! cards on your field, this Character gains [Rush].\n\n(This card can attack on the turn in which it is played.)",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP05-070_r1.jpg",
+   "count": 3
+  },
+  {
+   "id": "OP05-072",
+   "name": "Hone-Kichi",
+   "type": "Character",
+   "color": "Purple",
+   "cost": 4,
+   "power": 6000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[On Play] If you have 8 or more DON!! cards on your field, give up to 2 of your opponent's Characters 2000 power during this turn.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP05-072_r1.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP05-076",
+   "name": "When You're at Sea You Fight against Pirates!!",
+   "type": "Event",
+   "color": "Purple",
+   "cost": 1,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [],
+   "rarity": "R",
+   "text": "[Main] Look at 3 cards from the top of your deck; reveal up to 1 \"Straw Hat Crew\", \"Kid Pirates\", or \"Heart Pirates\" type card and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP05-076_p1.jpg",
+   "count": 3
+  },
+  {
+   "id": "P-041_r1",
+   "name": "Monkey.D.Luffy (P-041)",
+   "type": "Character",
+   "color": "Purple",
+   "cost": 10,
+   "power": 12000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Straw Hat Crew The Four Emperors"
+   ],
+   "rarity": "PR",
+   "text": "",
+   "image": "https://optcgapi.com/media/static/Card_Images/P-041_r1.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST18-001",
+   "name": "Uso-Hachi (ST18-001)",
+   "type": "Character",
+   "color": "Purple",
+   "cost": 3,
+   "power": 3000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Ranged",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[On Play] If you have 8 or more DON!! cards on your field, rest up to 1 of your opponent's Characters with a cost of 5 or less.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST18-001.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST18-002",
+   "name": "O-Nami",
+   "type": "Character",
+   "color": "Purple",
+   "cost": 4,
+   "power": 2000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\n\n[On Play] If you have 8 or more DON!! cards on your field, trash 1 card from your hand and draw 2 cards.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST18-002.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST18-003",
+   "name": "San-Gorou",
+   "type": "Character",
+   "color": "Purple",
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[When Attacking] [Once Per Turn] If you have 8 or more DON!! cards on your field, draw 1 card.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST18-003.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST18-004",
+   "name": "Zoro-Juurou (ST18-004)",
+   "type": "Character",
+   "color": "Purple",
+   "cost": 4,
+   "power": 6000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "SR",
+   "text": "[On Play] Look at 5 cards from the top of your deck; reveal up to 1 purple \"Straw Hat Crew\" type card and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST18-004.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST18-005",
+   "name": "Luffy-Tarou",
+   "type": "Character",
+   "color": "Purple",
+   "cost": 7,
+   "power": 8000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "SR",
+   "text": "[On Play] DON!! 1 (You may return the specified number of DON!! cards from your field to your DON!! deck.): Play up to 1 purple \"Straw Hat Crew\" type Character card with a cost of 5 or less from your hand.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST18-005.jpg",
+   "count": 3
+  }
+ ],
+ "quantitiesExact": false,
+ "sources": {
+  "deck": "https://optcgapi.com/api/decks/ST-18/",
+  "catalog": "https://optcgapi.com/api/allDecks/"
+ }
+}

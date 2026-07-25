@@ -1,0 +1,319 @@
+{
+ "slug": "st-25",
+ "id": "ST-25",
+ "name": "Starter Deck 25: BLUE Buggy",
+ "leader": {
+  "id": "OP09-042",
+  "name": "Buggy (OP09-042)",
+  "type": "Leader",
+  "color": "Blue",
+  "cost": null,
+  "power": 5000,
+  "counter": null,
+  "life": 5,
+  "attribute": "Slash",
+  "subTypes": [
+   "The Four Emperors Cross Guild"
+  ],
+  "rarity": "L",
+  "text": "[Activate: Main] You may rest 5 of your DON!! cards and trash 1 card from your hand: Play up to 1 \"Cross Guild\" type Character card from your hand.",
+  "image": "https://optcgapi.com/media/static/Card_Images/OP09-042_p2.jpg",
+  "count": 1
+ },
+ "altLeaders": [],
+ "cards": [
+  {
+   "id": "OP09-043",
+   "name": "Alvida (Reprint)",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Cross Guild"
+   ],
+   "rarity": "UC",
+   "text": "[On K.O.] If your Leader has the \"Cross Guild\" type, play up to 1 Character card with a cost of 5 or less other than [Alvida] from your hand.DISCLAIMER: This card is a reprint of the pre-existing card in the OP09 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP09-043_r1.jpg",
+   "count": 3
+  },
+  {
+   "id": "OP09-045",
+   "name": "Cabaji (Reprint)",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 5,
+   "power": 5000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Cross Guild"
+   ],
+   "rarity": "UC",
+   "text": "If you have a [Buggy] or [Mohji] Character, this Character cannot be K.O.'d in battle.\n\nDISCLAIMER: This card is a reprint of the pre-existing card in the OP09 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP09-045_r1.jpg",
+   "count": 3
+  },
+  {
+   "id": "OP09-051",
+   "name": "Buggy (Reprint)",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 10,
+   "power": 12000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "The Four Emperors Cross Guild"
+   ],
+   "rarity": "R",
+   "text": "[On Play] Place up to 1 of your opponent's Characters at the bottom of the owner's deck. Then, if you do not have 5 Characters with a cost of 5 or more, place this Character at the bottom of the owner's deck.\n\nDISCLAIMER: This card is a reprint of the pre-existing card in the OP09 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP09-051_r1.jpg",
+   "count": 3
+  },
+  {
+   "id": "OP09-053",
+   "name": "Mohji (Reprint)",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 5,
+   "power": 5000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Wisdom",
+   "subTypes": [
+    "Cross Guild"
+   ],
+   "rarity": "UC",
+   "text": "[On Play] Look at 5 cards from the top of your deck; reveal up to 1 [Richie] and add it to your hand. Then, place the rest at the bottom of your deck in any order and play up to 1 [Richie] from your hand.DISCLAIMER: This card is a reprint of the pre-existing card in the OP09 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP09-053_r1.jpg",
+   "count": 3
+  },
+  {
+   "id": "OP09-054",
+   "name": "Richie (Reprint)",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 2,
+   "power": 2000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Animal Cross Guild"
+   ],
+   "rarity": "C",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\n\nDISCLAIMER: This card is a reprint of the pre-existing card in the OP09 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP09-054_r1.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP09-055",
+   "name": "Mr.1(Daz.Bonez) (Reprint)",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 5,
+   "power": 7000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Former Baroque Works Cross Guild"
+   ],
+   "rarity": "C",
+   "text": "DISCLAIMER: This card is a reprint of the pre-existing card in the OP09 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP09-055_r1.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP09-056",
+   "name": "Mr.3(Galdino) (Reprint)",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 1,
+   "power": 2000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Former Baroque Works Cross Guild"
+   ],
+   "rarity": "R",
+   "text": "[On Play] Look at 4 cards from the top of your deck; reveal up to 1 \"Cross Guild\" type card or card with a type including \"Baroque Works\" other than [Mr.3(Galdino)] and add it to your hand. Then, place the rest at the bottom of your deck in any order.DISCLAIMER: This card is a reprint of the pre-existing card in the OP09 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP09-056_r1.jpg",
+   "count": 3
+  },
+  {
+   "id": "OP09-057",
+   "name": "Cross Guild (Reprint)",
+   "type": "Event",
+   "color": "Blue",
+   "cost": 1,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Cross Guild"
+   ],
+   "rarity": "R",
+   "text": "[Main] Look at 4 cards from the top of your deck; reveal up to 1 \"Cross Guild\" type card and add it to your hand. Then, place the rest at the bottom of your deck in any order.\n[Trigger] Activate this card's [Main] effect.\n\nDISCLAIMER: This card is a reprint of the pre-existing card in the OP09 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP09-057_r1.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST25-001",
+   "name": "Alvida",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 4,
+   "power": 5000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Cross Guild"
+   ],
+   "rarity": "C",
+   "text": "If you have 2 or more Characters with a base cost of 5 or more, this Character gains +1 cost.\n[On Play] If your Leader is [Buggy], draw 3 cards and trash 2 cards from your hand.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST25-001.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST25-001",
+   "name": "Alvida",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 4,
+   "power": 5000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Cross Guild"
+   ],
+   "rarity": "C",
+   "text": "If you have 2 or more Characters with a base cost of 5 or more, this Character gains +1 cost.\n[On Play] If your Leader is [Buggy], draw 3 cards and trash 2 cards from your hand.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST25-001_xelVoJm.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST25-002",
+   "name": "Cabaji",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 4,
+   "power": 1000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Cross Guild"
+   ],
+   "rarity": "C",
+   "text": "If you have 2 or more Characters with a base cost of 5 or more, this Character gains [Blocker] and +1 cost.\n(After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\n[Opponent's Turn] This Character gains +5000 power.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST25-002.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST25-003",
+   "name": "Crocodile & Mihawk",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 8,
+   "power": 7000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Slash Special",
+   "subTypes": [
+    "Former Baroque Works Cross Guild"
+   ],
+   "rarity": "SR",
+   "text": "[On Play] Draw 2 cards and trash 1 card from your hand. Then, play up to 1 \"Cross Guild\" type Character card with a cost of 4 or less from your hand.\n[Once Per Turn] If your \"Cross Guild\" type Character would be removed from the field by your opponent's effect, you may trash 1 card from your hand instead.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST25-003.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST25-003",
+   "name": "Crocodile & Mihawk",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 8,
+   "power": 7000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Slash Special",
+   "subTypes": [
+    "Former Baroque Works Cross Guild"
+   ],
+   "rarity": "SR",
+   "text": "[On Play] Draw 2 cards and trash 1 card from your hand. Then, play up to 1 \"Cross Guild\" type Character card with a cost of 4 or less from your hand.\n[Once Per Turn] If your \"Cross Guild\" type Character would be removed from the field by your opponent's effect, you may trash 1 card from your hand instead.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST25-003_0QHazIj.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST25-004",
+   "name": "Buggy",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 4,
+   "power": 1000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "The Four Emperors Cross Guild"
+   ],
+   "rarity": "SR",
+   "text": "[Activate:Main] You may trash 1 card from your hand and trash this Character: If your Leader is [Buggy], play up to 1 \"Cross Guild\" type Character card with a cost of 6 or less from your hand.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST25-004.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST25-004",
+   "name": "Buggy",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 4,
+   "power": 1000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "The Four Emperors Cross Guild"
+   ],
+   "rarity": "SR",
+   "text": "[Activate:Main] You may trash 1 card from your hand and trash this Character: If your Leader is [Buggy], play up to 1 \"Cross Guild\" type Character card with a cost of 6 or less from your hand.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST25-004_8Zo1qx2.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST25-005",
+   "name": "Mohji",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 4,
+   "power": 1000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Wisdom",
+   "subTypes": [
+    "Cross Guild"
+   ],
+   "rarity": "C",
+   "text": "If you have 2 or more Characters with a base cost of 5 or more, this Character gains [Blocker] and +1 cost.\n(After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\n[On K.O.] If your Leader is [Buggy] and you have 3 or less cards in your hand, draw 1 card.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST25-005.jpg",
+   "count": 4
+  }
+ ],
+ "quantitiesExact": false,
+ "sources": {
+  "deck": "https://optcgapi.com/api/decks/ST-25/",
+  "catalog": "https://optcgapi.com/api/allDecks/"
+ }
+}

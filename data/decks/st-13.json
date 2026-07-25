@@ -1,0 +1,639 @@
+{
+ "slug": "st-13",
+ "id": "ST-13",
+ "name": "Ultra Deck: The Three Brothers",
+ "leader": {
+  "id": "ST13-001",
+  "name": "Sabo",
+  "type": "Leader",
+  "color": "Red Yellow",
+  "cost": null,
+  "power": 5000,
+  "counter": null,
+  "life": 4,
+  "attribute": "Special",
+  "subTypes": [
+   "Revolutionary Army Dressrosa"
+  ],
+  "rarity": "L",
+  "text": "[DON!! x1][Activate: Main][Once Per Turn] You may add 1 of your Characters with a cost of 3 or more and 7000 power or more to the top of your Life cards face-up: Up to 1 of your Characters gains +2000 power until the start of your next turn.",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST13-001_wV6zdZw.jpg",
+  "count": 1
+ },
+ "altLeaders": [
+  {
+   "id": "ST13-001",
+   "name": "Sabo (001) (Parallel)",
+   "type": "Leader",
+   "color": "Red Yellow",
+   "cost": null,
+   "power": 5000,
+   "counter": null,
+   "life": 4,
+   "attribute": "Special",
+   "subTypes": [
+    "Revolutionary Army Dressrosa"
+   ],
+   "rarity": "L",
+   "text": "[DON!! x1][Activate: Main][Once Per Turn] You may add 1 of your Characters with a cost of 3 or more and 7000 power or more to the top of your Life cards face-up: Up to 1 of your Characters gains +2000 power until the start of your next turn.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-001_p1_r1DAPJ3.jpg"
+  },
+  {
+   "id": "ST13-002",
+   "name": "Portgas.D.Ace",
+   "type": "Leader",
+   "color": "Blue Yellow",
+   "cost": null,
+   "power": 5000,
+   "counter": null,
+   "life": 4,
+   "attribute": "Special",
+   "subTypes": [
+    "Whitebeard Pirates"
+   ],
+   "rarity": "L",
+   "text": "[DON!! x2][Activate: Main][Once Per Turn] Look at 5 cards from the top of your deck and add up to 1 Character card with a cost of 5 to the top of your Life cards face-up. Then, place the rest at the bottom of your deck in any order.\n[End of Your Turn] Trash all your face-up Life cards.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-002_1UL55Ec.jpg"
+  },
+  {
+   "id": "ST13-002",
+   "name": "Portgas.D.Ace (002) (Parallel)",
+   "type": "Leader",
+   "color": "Blue Yellow",
+   "cost": null,
+   "power": 5000,
+   "counter": null,
+   "life": 4,
+   "attribute": "Special",
+   "subTypes": [
+    "Whitebeard Pirates"
+   ],
+   "rarity": "L",
+   "text": "[DON!! x2][Activate: Main][Once Per Turn] Look at 5 cards from the top of your deck and add up to 1 Character card with a cost of 5 to the top of your Life cards face-up. Then, place the rest at the bottom of your deck in any order.\n[End of Your Turn] Trash all your face-up Life cards.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-002_p1_oKJEjjw.jpg"
+  },
+  {
+   "id": "ST13-003",
+   "name": "Monkey.D.Luffy",
+   "type": "Leader",
+   "color": "Yellow",
+   "cost": null,
+   "power": 5000,
+   "counter": null,
+   "life": 4,
+   "attribute": "Strike",
+   "subTypes": [
+    "Straw Hat Crew Supernovas"
+   ],
+   "rarity": "L",
+   "text": "Your face-up Life cards are placed at the bottom of your deck instead of being added to your hand, according to the rules.\n[DON!! x2][Activate: Main][Once Per Turn]You may trash 1 card from your hand: If you have 0 Life cards, add up to 2 Character cards with a cost of 5 from your hand or trash to the top of your Life cards face-up.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-003_a7Gzwsz.jpg"
+  },
+  {
+   "id": "ST13-003",
+   "name": "Monkey.D.Luffy (003) (Parallel)",
+   "type": "Leader",
+   "color": "Yellow",
+   "cost": null,
+   "power": 5000,
+   "counter": null,
+   "life": 4,
+   "attribute": "Strike",
+   "subTypes": [
+    "Straw Hat Crew Supernovas"
+   ],
+   "rarity": "L",
+   "text": "Your face-up Life cards are placed at the bottom of your deck instead of being added to your hand, according to the rules.\n[DON!! x2][Activate: Main][Once Per Turn]You may trash 1 card from your hand: If you have 0 Life cards, add up to 2 Character cards with a cost of 5 from your hand or trash to the top of your Life cards face-up.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-003_p1_z2jSOyv.jpg"
+  }
+ ],
+ "cards": [
+  {
+   "id": "ST13-004",
+   "name": "Edward.Newgate",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 6,
+   "power": 7000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "The Four Emperors Whitebeard Pirates"
+   ],
+   "rarity": "C",
+   "text": "[On Play] Add 1 card from the top of your deck to the top of your Life cards. Then, look at all your Life cards; place 1 card at the top of your deck and place the rest back in your Life area in any order.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-004_bFAHsxu.jpg",
+   "count": 1
+  },
+  {
+   "id": "ST13-004",
+   "name": "Edward.Newgate (Parallel)",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 6,
+   "power": 7000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "The Four Emperors Whitebeard Pirates"
+   ],
+   "rarity": "C",
+   "text": "[On Play] Add 1 card from the top of your deck to the top of your Life cards. Then, look at all your Life cards; place 1 card at the top of your deck and place the rest back in your Life area in any order.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-004_p1_SHFtr1o.jpg",
+   "count": 1
+  },
+  {
+   "id": "ST13-005",
+   "name": "Emporio.Ivankov",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 3,
+   "power": 4000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Revolutionary Army"
+   ],
+   "rarity": "R",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\n[On Play] You may trash 1 card from the top or bottom of your Life cards: Reveal up to 1 Character card with a cost of 5 from your hand and add it to the top of your Life cards face-down.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-005_40U3UIU.jpg",
+   "count": 1
+  },
+  {
+   "id": "ST13-005",
+   "name": "Emporio.Ivankov (Parallel)",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 3,
+   "power": 4000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Revolutionary Army"
+   ],
+   "rarity": "R",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\n[On Play] You may trash 1 card from the top or bottom of your Life cards: Reveal up to 1 Character card with a cost of 5 from your hand and add it to the top of your Life cards face-down.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-005_p1_gPmjvZo.jpg",
+   "count": 1
+  },
+  {
+   "id": "ST13-006",
+   "name": "Curly.Dadan (Parallel)",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 5,
+   "power": 4000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Mountain Bandits"
+   ],
+   "rarity": "C",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\n[On Play] Play up to 1 each of [Sabo], [Portgas.D.Ace], and [Monkey.D.Luffy] with a cost of 2 from your hand.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-006_p1_iOzHANL.jpg",
+   "count": 1
+  },
+  {
+   "id": "ST13-006",
+   "name": "Curly.Dadan",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 5,
+   "power": 4000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Mountain Bandits"
+   ],
+   "rarity": "C",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\n[On Play] Play up to 1 each of [Sabo], [Portgas.D.Ace], and [Monkey.D.Luffy] with a cost of 2 from your hand.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-006_brsBGn2.jpg",
+   "count": 1
+  },
+  {
+   "id": "ST13-007",
+   "name": "Sabo",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 2,
+   "power": 2000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Goa Kingdom"
+   ],
+   "rarity": "C",
+   "text": "[Activate: Main] You may trash this Character: Reveal 1 card from the top of your Life cards. If that card is a [Sabo] with a cost of 5, you may play that card. If you do, up to 1 of your Leader gains +2000 power until the end of your opponent's next turn.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-007_lKhAebg.jpg",
+   "count": 1
+  },
+  {
+   "id": "ST13-007",
+   "name": "Sabo (007) (Parallel)",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 2,
+   "power": 2000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Goa Kingdom"
+   ],
+   "rarity": "C",
+   "text": "[Activate: Main] You may trash this Character: Reveal 1 card from the top of your Life cards. If that card is a [Sabo] with a cost of 5, you may play that card. If you do, up to 1 of your Leader gains +2000 power until the end of your opponent's next turn.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-007_p1_KMXq7hM.jpg",
+   "count": 1
+  },
+  {
+   "id": "ST13-008",
+   "name": "Sabo",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Revolutionary Army Dressrosa"
+   ],
+   "rarity": "SR",
+   "text": "[On Play]You may trash 1 card from the top or bottom of your Life cards: K.O. up to 1 of your opponent's Characters with a cost of 5 or less.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-008_wSNB66G.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-008",
+   "name": "Sabo (008) (Parallel)",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Revolutionary Army Dressrosa"
+   ],
+   "rarity": "SR",
+   "text": "[On Play]You may trash 1 card from the top or bottom of your Life cards: K.O. up to 1 of your opponent's Characters with a cost of 5 or less.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-008_p1_dkohIfo.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-009",
+   "name": "Shanks",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 7,
+   "power": 7000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "The Four Emperors Red-Haired Pirates"
+   ],
+   "rarity": "C",
+   "text": "[On Play] You may turn 1 of your face-up Life cards face-down: If your opponent has 7 or more cards in their hand, trash up to 1 card from the top of your opponent's Life cards.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-009_82C1fh7.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-009",
+   "name": "Shanks (Parallel)",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 7,
+   "power": 7000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "The Four Emperors Red-Haired Pirates"
+   ],
+   "rarity": "C",
+   "text": "[On Play] You may turn 1 of your face-up Life cards face-down: If your opponent has 7 or more cards in their hand, trash up to 1 card from the top of your opponent's Life cards.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-009_p1_cdOyggP.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-010",
+   "name": "Portgas.D.Ace",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 2,
+   "power": 2000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Goa Kingdom"
+   ],
+   "rarity": "C",
+   "text": "[Activate: Main] You may trash this Character: Reveal 1 card from the top of your Life cards. If that card is a [Portgas.D.Ace] with a cost of 5, you may play that card. If you do, up to 1 of your Leader gains +2000 power until the end of your opponent's next turn.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-010_duLOHgI.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-010",
+   "name": "Portgas.D.Ace (010) (Parallel)",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 2,
+   "power": 2000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Goa Kingdom"
+   ],
+   "rarity": "C",
+   "text": "[Activate: Main] You may trash this Character: Reveal 1 card from the top of your Life cards. If that card is a [Portgas.D.Ace] with a cost of 5, you may play that card. If you do, up to 1 of your Leader gains +2000 power until the end of your opponent's next turn.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-010_p1_i6qNLyJ.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-011",
+   "name": "Portgas.D.Ace",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 5,
+   "power": 7000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Whitebeard Pirates"
+   ],
+   "rarity": "SR",
+   "text": "[On Play] If you have 2 or less Life cards, this Character gains [Rush].\n(This card can attack on the turn in which it is played.)",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-011_NLQAHYu.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-011",
+   "name": "Portgas.D.Ace (011) (Parallel)",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 5,
+   "power": 7000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Whitebeard Pirates"
+   ],
+   "rarity": "SR",
+   "text": "[On Play] If you have 2 or less Life cards, this Character gains [Rush].\n(This card can attack on the turn in which it is played.)",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-011_p1_GcxrQ13.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-012",
+   "name": "Makino",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 1,
+   "power": 0,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Wisdom",
+   "subTypes": [
+    "Windmill Village"
+   ],
+   "rarity": "C",
+   "text": "[On Play] You may add 1 card from the top or bottom of your Life cards to your hand: Look at all of your Life cards and place them back in your Life area in any order.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-012_XcvKWxa.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-012",
+   "name": "Makino (Parallel)",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 1,
+   "power": 0,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Wisdom",
+   "subTypes": [
+    "Windmill Village"
+   ],
+   "rarity": "C",
+   "text": "[On Play] You may add 1 card from the top or bottom of your Life cards to your hand: Look at all of your Life cards and place them back in your Life area in any order.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-012_p1_rrBanrh.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-013",
+   "name": "Monkey.D.Garp",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 1,
+   "power": 2000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Navy"
+   ],
+   "rarity": "SR",
+   "text": "[On Play] Look at 5 cards from the top of your deck; reveal up to 1 [Sabo], [Portgas.D.Ace], or [Monkey.D.Luffy] with a cost of 5 or less and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-013_UmmTC2r.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-013",
+   "name": "Monkey.D.Garp (Parallel)",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 1,
+   "power": 2000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Navy"
+   ],
+   "rarity": "SR",
+   "text": "[On Play] Look at 5 cards from the top of your deck; reveal up to 1 [Sabo], [Portgas.D.Ace], or [Monkey.D.Luffy] with a cost of 5 or less and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-013_p1_CACRD4O.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-014",
+   "name": "Monkey.D.Luffy",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 2,
+   "power": 2000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Goa Kingdom"
+   ],
+   "rarity": "C",
+   "text": "[Activate:Main] You may trash this Character: Reveal 1 card from the top of your Life cards. If that card is a [Monkey.D.Luffy] with a cost of 5, you may play that card. If you do, up to 1 of your Leader gains +2000 power until the end of your opponent's next turn.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-014_s5F6lLd.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-014",
+   "name": "Monkey.D.Luffy (014) (Parallel)",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 2,
+   "power": 2000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Goa Kingdom"
+   ],
+   "rarity": "C",
+   "text": "[Activate:Main] You may trash this Character: Reveal 1 card from the top of your Life cards. If that card is a [Monkey.D.Luffy] with a cost of 5, you may play that card. If you do, up to 1 of your Leader gains +2000 power until the end of your opponent's next turn.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-014_p1_zo7vyZR.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-015",
+   "name": "Monkey.D.Luffy",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Straw Hat Crew Supernovas"
+   ],
+   "rarity": "SR",
+   "text": "[Activate:Main][Once Per Turn]This Character gains +2000 power until the start of your next turn. Then, if you have 1 or more Life cards, draw 1 card and trash 1 card from the top of your Life cards.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-015_V5oHlxL.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-015",
+   "name": "Monkey.D.Luffy (015) (Parallel)",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Straw Hat Crew Supernovas"
+   ],
+   "rarity": "SR",
+   "text": "[Activate:Main][Once Per Turn]This Character gains +2000 power until the start of your next turn. Then, if you have 1 or more Life cards, draw 1 card and trash 1 card from the top of your Life cards.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-015_p1_DL0kiAs.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-016",
+   "name": "Yamato (Parallel)",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 5,
+   "power": 4000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Land of Wano"
+   ],
+   "rarity": "C",
+   "text": "[Rush] (This card can attack on the turn in which it is played.)\n[On Play] Look at all your Life cards; place 1 at the top of your deck and place the rest back in your Life area in any order.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-016_p1_6S69Pva.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-016",
+   "name": "Yamato",
+   "type": "Character",
+   "color": "Yellow",
+   "cost": 5,
+   "power": 4000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Land of Wano"
+   ],
+   "rarity": "C",
+   "text": "[Rush] (This card can attack on the turn in which it is played.)\n[On Play] Look at all your Life cards; place 1 at the top of your deck and place the rest back in your Life area in any order.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-016_H06pIrQ.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-017",
+   "name": "Flame Dragon King",
+   "type": "Event",
+   "color": "Yellow",
+   "cost": 2,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Revolutionary Army Dressrosa"
+   ],
+   "rarity": "C",
+   "text": "[Counter] Up to 1 of your Leader or Character cards gains +4000 power during this battle. Then, look at all your Life cards and place them back in your Life area in any order.\n[Trigger] You may add 1 card from the top or bottom of your Life cards to your hand: Add up to 1 card from your hand to the top of your Life cards.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-017_xf5N78N.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-018",
+   "name": "Gum-Gum Jet Spear",
+   "type": "Event",
+   "color": "Yellow",
+   "cost": 1,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Straw Hat Crew Punk Hazard"
+   ],
+   "rarity": "C",
+   "text": "[Counter] Up to 1 of your Leader or Character cards gains +2000 power during this battle. Then, if you have 0 Life cards, draw 1 card.\n[Trigger] You may add 1 card from the top or bottom of your Life cards to your hand: Add up to 1 card from your hand to the top of your Life cards.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-018_cTpeQOx.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST13-019",
+   "name": "The Three Brothers' Bond",
+   "type": "Event",
+   "color": "Yellow",
+   "cost": 1,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Goa Kingdom"
+   ],
+   "rarity": "C",
+   "text": "[Main] Look at 5 cards from the top of your deck; reveal up to 1 [Sabo], [Portgas.D.Ace], or [Monkey.D.Luffy] with a cost of 5 or less and add it to your hand. Then, place the rest at the bottom of your deck in any order.\n[Trigger] Activate this card's [Main] effect.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST13-019_KWlLyGb.jpg",
+   "count": 2
+  }
+ ],
+ "quantitiesExact": false,
+ "sources": {
+  "deck": "https://optcgapi.com/api/decks/ST-13/",
+  "catalog": "https://optcgapi.com/api/allDecks/"
+ }
+}

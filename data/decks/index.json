@@ -34,5 +34,194 @@
   "color": "Purple",
   "image": "https://optcgapi.com/media/static/Card_Images/ST04-001.jpg",
   "quantitiesExact": false
+ },
+ {
+  "slug": "st-05",
+  "id": "ST-05",
+  "name": "Starter Deck 5: Film Edition",
+  "leader": "Shanks",
+  "color": "Purple",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST05-001.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-06",
+  "id": "ST-06",
+  "name": "Starter Deck 6: Absolute Justice",
+  "leader": "Sakazuki",
+  "color": "Black",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST06-001.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-07",
+  "id": "ST-07",
+  "name": "Starter Deck 7: Big Mom Pirates",
+  "leader": "Charlotte Linlin",
+  "color": "Yellow",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST07-001.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-08",
+  "id": "ST-08",
+  "name": "Starter Deck 8: Monkey.D.Luffy",
+  "leader": "Monkey.D.Luffy",
+  "color": "Black",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST08-001.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-09",
+  "id": "ST-09",
+  "name": "Starter Deck 9: Yamato",
+  "leader": "Yamato",
+  "color": "Yellow",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST09-001.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-10",
+  "id": "ST-10",
+  "name": "Ultra Deck: The Three Captains",
+  "leader": "Trafalgar Law",
+  "color": "Purple Red",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST10-001.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-12",
+  "id": "ST-12",
+  "name": "Starter Deck 12: Zoro and Sanji",
+  "leader": "Roronoa Zoro & Sanji",
+  "color": "Blue Green",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST12-001.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-13",
+  "id": "ST-13",
+  "name": "Ultra Deck: The Three Brothers",
+  "leader": "Sabo",
+  "color": "Red Yellow",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST13-001_wV6zdZw.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-14",
+  "id": "ST-14",
+  "name": "Starter Deck 14: 3D2Y",
+  "leader": "Monkey.D.Luffy",
+  "color": "Black",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST14-001.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-16",
+  "id": "ST-16",
+  "name": "Starter Deck 16: GREEN Uta",
+  "leader": "Uta (ST11-001)",
+  "color": "Green",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST11-001_p1.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-18",
+  "id": "ST-18",
+  "name": "Starter Deck 18: PURPLE Monkey.D.Luffy",
+  "leader": "Monkey.D.Luffy (OP05-060)",
+  "color": "Purple",
+  "image": "https://optcgapi.com/media/static/Card_Images/OP05-060_p3.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-19",
+  "id": "ST-19",
+  "name": "Starter Deck 19: BLACK Smoker",
+  "leader": "Smoker (OP02-093)",
+  "color": "Black",
+  "image": "https://optcgapi.com/media/static/Card_Images/OP02-093_p2.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-21",
+  "id": "ST-21",
+  "name": "Starter Deck EX: Gear 5",
+  "leader": "Monkey.D.Luffy",
+  "color": "Red",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST21-001.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-22",
+  "id": "ST-22",
+  "name": "Starter Deck 22: Ace & Newgate",
+  "leader": "Ace & Newgate",
+  "color": "Blue",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST22-001_asHW7pp.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-23",
+  "id": "ST-23",
+  "name": "Starter Deck 23: RED Shanks",
+  "leader": "Shanks (OP09-001)",
+  "color": "Red",
+  "image": "https://optcgapi.com/media/static/Card_Images/OP09-001_p2.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-24",
+  "id": "ST-24",
+  "name": "Starter Deck 24: GREEN Jewelry Bonney",
+  "leader": "Jewelry Bonney (OP07-019)",
+  "color": "Green",
+  "image": "https://optcgapi.com/media/static/Card_Images/OP07-019_p3.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-25",
+  "id": "ST-25",
+  "name": "Starter Deck 25: BLUE Buggy",
+  "leader": "Buggy (OP09-042)",
+  "color": "Blue",
+  "image": "https://optcgapi.com/media/static/Card_Images/OP09-042_p2.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-26",
+  "id": "ST-26",
+  "name": "Starter Deck 26: PURPLE/BLACK Monkey.D.Luffy",
+  "leader": "Monkey.D.Luffy (OP09-061)",
+  "color": "Purple Black",
+  "image": "https://optcgapi.com/media/static/Card_Images/OP09-061_p2.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-27",
+  "id": "ST-27",
+  "name": "Starter Deck 27: BLACK Marshall.D.Teach",
+  "leader": "Marshall.D.Teach (OP09-081)",
+  "color": "Black",
+  "image": "https://optcgapi.com/media/static/Card_Images/OP09-081_p2.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-28",
+  "id": "ST-28",
+  "name": "Starter Deck 28: GREEN/YELLOW Yamato",
+  "leader": "Yamato (OP06-022)",
+  "color": "Green Yellow",
+  "image": "https://optcgapi.com/media/static/Card_Images/OP06-022_p3.jpg",
+  "quantitiesExact": false
+ },
+ {
+  "slug": "st-30",
+  "id": "ST-30",
+  "name": "Starter Deck EX: Luffy & Ace",
+  "leader": "Luffy & Ace",
+  "color": "Green Red",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST30-001_LM5IDx5.jpg",
+  "quantitiesExact": false
  }
 ]

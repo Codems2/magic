@@ -1,0 +1,283 @@
+{
+ "slug": "st-08",
+ "id": "ST-08",
+ "name": "Starter Deck 8: Monkey.D.Luffy",
+ "leader": {
+  "id": "ST08-001",
+  "name": "Monkey.D.Luffy",
+  "type": "Leader",
+  "color": "Black",
+  "cost": null,
+  "power": 5000,
+  "counter": null,
+  "life": 5,
+  "attribute": "Strike",
+  "subTypes": [
+   "Straw Hat Crew"
+  ],
+  "rarity": "L",
+  "text": "[Your Turn] When a Character is K.O.'d, give up to 1 rested DON!! card to this Leader.",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST08-001.jpg",
+  "count": 1
+ },
+ "altLeaders": [],
+ "cards": [
+  {
+   "id": "ST08-002",
+   "name": "Uta",
+   "type": "Character",
+   "color": "Black",
+   "cost": 2,
+   "power": 3000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "FILM"
+   ],
+   "rarity": "SR",
+   "text": "This Character cannot be K.O.'d in battle by Leaders. [Activate:Main] You may rest this Character: Give up to 1 of your opponent's Characters -2 cost during this turn.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST08-002.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST08-003",
+   "name": "Gaimon",
+   "type": "Character",
+   "color": "Black",
+   "cost": 2,
+   "power": 4000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Wisdom",
+   "subTypes": [
+    "East Blue"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST08-003.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST08-004",
+   "name": "Koby",
+   "type": "Character",
+   "color": "Black",
+   "cost": 4,
+   "power": 1000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Navy"
+   ],
+   "rarity": "C",
+   "text": "[Activate:Main] You may rest this Character: K.O. up to 1 of your opponent's Characters with a cost of 2 or less.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST08-004.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST08-005",
+   "name": "Shanks",
+   "type": "Character",
+   "color": "Black",
+   "cost": 9,
+   "power": 10000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Red-Haired Pirates"
+   ],
+   "rarity": "SR",
+   "text": "[On Play] You may trash 1 card from your hand: K.O. all Characters with a cost of 1 or less.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST08-005.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST08-006",
+   "name": "Shirahoshi",
+   "type": "Character",
+   "color": "Black",
+   "cost": 4,
+   "power": 0,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Wisdom",
+   "subTypes": [
+    "Merfolk"
+   ],
+   "rarity": "C",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [On Play] Give up to 1 of your opponent's Characters -4 cost during this turn.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST08-006.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST08-007",
+   "name": "Nefeltari Vivi",
+   "type": "Character",
+   "color": "Black",
+   "cost": 3,
+   "power": 1000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Alabasta"
+   ],
+   "rarity": "C",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [Trigger] Play this card.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST08-007.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST08-008",
+   "name": "Higuma",
+   "type": "Character",
+   "color": "Black",
+   "cost": 1,
+   "power": 2000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Mountain Bandits"
+   ],
+   "rarity": "C",
+   "text": "[On Play] Give up to 1 of your opponent's Characters -2 cost during this turn.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST08-008.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST08-009",
+   "name": "Makino",
+   "type": "Character",
+   "color": "Black",
+   "cost": 2,
+   "power": 0,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Wisdom",
+   "subTypes": [
+    "Windmill Village"
+   ],
+   "rarity": "C",
+   "text": "[On Play] If there is a Character with a cost of 0, draw 1 card.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST08-009.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST08-010",
+   "name": "Monkey.D.Garp",
+   "type": "Character",
+   "color": "Black",
+   "cost": 5,
+   "power": 7000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Navy"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST08-010.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST08-011",
+   "name": "Monkey.D.Luffy",
+   "type": "Character",
+   "color": "Black",
+   "cost": 3,
+   "power": 5000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST08-011.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST08-012",
+   "name": "Laboon",
+   "type": "Character",
+   "color": "Black",
+   "cost": 4,
+   "power": 6000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Animal"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST08-012.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST08-013",
+   "name": "Mr.2.Bon.Kurei (Bentham)",
+   "type": "Character",
+   "color": "Black",
+   "cost": 5,
+   "power": 6000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Former Baroque Works"
+   ],
+   "rarity": "C",
+   "text": "[DON!! x1] At the end of a battle in which this Character battles your opponent's Character, you may K.O. the opponent's Character you battled with. If you do, K.O. this Character.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST08-013.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST08-014",
+   "name": "Gum-Gum Bell",
+   "type": "Event",
+   "color": "Black",
+   "cost": 2,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[Main] You may add 1 card from the top of your Life cards to your hand: Give up to 1 of your opponent's Characters -7 cost during this turn. [Trigger] Add up to 1 black Character card with a cost of 2 or less from your trash to your hand.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST08-014.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST08-015",
+   "name": "Gum-Gum Pistol",
+   "type": "Event",
+   "color": "Black",
+   "cost": 3,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[Main] K.O. up to 1 of your opponent's Characters with a cost of 2 or less. [Trigger] Draw 1 card.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST08-015.jpg",
+   "count": 2
+  }
+ ],
+ "quantitiesExact": false,
+ "sources": {
+  "deck": "https://optcgapi.com/api/decks/ST-08/",
+  "catalog": "https://optcgapi.com/api/allDecks/"
+ }
+}

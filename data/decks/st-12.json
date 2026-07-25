@@ -1,0 +1,319 @@
+{
+ "slug": "st-12",
+ "id": "ST-12",
+ "name": "Starter Deck 12: Zoro and Sanji",
+ "leader": {
+  "id": "ST12-001",
+  "name": "Roronoa Zoro & Sanji",
+  "type": "Leader",
+  "color": "Blue Green",
+  "cost": null,
+  "power": 5000,
+  "counter": null,
+  "life": 4,
+  "attribute": "Slash Strike",
+  "subTypes": [
+   "Straw Hat Crew"
+  ],
+  "rarity": "L",
+  "text": "[DON!! x1][When Attacking][Once Per Turn] You may return 1 of your Characters with a cost of 2 or more to the owner's hand: Set up to 1 of your Characters with 7000 power or less as active.",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST12-001.jpg",
+  "count": 1
+ },
+ "altLeaders": [],
+ "cards": [
+  {
+   "id": "ST12-002",
+   "name": "Kuina",
+   "type": "Character",
+   "color": "Green",
+   "cost": 3,
+   "power": 2000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Frost Moon Village"
+   ],
+   "rarity": "C",
+   "text": "[Activate:Main] You may rest this Character: Rest up to 1 of your opponent's Characters with a cost of 4 or less. [Trigger] Play this card.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST12-002.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST12-003",
+   "name": "Dracule Mihawk",
+   "type": "Character",
+   "color": "Green",
+   "cost": 3,
+   "power": 4000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "The Seven Warlords of the Sea Muggy Kingdom"
+   ],
+   "rarity": "SR",
+   "text": "[On Play] If you have 2 or less Characters, play up to 1 [Muggy Kingdom] type or \"Slash\" attribute Character card with a cost of 4 or less other than [Dracule Mihawk] from your hand rested.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST12-003.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST12-004",
+   "name": "Humandrill",
+   "type": "Character",
+   "color": "Green",
+   "cost": 3,
+   "power": 5000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Wisdom",
+   "subTypes": [
+    "Animal Muggy Kingdom"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST12-004.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST12-005",
+   "name": "Perona",
+   "type": "Character",
+   "color": "Green",
+   "cost": 4,
+   "power": 6000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Thriller Bark Pirates Muggy Kingdom"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST12-005.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST12-006",
+   "name": "Yosaku & Johnny",
+   "type": "Character",
+   "color": "Green",
+   "cost": 2,
+   "power": 3000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "East Blue"
+   ],
+   "rarity": "C",
+   "text": "[DON!! x1][When Attacking] Choose one: • Rest up to 1 of your opponent's Characters with a cost of 2 or less. • K.O. up to 1 of your opponent's rested Characters with a cost of 2 or less.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST12-006.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST12-007",
+   "name": "Rika",
+   "type": "Character",
+   "color": "Green",
+   "cost": 2,
+   "power": 0,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Wisdom",
+   "subTypes": [
+    "East Blue"
+   ],
+   "rarity": "C",
+   "text": "[On Play] (2) (You may rest the specified number of DON!! cards in your cost area.): If your opponent has 3 or more Life cards, set up to 1 of your \"Slash\" attribute Characters with a cost of 4 or less as active.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST12-007.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST12-008",
+   "name": "Roronoa Zoro",
+   "type": "Character",
+   "color": "Green",
+   "cost": 4,
+   "power": 6000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[DON!! x1][When Attacking] Rest up to 1 of your opponent's Characters with a cost of 6 or less.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST12-008.jpg",
+   "count": 3
+  },
+  {
+   "id": "ST12-009",
+   "name": "Elephant True Bluefin",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 1,
+   "power": 3000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Animal"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST12-009.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST12-010",
+   "name": "Emporio.Ivankov",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 3,
+   "power": 4000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Revolutionary Army Impel Down"
+   ],
+   "rarity": "SR",
+   "text": "[On Play] Reveal 1 card from the top of your deck and play up to 1 Character card with a cost of 2. Then, place the rest at the top or bottom of your deck. [When Attacking][Once Per Turn] Draw 1 card if you have 6 or less cards in your hand.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST12-010.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST12-011",
+   "name": "Sanji",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 2,
+   "power": 3000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[DON!! x1][When Attacking] If you have 5 or less cards in your hand, this Character gains +2000 power until the start of your next turn.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST12-011.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST12-012",
+   "name": "Charlotte Pudding",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 2,
+   "power": 2000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Wisdom",
+   "subTypes": [
+    "Big Mom Pirates"
+   ],
+   "rarity": "C",
+   "text": "[Activate:Main] Return this Character to the owner's hand.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST12-012.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST12-013",
+   "name": "Zeff",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 5,
+   "power": 5000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "East Blue"
+   ],
+   "rarity": "C",
+   "text": "[On Play] Look at 3 cards from the top of your deck and place them at the top or bottom of the deck in any order. [When Attacking] Reveal 1 card from the top of your deck and play up to 1 Character card with a cost of 2 rested. Then, place the rest at the top or bottom of your deck.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST12-013.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST12-014",
+   "name": "Duval",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 2,
+   "power": 1000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "The Flying Fish Riders"
+   ],
+   "rarity": "C",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [On Play] Look at 3 cards from the top of your deck and place them at the top or bottom of the deck in any order.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST12-014.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST12-015",
+   "name": "Patty & Carne",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 2,
+   "power": 4000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "East Blue"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST12-015.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST12-016",
+   "name": "Lion Strike",
+   "type": "Event",
+   "color": "Green",
+   "cost": 2,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[Main] / [Counter] Rest up to 1 of your opponent's Leader or Character cards with a cost of 4 or less. [Trigger] Activate this card's [Main] effect.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST12-016.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST12-017",
+   "name": "Plastic Surgery Shot",
+   "type": "Event",
+   "color": "Blue",
+   "cost": 1,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[Counter] Up to 1 of your Leader or Character cards gains +2000 power during this battle. Then, reveal 1 card from the top of your deck, play up to 1 Character card with a cost of 2, and place the rest at the top or bottom of your deck.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST12-017.jpg",
+   "count": 2
+  }
+ ],
+ "quantitiesExact": false,
+ "sources": {
+  "deck": "https://optcgapi.com/api/decks/ST-12/",
+  "catalog": "https://optcgapi.com/api/allDecks/"
+ }
+}
