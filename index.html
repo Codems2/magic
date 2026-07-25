@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador One Piece TCG</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="setup" class="screen">
+    <h1>🏴‍☠️ Simulador de One Piece Card Game</h1>
+    <p class="subtitle">Starter Decks oficiales · 1v1 contra un bot · cartas de OPTCG API</p>
+    <h2>Tu mazo</h2>
+    <div id="myDecks" class="deck-grid"></div>
+    <h2>Mazo del bot</h2>
+    <div id="botDecks" class="deck-grid"></div>
+    <button id="startBtn" class="primary" disabled>¡Zarpar!</button>
+  </div>
+
+  <div id="game" class="screen hidden">
+    <div id="topbar">
+      <span id="turnInfo"></span>
+      <span id="promptText"></span>
+      <span id="promptButtons"></span>
+      <button id="logToggle" title="Registro">📜</button>
+    </div>
+    <div id="table">
+      <div id="oppArea" class="side"></div>
+      <div id="midRow">
+        <div id="log"></div>
+      </div>
+      <div id="selfArea" class="side"></div>
+      <div id="hand"></div>
+    </div>
+    <div id="preview"></div>
+    <div id="overlay" class="hidden"></div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
