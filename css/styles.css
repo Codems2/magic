@@ -242,6 +242,16 @@ button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
 .card .donB { position: absolute; top: 2px; right: 2px; background: linear-gradient(135deg,#ffe08a,#e8a71e); color: #3a2402; font-size: .6rem; font-weight: 800; border-radius: 3px; padding: 0 3px; box-shadow: 0 0 4px rgba(245,197,66,.7); }
 .card .costB { position: absolute; top: 2px; left: 2px; background: rgba(20,40,66,.95); color: var(--sel); font-size: .62rem; font-weight: 800; border-radius: 3px; padding: 0 4px; }
 .card .cntB { position: absolute; bottom: 2px; right: 2px; background: rgba(78,205,138,.94); color: #04160c; font-size: .56rem; font-weight: 800; border-radius: 3px; padding: 0 3px; }
+.card .useB {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  background: linear-gradient(180deg, var(--ok), #2f9c66); color: #04160c;
+  font-size: .56rem; font-weight: 800; border-radius: 5px; padding: 2px 5px; white-space: nowrap;
+  box-shadow: 0 0 8px rgba(78,205,138,.8); animation: usepulse 1.1s ease-in-out infinite;
+}
+@keyframes usepulse { 0%,100% { box-shadow: 0 0 6px rgba(78,205,138,.6); } 50% { box-shadow: 0 0 14px rgba(78,205,138,1); } }
+.card.has-use { border-color: var(--ok); }
+.card .warnB { position: absolute; bottom: 2px; left: 2px; background: rgba(200,120,40,.95); color: #fff; font-size: .58rem; font-weight: 800; border-radius: 3px; padding: 0 3px; }
+#preview .hint, #previewModal .hint { color: var(--gold); }
 
 /* efectos de combate */
 .card.fx-attacker { box-shadow: 0 0 16px 3px var(--gold); z-index: 6; }

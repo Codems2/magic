@@ -343,6 +343,21 @@ export class UI {
     if (card.givenDon > 0) div.innerHTML += `<span class="donB">+${card.givenDon}</span>`;
     if (hand && card.counterValue) div.innerHTML += `<span class="cntB">C${card.counterValue}</span>`;
 
+    // Indicadores didácticos (solo tus cartas).
+    const mine = card.owner === this.human?.player;
+    const sc = card.script;
+    if (mine && sc) {
+      // ✨ Habilidad activable ahora mismo (hay que tocar la carta para usarla).
+      if (card.zone !== 'hand' && this.human?.canActivate?.(this.game, card)) {
+        div.innerHTML += `<span class="useB" title="Toca la carta y elige «Activar habilidad»">✨ USAR</span>`;
+        div.classList.add('has-use');
+      }
+      // ⚠ Parte del texto de esta carta no está simulada.
+      if (sc.unknown?.length) {
+        div.innerHTML += `<span class="warnB" title="Parte del efecto de esta carta aún no está simulado">⚠</span>`;
+      }
+    }
+
     const imgEl = div.querySelector('img');
     if (imgEl) imgEl.onerror = () => { failedImages.add(img); imgEl.remove(); div.insertAdjacentHTML('afterbegin', fallback); };
 
@@ -370,8 +385,36 @@ export class UI {
     return div;
   }
 
+  // Resumen en lenguaje llano de CUÁNDO actúa cada carta (para aprender).
+  timingHint(card) {
+    const WHEN = {
+      onPlay: '▸ Al jugarla', whenAttacking: '▸ Al atacar con ella',
+      activateMain: '▸ Tú la activas (tócala en tu turno)', main: '▸ Al jugar este evento',
+      trigger: '▸ Si la pierdes como carta de Vida', counter: '▸ En defensa (paso de counter)',
+      onBlock: '▸ Al bloquear con ella', endOfTurn: '▸ Al final de tu turno',
+      onKO: '▸ Cuando la eliminan', static: '▸ Efecto continuo mientras esté en juego',
+    };
+    const abs = card.script?.abilities ?? [];
+    const seen = new Set();
+    const hints = [];
+    for (const ab of abs) {
+      if (!ab.ops.length && ab.when !== 'static') continue;
+      if (seen.has(ab.when)) continue;
+      seen.add(ab.when);
+      let h = WHEN[ab.when];
+      if (h && ab.donX) h += ` (dale ${ab.donX} DON!!)`;
+      if (h) hints.push(h);
+    }
+    if (card.hasBlocker) hints.push('🛡 [Blocker]: puede desviar un ataque hacia ella');
+    if (card.hasRush) hints.push('⚡ [Rush]: puede atacar el turno que entra');
+    if (card.script?.unknown?.length) hints.push('⚠ Parte de su efecto aún no está simulado');
+    return hints;
+  }
+
   previewText(card) {
-    return `<div class="ptext"><b>${card.name}</b>  ${card.type} · coste ${card.cost ?? '—'} · ${card.data.power ?? '—'}\n${(card.data.subTypes ?? []).join(' / ')}\n\n${card.text || '(sin texto)'}</div>`;
+    const hints = this.timingHint(card);
+    const hintBlock = hints.length ? `\n\n${hints.join('\n')}` : '';
+    return `<div class="ptext"><b>${card.name}</b>  ${card.type} · coste ${card.cost ?? '—'} · ${card.data.power ?? '—'}\n${(card.data.subTypes ?? []).join(' / ')}\n\n${card.text || '(sin texto)'}<span class="hint">${hintBlock}</span></div>`;
   }
 
   showPreview(card) {
