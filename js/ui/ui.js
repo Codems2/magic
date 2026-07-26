@@ -6,10 +6,11 @@ const IS_TOUCH = window.matchMedia?.('(hover: none)').matches ?? false;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export class UI {
-  constructor() {
+  constructor(ctrl) {
     this.game = null;
     this.human = null;
     this.pickState = null;
+    this.ctrl = ctrl ?? { speed: 1 }; // factor de velocidad compartido con el bot
   }
 
   bind(game, human) {
@@ -18,6 +19,49 @@ export class UI {
     $('log').innerHTML = '';
     const t = $('logToggle');
     if (t) t.onclick = () => document.body.classList.toggle('show-log');
+    // Selector de velocidad del bot.
+    const sel = $('speedSel');
+    if (sel) {
+      sel.querySelectorAll('button').forEach((b) => {
+        b.onclick = () => {
+          this.ctrl.speed = parseFloat(b.dataset.sp);
+          sel.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+        };
+      });
+    }
+  }
+
+  // Cartel grande y legible con lo que hace el rival (el bot).
+  async banner(ev) {
+    if (!ev.isBot) return; // solo narramos las jugadas del rival
+    const me = this.human?.player;
+    const ICON = { play: '🃏', event: '🎴', ability: '✨', don: '🔶', attack: '⚔️' };
+    let text;
+    switch (ev.kind) {
+      case 'play': text = `juega <b>${ev.card}</b>`; break;
+      case 'event': text = `usa el evento <b>${ev.card}</b>`; break;
+      case 'ability': text = `usa el efecto de <b>${ev.card}</b>`; break;
+      case 'don': text = `da ${ev.n} DON!! a <b>${ev.card}</b>`; break;
+      case 'attack': {
+        const tgt = ev.targetIsLeader ? 'tu <b>Líder</b>' : `tu <b>${ev.targetName}</b>`;
+        text = `ataca con <b>${ev.attacker}</b> a ${tgt}`;
+        break;
+      }
+      default: return;
+    }
+    const el = $('banner');
+    const token = (this._bannerToken = (this._bannerToken ?? 0) + 1);
+    el.innerHTML = `<span class="bIcon">${ICON[ev.kind] ?? '🏴‍☠️'}</span>
+      <span class="bText"><span class="bWho">El rival</span> ${text}</span>`;
+    el.classList.remove('hidden');
+    el.classList.add('show');
+    // Duración proporcional a la velocidad elegida (más lento = más tiempo de lectura).
+    const dur = Math.max(700, 1150 * this.ctrl.speed);
+    await sleep(dur);
+    if (this._bannerToken !== token) return; // otra jugada ya tomó el cartel
+    el.classList.remove('show');
+    await sleep(180);
+    if (this._bannerToken === token) el.classList.add('hidden');
   }
 
   logLine(msg) {
@@ -267,7 +311,7 @@ export class UI {
         <animate attributeName="y2" to="${y2}" dur="0.28s" fill="freeze"/>
       </line>`;
 
-    await sleep(750);
+    await sleep(Math.max(500, 750 * this.ctrl.speed));
     fx.innerHTML = '';
     fx.style.display = 'none';
     aEl.classList.remove('fx-attacker');

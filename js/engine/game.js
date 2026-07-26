@@ -47,11 +47,12 @@ export class Player {
 }
 
 export class Game {
-  constructor(configs, { seed = 42, onLog = null, onAnimate = null, maxTurns = 60 } = {}) {
+  constructor(configs, { seed = 42, onLog = null, onAnimate = null, onNarrate = null, maxTurns = 60 } = {}) {
     resetIds();
     this.rng = mulberry32(seed);
     this.onLog = onLog;
     this.onAnimate = onAnimate;   // hook opcional para animaciones de la UI
+    this.onNarrate = onNarrate;   // hook opcional: la UI narra las jugadas
     this.maxTurns = maxTurns;
     this.turn = 0;
     this.phase = 'setup';
@@ -130,6 +131,11 @@ export class Game {
   log(msg) {
     this.logLines.push(msg);
     if (this.onLog) this.onLog(msg);
+  }
+
+  // Narración estructurada de una jugada (la UI decide si mostrar cartel).
+  async narrate(player, ev) {
+    if (this.onNarrate) await this.onNarrate({ actor: player.name, isBot: player.isBot, ...ev });
   }
 
   shuffle(arr) {
@@ -299,6 +305,7 @@ export class Game {
     this.payDon(p, card.cost);
     p.hand.splice(p.hand.indexOf(card), 1);
     this.log(`${p.name} juega el evento ${card.name}.`);
+    await this.narrate(p, { kind: 'event', card: card.name });
     await this.payAbilityCost(p, card, main.cost);
     await this.resolveOps(main.ops, { source: card, p });
     card.zone = 'trash';
@@ -317,6 +324,7 @@ export class Game {
     if (!this.canPayAbilityCost(p, card, ab.cost)) throw new Error('coste no pagable');
     card._activatedTurn = this.turn;
     this.log(`${p.name} activa ${card.name}.`);
+    await this.narrate(p, { kind: 'ability', card: card.name });
     await this.payAbilityCost(p, card, ab.cost);
     await this.resolveOps(ab.ops, { source: card, p });
   }
@@ -753,6 +761,7 @@ export class Game {
     card.enteredTurn = this.turn;
     p.characters.push(card);
     this.log(`${p.name} juega ${card.name} (${card.cost} DON, ${card.data.power ?? 0}).`);
+    await this.narrate(p, { kind: 'play', card: card.name });
     await this.runTaggedAbilities(card, 'onPlay');
   }
 
@@ -778,6 +787,7 @@ export class Game {
     p.donActive -= n;
     card.givenDon += n;
     this.log(`${p.name} da ${n} DON!! a ${card.name} (${card.power(this)}).`);
+    this.narrate(p, { kind: 'don', n, card: card.name });
   }
 
   // ---- combate -----------------------------------------------------------
@@ -795,6 +805,7 @@ export class Game {
 
     attacker.rested = true;
     this.log(`⚔ ${attacker.name} (${attacker.power(this)}) ataca a ${target.name} (${target.power(this)}).`);
+    await this.narrate(p, { kind: 'attack', attacker: attacker.name, targetName: target.name, targetIsLeader: target.isLeader });
     if (this.onAnimate) await this.onAnimate({ type: 'attack', attackerId: attacker.id, targetId: target.id });
 
     // [When Attacking] (con condición [DON!! xN]); puede vetar bloqueadores.

@@ -8,13 +8,16 @@ import { HumanController } from './ui/human.js';
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Bot con pausas para que la partida se pueda seguir con calma.
+// Control de ritmo compartido entre el bot y la UI (lo cambia el selector).
+const ctrl = { speed: 1 };
+
+// Bot con pausas escaladas por el selector de velocidad.
 function watchableBot() {
   const bot = new BotController('Bot');
-  const delays = { mainAction: 750, chooseBlocker: 650, counterStep: 650, triggerDecision: 500 };
+  const delays = { mainAction: 650, chooseBlocker: 600, counterStep: 600, triggerDecision: 500 };
   for (const [method, delay] of Object.entries(delays)) {
     const orig = bot[method].bind(bot);
-    bot[method] = async (...args) => { await sleep(delay); return orig(...args); };
+    bot[method] = async (...args) => { await sleep(delay * ctrl.speed); return orig(...args); };
   }
   return bot;
 }
@@ -60,7 +63,7 @@ async function startGame(myDeck, botDeck) {
   $('setup').classList.add('hidden');
   $('game').classList.remove('hidden');
 
-  const ui = new UI();
+  const ui = new UI(ctrl);
   const human = new HumanController(ui);
   const configs = [
     { name: 'Tú', deck: myDeck, controller: human, isBot: false },
@@ -73,6 +76,7 @@ async function startGame(myDeck, botDeck) {
     seed: (Math.random() * 2 ** 31) | 0,
     onLog: (msg) => { ui.logLine(msg); ui.render(); },
     onAnimate: (ev) => (ev.type === 'attack' ? ui.animateAttack(ev) : Promise.resolve()),
+    onNarrate: (ev) => ui.banner(ev),
   });
   ui.bind(game, human);
   ui.render();
