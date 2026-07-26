@@ -24,7 +24,15 @@ export class BotController {
     const enemy = cands.filter((c) => c.owner !== p);
     switch (purpose) {
       case 'ko': case 'bounce': case 'tuckBottom': case 'rest':
-        return enemy.sort((a, b) => (b.data.power ?? 0) - (a.data.power ?? 0))[0]?.id ?? null;
+      case 'powerDown': case 'costDown':
+        // Al enemigo más peligroso (mayor poder + habilidades).
+        return enemy.sort((a, b) => (b.power(game) ?? 0) - (a.power(game) ?? 0))[0]?.id ?? enemy[0]?.id ?? null;
+      case 'playFree':
+        // Pon en juego el personaje más fuerte disponible.
+        return cands.sort((a, b) => (b.data.power ?? 0) - (a.data.power ?? 0))[0]?.id ?? null;
+      case 'toLife':
+        // A la Vida: la carta menos útil de la mano.
+        return own.sort((a, b) => this.handValue(a) - this.handValue(b))[0]?.id ?? null;
       case 'giveDon': case 'grantNoBlocker':
         // Al líder por defecto (flexible para atacar o defender).
         return (own.find((c) => c.isLeader) ?? own[0])?.id ?? null;
@@ -71,8 +79,11 @@ export class BotController {
     const card = game.byId(cardId);
     const ab = abilitiesOf(card, when)[0];
     if (!ab) return false;
-    // Paga si el efecto vale más que el coste aproximado.
-    const costWeight = (ab.cost?.donReturn ?? 0) * 0.8 + (ab.cost?.trashHand ?? 0) * 0.7 + (ab.cost?.donRest ?? 0) * 0.4;
+    // Paga si el efecto vale más que el coste aproximado (la Vida pesa mucho).
+    const c = ab.cost ?? {};
+    const costWeight = (c.donReturn ?? 0) * 0.8 + (c.donReturnVar ? 0.8 : 0) + (c.trashHand ?? 0) * 0.7 +
+      (c.donRest ?? 0) * 0.4 + (c.trashLife ?? 0) * 2.5 + (c.lifeToHand ?? 0) * 0.6 +
+      (c.trashSelf ? 1.5 : 0) + (c.bounceOwn ? 1 : 0) + (c.charToLife ? 2 : 0) + (c.returnGivenDon ?? 0) * 0.6;
     return opsValue(ab.ops) > costWeight;
   }
 

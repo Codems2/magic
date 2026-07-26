@@ -72,7 +72,8 @@ export class HumanController {
       if (choice === 'don') return { type: 'giveDon', cardId: card.id, n: 1 };
       if (choice === 'activate') return { type: 'activate', cardId: card.id };
       if (choice === 'attack') {
-        const targets = [opp.leader, ...opp.characters.filter((c) => c.rested)];
+        const canHitActive = card.script?.abilities?.some((ab) => ab.ops.some((o) => o.op === 'canAttackActive'));
+        const targets = [opp.leader, ...opp.characters.filter((c) => c.rested || canHitActive)];
         const t = await this.ui.pick({
           cardIds: targets.map((c) => c.id),
           text: `¿A quién ataca ${card.name} (${card.power(game)})?`,
@@ -150,6 +151,7 @@ export class HumanController {
       recover: 'recuperar del descarte', grantNoBlocker: 'imparable este turno',
       powerDown: 'quitar poder', costDown: 'reducir coste',
       toLife: 'poner en tu Vida (boca abajo)', lifeToDeck: 'poner en lo alto del mazo',
+      playFree: 'poner en juego gratis', trashLifeTarget: 'descartar de tu Vida',
     };
     const res = await this.ui.pick({
       cardIds: candidateIds,
@@ -191,11 +193,23 @@ export class HumanController {
   async payOptionalCost(game, { cardId, when }) {
     const card = game.byId(cardId);
     const ab = abilitiesOf(card, when)[0];
+    const c = ab?.cost ?? {};
     const parts = [];
-    if (ab?.cost?.donRest) parts.push(`girar ${ab.cost.donRest} DON!!`);
-    if (ab?.cost?.donReturn) parts.push(`devolver ${ab.cost.donReturn} DON!! al mazo`);
-    if (ab?.cost?.trashHand) parts.push(`descartar ${ab.cost.trashHand} carta(s)`);
-    if (ab?.cost?.restSelf) parts.push('girar esta carta');
+    if (c.donRest) parts.push(`girar ${c.donRest} DON!!`);
+    if (c.donReturn) parts.push(`devolver ${c.donReturn} DON!! al mazo`);
+    if (c.donReturnVar) parts.push('devolver 1+ DON!! al mazo');
+    if (c.returnGivenDon) parts.push(`devolver ${c.returnGivenDon} DON!! dado(s)`);
+    if (c.trashHand) parts.push(`descartar ${c.trashHand} carta(s)`);
+    if (c.trashHandAny) parts.push('descartar cartas (las que quieras)');
+    if (c.trashLife) parts.push(`descartar ${c.trashLife} carta(s) de tu Vida`);
+    if (c.lifeToHand) parts.push(`llevar ${c.lifeToHand} carta(s) de Vida a la mano`);
+    if (c.restOwn) parts.push(`girar ${c.restOwn.n} personaje(s) tuyo(s)`);
+    if (c.bounceOwn) parts.push(`devolver ${c.bounceOwn.n} personaje(s) tuyo(s) a la mano`);
+    if (c.charToLife) parts.push(`poner ${c.charToLife.n} personaje(s) tuyo(s) en tu Vida`);
+    if (c.trashToBottom) parts.push(`poner ${c.trashToBottom} del descarte al fondo del mazo`);
+    if (c.revealHand) parts.push(`revelar ${c.revealHand.n} carta(s) de tu mano`);
+    if (c.restSelf) parts.push('girar esta carta');
+    if (c.trashSelf) parts.push('descartar esta carta');
     return this.ui.dialog({
       title: `Habilidad de ${card.name}`,
       body: `¿Pagas el coste (${parts.join(' + ') || 'gratis'}) para activar su efecto?`,

@@ -89,28 +89,108 @@ export class Game {
 
   // ---- estáticas ---------------------------------------------------------
 
+  // Filtro sin poder dinámico (evita recursión con staticPowerFor).
+  matchesFilterStatic(card, f) {
+    if (!f) return true;
+    const cmp = (val, spec) => spec.dir === 'less' ? val <= spec.v : spec.dir === 'more' ? val >= spec.v : val === spec.v;
+    if (f.names && !f.names.some((nm) => card.name.toLowerCase().includes(nm.toLowerCase()))) return false;
+    if (f.notName && card.name.toLowerCase().includes(f.notName.toLowerCase())) return false;
+    if (f.types && !f.types.some((t) => (card.data.subTypes ?? []).some((s) => s.toLowerCase().includes(t.toLowerCase())))) return false;
+    if (f.colors && !f.colors.some((c) => (card.color ?? '').toLowerCase().includes(c))) return false;
+    if (f.basePower && !cmp(card.data.power ?? 0, f.basePower)) return false;
+    if (f.power && !cmp(card.data.power ?? 0, f.power)) return false;
+    if (f.cost && !cmp(card.data.cost ?? 0, f.cost)) return false;
+    return true;
+  }
+
+  buffInScope(op, card) {
+    const inScope = (op.scope === 'leader' && card.isLeader) ||
+      (op.scope === 'char' && card.isCharacter) || op.scope === 'leaderChar';
+    return inScope && this.matchesFilterStatic(card, op.filter);
+  }
+
   staticPowerFor(card) {
     let bonus = 0;
     const p = card.owner;
     for (const ab of card.script?.abilities ?? []) {
       if (ab.donX && card.givenDon < ab.donX) continue;
+      if (ab.oppTurn && this.activePlayer === p) continue;
+      if (ab.yourTurn && this.activePlayer !== p) continue;
       for (const op of ab.ops) {
         if (op.op === 'powerSelf' && ab.when === 'static') bonus += op.n;
         else if (op.op === 'staticSelfPower' && p.characters.length >= (op.cond?.minChars ?? 0)) bonus += op.n;
       }
     }
-    // Auras de otras cartas del mismo jugador (p. ej. "si está girada, +1000").
+    // Auras estáticas de cartas del mismo jugador: "si está girada +1000" y
+    // buffs de grupo ("all of your X gain +N power", "[Opponent's Turn] ...").
     for (const other of p.board()) {
-      if (other === card) continue;
       for (const ab of other.script?.abilities ?? []) {
+        if (ab.when !== 'static') continue;
         if (ab.donX && other.givenDon < ab.donX) continue;
         if (ab.yourTurn && this.activePlayer !== p) continue;
+        if (ab.oppTurn && this.activePlayer === p) continue;
         for (const op of ab.ops) {
-          if (op.op === 'auraWhileRested' && other.rested) bonus += op.n;
+          if (op.op === 'auraWhileRested' && other !== card && other.rested) bonus += op.n;
+          if (op.op === 'buff' && op.side === 'own' && this.buffInScope(op, card)) {
+            for (const ch of op.changes) if (ch.stat === 'power') bonus += ch.delta;
+          }
         }
       }
     }
     return bonus;
+  }
+
+  // ¿La carta cumple un filtro de objetivo (color/subtipo/nombre/poder/coste)?
+  matchesFilter(card, f) {
+    if (!f) return true;
+    const cmp = (val, spec) => spec.dir === 'less' ? val <= spec.v : spec.dir === 'more' ? val >= spec.v : val === spec.v;
+    if (f.names && !f.names.some((nm) => card.name.toLowerCase().includes(nm.toLowerCase()))) return false;
+    if (f.notName && card.name.toLowerCase().includes(f.notName.toLowerCase())) return false;
+    if (f.types && !f.types.some((t) => (card.data.subTypes ?? []).some((s) => s.toLowerCase().includes(t.toLowerCase())))) return false;
+    if (f.colors && !f.colors.some((c) => (card.color ?? '').toLowerCase().includes(c))) return false;
+    if (f.basePower && !cmp(card.data.power ?? 0, f.basePower)) return false;
+    if (f.power && !cmp(card.power(this), f.power)) return false;
+    if (f.cost && !cmp(card.cost, f.cost)) return false;
+    return true;
+  }
+
+  // Evalúa un descriptor de condición "if ..." (ver parseCondition).
+  evalCond(cond, ctx) {
+    const p = ctx.p; const opp = this.opponentOf(p); const src = ctx.source;
+    const cmp = (val, spec) => spec.dir === 'less' ? val <= spec.v : spec.dir === 'more' ? val >= spec.v : val === spec.v;
+    const donField = p.donActive + p.donRested;
+    switch (cond.t) {
+      case 'and': return this.evalCond(cond.a, ctx) && this.evalCond(cond.b, ctx);
+      case 'youLife': return cmp(p.life.length, cond);
+      case 'oppLife': return cmp(opp.life.length, cond);
+      case 'lifeLEOpp': return p.life.length <= opp.life.length;
+      case 'lifeLTOpp': return p.life.length < opp.life.length;
+      case 'youHand': return cmp(p.hand.length, cond);
+      case 'oppHand': return cmp(opp.hand.length, cond);
+      case 'leaderName': return p.leader.name.toLowerCase().includes(cond.name.toLowerCase());
+      case 'leaderType': return (p.leader.data.subTypes ?? []).some((s) => s.toLowerCase().includes(cond.type.toLowerCase()));
+      case 'leaderMulticolor': return (p.leader.color ?? '').includes('/');
+      case 'boardCost': return [...p.characters, ...opp.characters].some((c) => c.cost === cond.v);
+      case 'oppHasChar': return opp.characters.some((c) => this.matchesFilter(c, cond.filter));
+      case 'oppRested': return opp.characters.filter((c) => c.rested).length >= cond.v;
+      case 'youHaveMatch': {
+        const list = p.characters.filter((c) => this.matchesFilter(c, cond.filter) && (!cond.filter.rested || c.rested));
+        return cond.dir === 'less' ? list.length <= (cond.count ?? 1) : list.length >= (cond.count ?? 1);
+      }
+      case 'don': return cond.any.some((spec) => cmp(donField, spec));
+      case 'rested': {
+        const val = cond.kind === 'don' ? p.donRested
+          : cond.kind === 'char' ? p.characters.filter((c) => c.rested).length
+            : p.donRested + p.characters.filter((c) => c.rested).length + (p.leader.rested ? 1 : 0) + (p.stage?.rested ? 1 : 0);
+        return val >= cond.v;
+      }
+      case 'playedThisTurn': return src?.enteredTurn === this.turn;
+      case 'didPlay': return !!ctx.didPlay;
+      case 'not': return !this.evalCond(cond.a, ctx);
+      case 'oppMoreDon': return (opp.donActive + opp.donRested) > (p.donActive + p.donRested);
+      case 'restedByEffect': return !!p._restedByEffectTurn && p._restedByEffectTurn === this.turn;
+      default: return false;
+    }
   }
 
   staticKeyword(card, kw) {
@@ -119,6 +199,69 @@ export class Game {
       if (ab.donX && card.givenDon < ab.donX) continue;
       if (ab.ops.some((op) => op.op === 'gainKeyword' && op.kw === kw)) return true;
     }
+    // Auras de grupo estáticas que otorgan palabras clave.
+    const p = card.owner;
+    for (const other of p.board()) {
+      for (const ab of other.script?.abilities ?? []) {
+        if (ab.when !== 'static') continue;
+        if (ab.donX && other.givenDon < ab.donX) continue;
+        if (ab.yourTurn && this.activePlayer !== p) continue;
+        if (ab.oppTurn && this.activePlayer === p) continue;
+        for (const op of ab.ops) {
+          if (op.op === 'buff' && op.side === 'own' && (op.kws ?? []).some((k) => k.toLowerCase() === kw.toLowerCase()) && this.buffInScope(op, card)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // ¿Puede esta carta ser KO en este contexto? Consulta protecciones estáticas
+  // ("cannot be KO'd in battle / by effects / by leaders").
+  canBeKOd(card, { byEffect = false, byLeaderBattle = false } = {}) {
+    for (const ab of card.script?.abilities ?? []) {
+      if (ab.when !== 'static' && ab.when !== 'onPlay') continue;
+      if (ab.donX && card.givenDon < ab.donX) continue;
+      for (const op of ab.ops) {
+        if (op.op === 'ifCond') {
+          if (!this.evalCond(op.cond, { p: card.owner, source: card })) continue;
+          if (op.ops.some((o) => o.op === 'cannotKO' && this.koModeBlocks(o, byEffect, byLeaderBattle))) return false;
+        }
+        if (op.op === 'cannotKO' && this.koModeBlocks(op, byEffect, byLeaderBattle)) return false;
+      }
+    }
+    return true;
+  }
+
+  // Efectos de reemplazo ante KO/retirada ("...you may ... instead").
+  // Devuelve true si se evitó el KO (la carta permanece en el tablero).
+  async tryPreventKO(card, { byEffect }) {
+    for (const ab of card.script?.abilities ?? []) {
+      if (ab.donX && card.givenDon < ab.donX) continue;
+      for (const op of ab.ops) {
+        if (op.op !== 'koReplace') continue;
+        if (op.trigger === 'remove' && !byEffect) continue;
+        const owner = card.owner;
+        const cost = { trashHand: op.trashHand ?? 0, trashLife: op.trashLife ?? 0 };
+        if (op.action === 'pay' && !this.canPayAbilityCost(owner, card, cost)) continue;
+        const wants = owner.isBot
+          ? (op.action === 'rest' || (owner.hand.length > (op.trashHand ?? 0) + 1))
+          : await owner.controller.chooseOption(this, {
+            prompt: `${card.name} sería eliminado. ¿Evitarlo (${op.action === 'rest' ? 'girándolo' : 'pagando un coste'})?`,
+            options: ['Sí', 'No'],
+          }) === 0;
+        if (!wants) continue;
+        if (op.action === 'pay') { await this.payAbilityCost(owner, card, cost); this.log(`🛡 ${card.name} evita ser eliminado pagando un coste.`); return true; }
+        if (op.action === 'rest') { card.rested = true; this.log(`🛡 ${card.name} se gira en vez de ser eliminado.`); return true; }
+        if (op.action === 'trashDraw') { this.draw(owner, op.draw ?? 1); this.log(`${owner.name} roba al retirarse ${card.name}.`); return false; }
+      }
+    }
+    return false;
+  }
+
+  koModeBlocks(op, byEffect, byLeaderBattle) {
+    if (op.mode === 'any') return true;
+    if (op.mode === 'effect') return byEffect;
+    if (op.mode === 'battle') return !byEffect && (op.by !== 'leader' || byLeaderBattle);
     return false;
   }
 
@@ -208,7 +351,9 @@ export class Game {
     for (const c of p.board()) {
       p.donActive += c.givenDon;
       c.givenDon = 0;
-      c.rested = false;
+      // Congelado: permanece girado este refresco y se libera el marcador.
+      if (c._frozenUntil === this.turn) c._frozenUntil = 0;
+      else c.rested = false;
     }
     p.donActive += p.donRested;
     p.donRested = 0;
@@ -238,7 +383,10 @@ export class Game {
       await this.runTaggedAbilities(c, 'endOfTurn');
       if (this.over) return;
     }
-    for (const q of this.players) for (const c of q.board()) c.cleanupEndOfTurn();
+    for (const q of this.players) {
+      for (const c of q.board()) { c.cleanupEndOfTurn(); c.expireMods(this.turn); }
+      if (q.stage) q.stage.expireMods(this.turn);
+    }
     this.activeIdx = 1 - this.activeIdx;
   }
 
@@ -274,9 +422,19 @@ export class Game {
     if (!cost) return true;
     if (cost.donRest > p.donActive) return false;
     if (cost.donReturn > p.donActive + p.donRested) return false;
+    if (cost.donReturnVar && p.donActive + p.donRested < 1) return false;
+    if (cost.returnGivenDon && p.donGiven < cost.returnGivenDon) return false;
     if (cost.trashHand > p.hand.length) return false;
     if (cost.trashLife > p.life.length) return false;
+    if (cost.lifeToHand > p.life.length) return false;
+    if (cost.trashToBottom > p.trash.length) return false;
+    if (cost.turnLifeDown && p.life.length < cost.turnLifeDown) return false;
     if (cost.restSelf && source.rested) return false;
+    if (cost.trashHandFilter && p.hand.filter((c) => this.matchesFilter(c, cost.trashHandFilter)).length < cost.trashHand) return false;
+    if (cost.restOwn && p.characters.filter((c) => !c.rested && this.matchesFilter(c, cost.restOwn.filter)).length < cost.restOwn.n) return false;
+    if (cost.bounceOwn && p.characters.filter((c) => this.matchesFilter(c, cost.bounceOwn.filter)).length < cost.bounceOwn.n) return false;
+    if (cost.charToLife && p.characters.filter((c) => this.matchesFilter(c, cost.charToLife.filter)).length < cost.charToLife.n) return false;
+    if (cost.revealHand && p.hand.filter((c) => this.matchesFilter(c, cost.revealHand.filter)).length < cost.revealHand.n) return false;
     return true;
   }
 
@@ -312,6 +470,68 @@ export class Game {
         this.log(`${p.name} descarta una carta de su Vida como coste (${c.name}). Vidas: ${p.life.length}.`);
       }
     }
+    if (cost.donReturnVar) {
+      // Devuelve al menos 1 DON!! (el bot/humano podría afinar; aquí 1).
+      const back = Math.min(1, p.donActive + p.donRested);
+      const fromActive = Math.min(back, p.donActive);
+      p.donActive -= fromActive; p.donRested -= (back - fromActive); p.donDeck += back;
+      this._donReturnedThisResolve = back;
+      this.log(`${p.name} devuelve ${back} DON!! a su mazo de DON.`);
+    }
+    if (cost.returnGivenDon) {
+      let need = cost.returnGivenDon;
+      for (const c of p.board()) {
+        while (need > 0 && c.givenDon > 0) { c.givenDon--; p.donRested++; need--; }
+      }
+      this.log(`${p.name} devuelve ${cost.returnGivenDon} DON!! dado(s) al área de coste (girados).`);
+    }
+    if (cost.lifeToHand) {
+      for (let i = 0; i < cost.lifeToHand && p.life.length; i++) {
+        const c = p.life.shift(); c.zone = 'hand'; p.hand.push(c);
+      }
+      this.log(`${p.name} añade ${cost.lifeToHand} carta(s) de su Vida a la mano como coste (Vida: ${p.life.length}).`);
+    }
+    if (cost.trashToBottom) {
+      for (let i = 0; i < cost.trashToBottom && p.trash.length; i++) {
+        const c = p.trash.shift(); c.zone = 'deck'; p.library.push(c);
+      }
+      this.log(`${p.name} pone ${cost.trashToBottom} carta(s) del descarte al fondo del mazo.`);
+    }
+    if (cost.trashHandAny) {
+      // Descarta las que el jugador elija (0 o más) — se simplifica a ninguna
+      // salvo que el efecto lo requiera; el bot no descarta de más.
+    }
+    if (cost.trashHandFilter) {
+      const cands = p.hand.filter((c) => this.matchesFilter(c, cost.trashHandFilter)).slice(0, cost.trashHand);
+      for (const c of cands) { this.trashFromHand(c); this.log(`${p.name} descarta ${c.name} como coste.`); }
+    }
+    if (cost.restOwn) {
+      for (const c of p.characters.filter((c2) => !c2.rested && this.matchesFilter(c2, cost.restOwn.filter)).slice(0, cost.restOwn.n)) {
+        c.rested = true; this.log(`${p.name} gira ${c.name} como coste.`);
+      }
+    }
+    if (cost.bounceOwn) {
+      for (const c of p.characters.filter((c2) => this.matchesFilter(c2, cost.bounceOwn.filter)).slice(0, cost.bounceOwn.n)) {
+        p.donActive += c.givenDon; c.givenDon = 0;
+        p.characters.splice(p.characters.indexOf(c), 1);
+        c.rested = false; c.tempPower = 0; c.mods = [];
+        c.zone = 'hand'; p.hand.push(c);
+        this.log(`${p.name} devuelve ${c.name} a su mano como coste.`);
+      }
+    }
+    if (cost.charToLife) {
+      for (const c of p.characters.filter((c2) => this.matchesFilter(c2, cost.charToLife.filter)).slice(0, cost.charToLife.n)) {
+        p.donActive += c.givenDon; c.givenDon = 0;
+        p.characters.splice(p.characters.indexOf(c), 1);
+        c.rested = false; c.tempPower = 0; c.mods = [];
+        c.zone = 'life'; p.life.unshift(c);
+        this.log(`${p.name} pone ${c.name} en lo alto de su Vida como coste (Vida: ${p.life.length}).`);
+      }
+    }
+    if (cost.revealHand) {
+      this.log(`${p.name} revela ${cost.revealHand.n} carta(s) de su mano como coste.`);
+    }
+    if (cost.turnLifeDown) { /* No modelamos Vida boca arriba/abajo: sin efecto visible. */ }
     if (cost.restSelf) source.rested = true;
     if (cost.trashSelf) this.trashCard(source);
   }
@@ -327,6 +547,7 @@ export class Game {
     this.log(`${p.name} juega el evento ${card.name}.`);
     await this.narrate(p, { kind: 'event', card: card.name });
     await this.payAbilityCost(p, card, main.cost);
+    if (this.costReturnsDon(main.cost)) await this.fireOnBoard(p, 'onDonReturn');
     await this.resolveOps(main.ops, { source: card, p });
     card.zone = 'trash';
     p.trash.push(card);
@@ -346,8 +567,19 @@ export class Game {
     this.log(`${p.name} activa ${card.name}.`);
     await this.narrate(p, { kind: 'ability', card: card.name });
     await this.payAbilityCost(p, card, ab.cost);
+    if (this.costReturnsDon(ab.cost)) await this.fireOnBoard(p, 'onDonReturn');
     await this.resolveOps(ab.ops, { source: card, p });
   }
+
+  // Dispara un timing en todas las cartas del tablero de un jugador.
+  async fireOnBoard(p, when, ctx = {}) {
+    for (const c of [...p.board()]) {
+      if (this.over) return;
+      await this.runTaggedAbilities(c, when, ctx);
+    }
+  }
+
+  costReturnsDon(cost) { return !!(cost && (cost.donReturn || cost.donReturnVar || cost.returnGivenDon)); }
 
   async runTaggedAbilities(card, when, ctx = {}) {
     for (const ab of abilitiesOf(card, when)) {
@@ -360,6 +592,7 @@ export class Game {
         const wants = await p.controller.payOptionalCost(this, { cardId: card.id, when });
         if (!wants) continue;
         await this.payAbilityCost(p, card, ab.cost);
+        if (this.costReturnsDon(ab.cost) && when !== 'onDonReturn') await this.fireOnBoard(p, 'onDonReturn');
       }
       (card._usedTurn ??= {})[when] = this.turn;
       await this.resolveOps(ab.ops, { source: card, p, ...ctx });
@@ -410,6 +643,50 @@ export class Game {
           if (real) this.log(`${opp.name} gira ${real} DON!!.`);
           break;
         }
+        case 'buff': {
+          const expireTurn = op.dur === 'next' ? this.turn + 1 : this.turn;
+          const owner = op.side === 'opp' ? opp : p;
+          const poolAll = () => {
+            let arr;
+            if (op.scope === 'leader') arr = [owner.leader];
+            else if (op.scope === 'leaderChar') arr = [owner.leader, ...owner.characters];
+            else arr = [...owner.characters];
+            return arr.filter(Boolean).filter((c) => this.matchesFilter(c, op.filter));
+          };
+          const label = (t) => {
+            const parts = op.changes.map((ch) => `${ch.delta >= 0 ? '+' : ''}${ch.delta} ${ch.stat === 'power' ? 'poder' : 'coste'}`);
+            for (const kw of op.kws) parts.push(`[${kw}]`);
+            return parts.join(' y ');
+          };
+          const apply = (t) => {
+            for (const ch of op.changes) t.addMod({ stat: ch.stat, delta: ch.delta, expireTurn });
+            for (const kw of op.kws) t.addMod({ stat: 'kw', kw, expireTurn });
+            this.log(`${t.name} recibe ${label(t)} (${t.power(this)}).`);
+          };
+          if (op.all) { poolAll().forEach(apply); break; }
+          const chosen = new Set();
+          const purpose = op.side === 'opp'
+            ? (op.changes.some((c) => c.stat === 'cost') ? 'costDown' : 'powerDown')
+            : 'powerUp';
+          for (let i = 0; i < op.targets; i++) {
+            const cands = poolAll().filter((c) => !chosen.has(c.id));
+            if (!cands.length) break;
+            const id = await p.controller.chooseTarget(this, {
+              purpose, candidateIds: cands.map((c) => c.id), optional: true, battle: ctx.battle ?? null,
+            });
+            const t = this.byId(id);
+            if (t && cands.includes(t)) { chosen.add(t.id); apply(t); }
+          }
+          break;
+        }
+        case 'selfGrant': {
+          const expireTurn = op.dur === 'next' ? this.turn + 1 : this.turn;
+          const t = op.target === 'leader' ? p.leader : ctx.source;
+          for (const ch of op.changes) t.addMod({ stat: ch.stat, delta: ch.delta, expireTurn });
+          for (const kw of op.kws) t.addMod({ stat: 'kw', kw, expireTurn });
+          this.log(`${t.name} gana ${op.changes.map((c) => `${c.delta >= 0 ? '+' : ''}${c.delta} ${c.stat === 'power' ? 'poder' : 'coste'}`).concat(op.kws.map((k) => `[${k}]`)).join(' y ')} (${t.power(this)}).`);
+          break;
+        }
         case 'powerUp': {
           for (let i = 0; i < (op.targets ?? 1); i++) {
             const cands = p.board().filter((c) => !(op.other && c === ctx.source));
@@ -426,27 +703,36 @@ export class Game {
           break;
         }
         case 'ko': {
+          if (op.scope === 'self') { this.log(`💥 ${ctx.source.name} se va al descarte.`); this.trashCard(ctx.source); break; }
+          const pool = () => {
+            const base = op.scope === 'all' ? [...p.characters, ...opp.characters] : [...opp.characters];
+            return base.filter((c) =>
+              this.matchesFilter(c, op.filter) &&
+              (!op.restedOnly || c.rested) && (!op.activeOnly || !c.rested) &&
+              (!op.blockerOnly || c.hasBlocker) &&
+              this.canBeKOd(c, { byEffect: true }));
+          };
+          if (op.all) { for (const c of pool()) { this.log(`💥 ${c.name} es KO por efecto.`); this.koCharacter(c); } if (!op._noTrigger) await this.fireOnCharKO(); break; }
+          let anyKO = false;
           for (let i = 0; i < op.targets; i++) {
-            const cands = opp.characters.filter((c) =>
-              (op.maxCost === null || c.cost <= op.maxCost) &&
-              (op.maxPower === null || c.power(this) <= op.maxPower) &&
-              (!op.restedOnly || c.rested) &&
-              (!op.blockerOnly || c.hasBlocker));
+            const cands = pool();
             if (!cands.length) break;
             const targetId = await p.controller.chooseTarget(this, {
               purpose: 'ko', candidateIds: cands.map((c) => c.id), optional: true,
             });
             const t = this.byId(targetId);
             if (t && cands.includes(t)) {
-              this.log(`💥 ${t.name} es KO por efecto.`);
-              this.koCharacter(t);
+              if (await this.tryPreventKO(t, { byEffect: true })) continue;
+              this.log(`💥 ${t.name} es KO por efecto.`); this.koCharacter(t); anyKO = true;
             }
           }
+          if (anyKO) await this.fireOnCharKO();
           break;
         }
         case 'bounce': case 'tuckBottom': {
           for (let i = 0; i < op.targets; i++) {
-            const cands = [...opp.characters, ...p.characters].filter((c) => c.cost <= op.maxCost);
+            const cands = [...opp.characters, ...p.characters].filter((c) => c.cost <= (op.maxCost ?? 99) &&
+              (op.maxPower == null || c.power(this) <= op.maxPower));
             if (!cands.length) break;
             const targetId = await p.controller.chooseTarget(this, {
               purpose: op.op, candidateIds: cands.map((c) => c.id), optional: true,
@@ -469,19 +755,24 @@ export class Game {
         }
         case 'restTarget': {
           for (let i = 0; i < op.targets; i++) {
-            const cands = opp.characters.filter((c) => !c.rested);
+            let cands = [...opp.characters];
+            if (op.includeLeader && opp.leader) cands.push(opp.leader);
+            cands = cands.filter((c) => !c.rested && (!op.blockerOnly || c.hasBlocker) && this.matchesFilter(c, op.filter));
             if (!cands.length) break;
             const targetId = await p.controller.chooseTarget(this, {
               purpose: 'rest', candidateIds: cands.map((c) => c.id), optional: true,
             });
             const t = this.byId(targetId);
-            if (t && cands.includes(t)) { t.rested = true; this.log(`${t.name} queda girado.`); }
+            if (t && cands.includes(t)) { t.rested = true; p._restedByEffectTurn = this.turn; this.log(`${t.name} queda girado.`); }
           }
           break;
         }
         case 'unrestChar': {
+          const okCand = (c) => c.rested && this.matchesFilter(c, op.filter) &&
+            (op.maxCost == null || c.cost <= op.maxCost);
+          if (op.all) { for (const c of p.characters.filter(okCand)) { c.rested = false; this.log(`${c.name} se endereza.`); } break; }
           for (let i = 0; i < op.targets; i++) {
-            const cands = p.characters.filter((c) => c.rested && c.cost <= op.maxCost);
+            const cands = p.characters.filter(okCand);
             if (!cands.length) break;
             const targetId = await p.controller.chooseTarget(this, {
               purpose: 'unrest', candidateIds: cands.map((c) => c.id), optional: true,
@@ -494,6 +785,96 @@ export class Game {
         case 'unrestSelf': {
           ctx.source.rested = false;
           this.log(`${ctx.source.name} se endereza.`);
+          break;
+        }
+        case 'bounceSelf': {
+          const c = ctx.source; const q = c.owner;
+          if (c.zone === 'characters') {
+            q.donActive += c.givenDon; c.givenDon = 0;
+            q.characters.splice(q.characters.indexOf(c), 1);
+            c.rested = false; c.tempPower = 0; c.mods = [];
+            c.zone = 'hand'; q.hand.push(c);
+            this.log(`↩ ${c.name} vuelve a la mano de ${q.name}.`);
+          }
+          break;
+        }
+        case 'bounceOwn': {
+          const cands = p.characters.filter((c) => this.matchesFilter(c, op.filter));
+          const list = op.all ? cands : cands.slice(0, op.targets ?? 1);
+          for (const t of [...list]) {
+            p.donActive += t.givenDon; t.givenDon = 0;
+            p.characters.splice(p.characters.indexOf(t), 1);
+            t.rested = false; t.tempPower = 0; t.mods = [];
+            t.zone = 'hand'; p.hand.push(t);
+            this.log(`↩ ${t.name} vuelve a tu mano.`);
+          }
+          break;
+        }
+        case 'oppDiscard': {
+          for (let i = 0; i < op.n && opp.hand.length; i++) {
+            let id;
+            if (op.oppChooses) {
+              const ids = await opp.controller.discardFromHand(this, 1);
+              id = ids[0];
+            } else {
+              // El defensor elige qué descartar salvo que sea "aleatorio"; en la
+              // práctica siempre elige el dueño de la carta.
+              const ids = await opp.controller.discardFromHand(this, 1);
+              id = ids[0];
+            }
+            const c = this.byId(id) ?? opp.hand[0];
+            if (c && c.zone === 'hand' && c.owner === opp) { this.trashFromHand(c); this.log(`${opp.name} descarta ${c.name}.`); }
+          }
+          break;
+        }
+        case 'canAttackActive': { ctx.source._canAttackActive = true; break; }
+        case 'freeze': {
+          for (let i = 0; i < op.targets; i++) {
+            const cands = opp.characters.filter((c) => this.matchesFilter(c, op.filter) && !c._frozenUntil);
+            if (!cands.length) break;
+            const id = await p.controller.chooseTarget(this, { purpose: 'rest', candidateIds: cands.map((c) => c.id), optional: true });
+            const t = this.byId(id);
+            if (t && cands.includes(t)) { t.rested = true; t._frozenUntil = this.turn + 1; this.log(`${t.name} no se enderezará en el próximo refresco del rival.`); }
+          }
+          break;
+        }
+        case 'cannotAttack': {
+          for (let i = 0; i < op.targets; i++) {
+            const cands = opp.characters.filter((c) => this.matchesFilter(c, op.filter) && c._cannotAttackUntil !== this.turn + 1);
+            if (!cands.length) break;
+            const id = await p.controller.chooseTarget(this, { purpose: 'rest', candidateIds: cands.map((c) => c.id), optional: true });
+            const t = this.byId(id);
+            if (t && cands.includes(t)) { t._cannotAttackUntil = this.turn + 1; this.log(`${t.name} no podrá atacar hasta el próximo turno del rival.`); }
+          }
+          break;
+        }
+        case 'noBlockerGroup': { if (ctx.battle) ctx.battle.noBlocker = { minPower: 0 }; break; }
+        case 'setBasePower': {
+          const t = op.who === 'leader' ? p.leader : ctx.source;
+          const expireTurn = op.dur === 'next' ? this.turn + 1 : this.turn;
+          const delta = op.value - (t.data.power ?? 0);
+          t.addMod({ stat: 'power', delta, expireTurn });
+          this.log(`${t.name}: poder base pasa a ${op.value} (${t.power(this)}).`);
+          break;
+        }
+        case 'selfCost': { ctx.source.tempCost += op.delta; this.log(`${ctx.source.name}: coste ${op.delta >= 0 ? '+' : ''}${op.delta} (ahora ${ctx.source.cost}).`); break; }
+        case 'selfDiscard': {
+          const ids = await p.controller.discardFromHand(this, op.n);
+          for (const id of ids.slice(0, op.n)) { const c = this.byId(id); if (c && c.zone === 'hand' && c.owner === p) { this.trashFromHand(c); this.log(`${p.name} descarta ${c.name}.`); } }
+          break;
+        }
+        case 'trashThenDraw': {
+          const ids = await p.controller.discardFromHand(this, op.trash);
+          for (const id of ids.slice(0, op.trash)) { const c = this.byId(id); if (c && c.zone === 'hand' && c.owner === p) this.trashFromHand(c); }
+          this.draw(p, op.n);
+          break;
+        }
+        case 'ownChoose': {
+          const idx = await p.controller.chooseOption(this, {
+            prompt: 'Elige una opción:', options: op.options.map((o) => this.describeOps(o)),
+          });
+          const chosen = op.options[Math.max(0, Math.min(idx ?? 0, op.options.length - 1))];
+          await this.resolveOps(chosen, ctx);
           break;
         }
         case 'trashOppLife': {
@@ -574,6 +955,10 @@ export class Game {
               this.log(`${t.name} reduce su coste en ${op.n} (${t.cost}).`);
             }
           }
+          break;
+        }
+        case 'ifCond': {
+          if (this.evalCond(op.cond, ctx)) await this.resolveOps(op.ops, ctx);
           break;
         }
         case 'ifOppLife': {
@@ -673,6 +1058,106 @@ export class Game {
           }
           break;
         }
+        case 'revealTopThen': {
+          if (!p.library.length) break;
+          const c = p.library[0];
+          this.log(`${p.name} revela ${c.name}.`);
+          const ok = this.matchesFilter(c, op.filter) ||
+            (op.filter.types && op.filter.types.some((t) => (c.data.subTypes ?? []).some((s) => s.toLowerCase().includes(t.toLowerCase()))));
+          if (ok) await this.resolveOps(op.ops, ctx);
+          break;
+        }
+        case 'revealLifePlay': {
+          if (!p.life.length) break;
+          const c = p.life[0];
+          this.log(`${p.name} revela de su Vida: ${c.name}.`);
+          const ok = this.matchesFilter(c, op.filter) && c.cost <= (op.maxCost ?? 99) && c.isCharacter && p.characters.length < 5;
+          if (ok) {
+            const wants = p.isBot ? true : await p.controller.chooseOption(this, { prompt: `¿Jugar ${c.name} desde tu Vida?`, options: ['Sí, jugarla', 'No'] }) === 0;
+            if (wants) {
+              p.life.shift();
+              c.zone = 'characters'; c.rested = false; c.summonedThisTurn = true; c.enteredTurn = this.turn;
+              p.characters.push(c);
+              ctx.didPlay = true;
+              this.log(`${p.name} juega ${c.name} desde su Vida.`);
+              await this.runTaggedAbilities(c, 'onPlay');
+            }
+          }
+          break;
+        }
+        case 'lookAddToLife': {
+          const seen = p.library.splice(0, Math.min(op.n, p.library.length));
+          const hit = seen.find((c) => this.matchesFilter(c, op.filter));
+          if (hit) { seen.splice(seen.indexOf(hit), 1); hit.zone = 'life'; p.life.unshift(hit); this.log(`${p.name} añade ${hit.name} a lo alto de su Vida (${p.life.length}).`); }
+          this.shuffle(seen); p.library.push(...seen);
+          break;
+        }
+        case 'lifeReorder': { this.log(`${p.name} mira y reordena sus cartas de Vida.`); break; }
+        case 'lifeScryEither': {
+          const side = await p.controller.chooseOption(this, { prompt: '¿Mirar tu Vida o la del rival?', options: ['Tu Vida', 'La del rival'] });
+          const who = side === 1 ? opp : p;
+          if (who.life.length) {
+            const toBottom = await p.controller.chooseOption(this, { prompt: `Carta superior de la Vida de ${who.name}: ¿al fondo?`, options: ['Dejar arriba', 'Al fondo'] });
+            if (toBottom === 1) { who.life.push(who.life.shift()); }
+          }
+          this.log(`${p.name} escruta una Vida.`);
+          break;
+        }
+        case 'cardsToLifeFromZone': {
+          for (let i = 0; i < op.n; i++) {
+            const zones = op.from === 'trash' ? [p.trash] : op.from === 'handTrash' ? [p.hand, p.trash] : [p.hand];
+            const cands = zones.flat().filter((c) => this.matchesFilter(c, op.filter));
+            if (!cands.length) break;
+            const id = await p.controller.chooseTarget(this, { purpose: 'toLife', candidateIds: cands.map((c) => c.id), optional: true });
+            const c = this.byId(id);
+            if (!c || !cands.includes(c)) break;
+            const zone = c.zone === 'trash' ? p.trash : p.hand;
+            zone.splice(zone.indexOf(c), 1);
+            c.zone = 'life'; p.life.unshift(c);
+            this.log(`${p.name} pone ${c.name} en lo alto de su Vida (${p.life.length}).`);
+          }
+          break;
+        }
+        case 'charToLifeEffect': {
+          const src = op.side === 'opp' ? opp : p;
+          for (let i = 0; i < op.targets; i++) {
+            const cands = src.characters.filter((c) => this.matchesFilter(c, op.filter));
+            if (!cands.length) break;
+            const id = await p.controller.chooseTarget(this, { purpose: op.side === 'opp' ? 'ko' : 'toLife', candidateIds: cands.map((c) => c.id), optional: true });
+            const c = this.byId(id);
+            if (!c || !cands.includes(c)) break;
+            src.donActive += c.givenDon; c.givenDon = 0;
+            src.characters.splice(src.characters.indexOf(c), 1);
+            c.rested = false; c.tempPower = 0; c.mods = [];
+            c.zone = 'life'; src.life.unshift(c);
+            this.log(`${c.name} pasa a lo alto de la Vida de ${src.name} (${src.life.length}).`);
+          }
+          break;
+        }
+        case 'trashFaceUpLife': { /* No modelamos Vida boca arriba: sin efecto. */ break; }
+        case 'tuckSelf': {
+          const c = ctx.source; const q = c.owner;
+          if (c.zone === 'characters') {
+            q.donActive += c.givenDon; c.givenDon = 0;
+            q.characters.splice(q.characters.indexOf(c), 1);
+            c.rested = false; c.tempPower = 0; c.mods = [];
+            c.zone = 'deck'; q.library.push(c);
+            this.log(`⤵ ${c.name} va al fondo del mazo.`);
+          }
+          break;
+        }
+        case 'giveRestedDonEach': {
+          const cands = p.characters.filter((c) => this.matchesFilter(c, op.filter));
+          for (const t of cands.slice(0, op.targets)) {
+            const give = Math.min(op.each, p.donRested);
+            if (give <= 0) break;
+            p.donRested -= give; t.givenDon += give;
+            this.log(`${p.name} da ${give} DON!! (girado) a ${t.name}.`);
+          }
+          break;
+        }
+        case 'battleAttrBuff': break; // estática de combate: se aplica en attack().
+        case 'koReplace': break; // se consulta en tryKOReplace al ir a eliminar.
         case 'oppChoose': {
           // El rival elige cuál de las opciones sufre; el efecto se resuelve
           // desde la perspectiva del controlador de la carta (p).
@@ -691,7 +1176,7 @@ export class Game {
         }
         case 'trashToHand': {
           for (let i = 0; i < op.targets; i++) {
-            const cands = p.trash.filter((c) => c.isCharacter && c.cost <= op.maxCost);
+            const cands = p.trash.filter((c) => c.cost <= (op.maxCost ?? 99) && this.matchesFilter(c, op.filter));
             if (!cands.length) break;
             const targetId = await p.controller.chooseTarget(this, {
               purpose: 'recover', candidateIds: cands.map((c) => c.id), optional: true,
@@ -707,16 +1192,25 @@ export class Game {
           break;
         }
         case 'playFromZone': {
-          const zone = op.zone === 'deck' ? p.library : p.hand;
-          const hit = zone.find((c) => c.isCharacter && c.cost <= op.maxCost &&
-            c.name.toLowerCase().includes(op.name.toLowerCase()));
-          if (hit && p.characters.length < 5) {
+          const zone = op.zone === 'deck' ? p.library : op.zone === 'trash' ? p.trash : p.hand;
+          // "each of [A],[B],[C]": juega uno por cada nombre; si no, hasta N.
+          const rounds = op.each && op.filter?.names ? op.filter.names.map((nm) => ({ names: [nm] })) : Array(op.targets ?? 1).fill(op.filter);
+          for (const rf of rounds) {
+            if (p.characters.length >= 5) break;
+            const cands = zone.filter((c) => c.isCharacter && c.cost <= (op.maxCost ?? 99) && this.matchesFilter(c, rf) && this.matchesFilter(c, op.filter));
+            if (!cands.length) continue;
+            const id = await p.controller.chooseTarget(this, {
+              purpose: 'playFree', candidateIds: cands.map((c) => c.id), optional: true,
+            });
+            const hit = this.byId(id);
+            if (!hit || !cands.includes(hit)) break;
             zone.splice(zone.indexOf(hit), 1);
             hit.zone = 'characters';
-            hit.rested = false;
+            hit.rested = !!op.rested;
             hit.summonedThisTurn = true;
+            hit.enteredTurn = this.turn;
             p.characters.push(hit);
-            this.log(`${p.name} pone en juego ${hit.name} gratis.`);
+            this.log(`${p.name} pone en juego ${hit.name} gratis${op.rested ? ' (girado)' : ''}.`);
             await this.runTaggedAbilities(hit, 'onPlay');
           }
           if (op.zone === 'deck') this.shuffle(p.library);
@@ -726,11 +1220,14 @@ export class Game {
           const c = ctx.source;
           if (c.isCharacter && p.characters.length < 5 && c.zone !== 'characters') {
             if (c.zone === 'hand') p.hand.splice(p.hand.indexOf(c), 1);
+            else if (c.zone === 'trash') p.trash.splice(p.trash.indexOf(c), 1);
+            else if (c.zone === 'life') p.life.splice(p.life.indexOf(c), 1);
             c.zone = 'characters';
-            c.rested = false;
+            c.rested = !!op.rested;
             c.summonedThisTurn = true;
+            c.enteredTurn = this.turn;
             p.characters.push(c);
-            this.log(`${p.name} pone en juego ${c.name} gratis.`);
+            this.log(`${p.name} pone en juego ${c.name} gratis${op.rested ? ' (girado)' : ''}.`);
             await this.runTaggedAbilities(c, 'onPlay');
           } else if (ctx.toHandFallback) {
             c.zone = 'hand';
@@ -738,6 +1235,19 @@ export class Game {
           }
           break;
         }
+        case 'restOwnAction': {
+          const cands = p.characters.filter((c) => !c.rested && this.matchesFilter(c, op.filter));
+          for (let i = 0; i < op.n && cands.length; i++) {
+            const id = await p.controller.chooseTarget(this, { purpose: 'rest', candidateIds: cands.map((c) => c.id), optional: true });
+            const t = this.byId(id);
+            if (!t || !cands.includes(t)) break;
+            t.rested = true; cands.splice(cands.indexOf(t), 1);
+            this.log(`${p.name} gira ${t.name}.`);
+          }
+          break;
+        }
+        case 'koBattled': break;   // lo ejecuta afterCharBattle con el objetivo real.
+        case 'negate': break;      // negación de efectos no modelada.
         case 'runAbility': {
           const ab = abilitiesOf(ctx.source, op.which)[0];
           if (ab) {
@@ -862,8 +1372,9 @@ export class Game {
       throw new Error('atacante inválido');
     }
     let target = targetId === 'leader' ? opp.leader : this.byId(targetId);
+    const canHitActive = attacker.script?.abilities?.some((ab) => ab.ops.some((o) => o.op === 'canAttackActive'));
     const validTarget = target === opp.leader ||
-      (target && target.owner === opp && target.zone === 'characters' && target.rested);
+      (target && target.owner === opp && target.zone === 'characters' && (target.rested || canHitActive));
     if (!validTarget) throw new Error('objetivo inválido (líder o personaje girado)');
 
     attacker.rested = true;
@@ -895,6 +1406,10 @@ export class Game {
         blocker.rested = true;
         target = blocker;
         this.log(`🛡 ${blocker.name} bloquea (${blocker.power(this)}).`);
+        // "When your opponent activates a [Blocker]": lo activó el DEFENSOR,
+        // así que dispara las habilidades del atacante (p).
+        await this.fireOnBoard(p, 'onOppBlocker');
+        if (this.over) return;
         await this.runTaggedAbilities(blocker, 'onBlock');
         if (this.over) return;
       }
@@ -935,6 +1450,17 @@ export class Game {
       if (this.over) return;
     }
 
+    // Buff condicional de combate: "cuando batalla contra X de atributo Y, +N".
+    let attrBonus = 0;
+    for (const ab of attacker.script?.abilities ?? []) {
+      for (const o of ab.ops) {
+        if (o.op === 'battleAttrBuff' && (target.data.attribute ?? '').toLowerCase() === o.attribute.toLowerCase()) {
+          attrBonus += o.n; attacker.tempPower += o.n;
+          this.log(`${attacker.name} gana +${o.n} por batallar contra ${o.attribute} (${attacker.power(this)}).`);
+        }
+      }
+    }
+
     // Resolución.
     const atkPower = attacker.power(this);
     const defPower = target.power(this);
@@ -945,30 +1471,53 @@ export class Game {
           if (this.over) return;
           await this.dealLeaderDamage(opp, attacker);
         }
+      } else if (!this.canBeKOd(target, { byEffect: false, byLeaderBattle: attacker.isLeader })) {
+        this.log(`🛡 ${target.name} no puede ser KO en batalla (efecto).`);
+        await this.afterCharBattle(attacker, target);
+      } else if (await this.tryPreventKO(target, { byEffect: false })) {
+        await this.afterCharBattle(attacker, target);
       } else {
         this.log(`💥 ${target.name} es KO.`);
         this.koCharacter(target);
         // ST02-010: "si esta carta batalla contra un personaje, enderézala".
-        await this.afterCharBattle(attacker);
+        await this.afterCharBattle(attacker, target);
+        await this.fireOnCharKO();
       }
     } else {
       this.log(`El ataque no supera al defensor (${atkPower} vs ${defPower}).`);
-      if (!target.isLeader) await this.afterCharBattle(attacker);
+      if (!target.isLeader) await this.afterCharBattle(attacker, target);
     }
     // El bono de counter dura solo esta batalla.
     if (target.zone !== 'trash') target.tempPower -= counterBonus;
     this.checkState();
   }
 
-  async afterCharBattle(attacker) {
+  async fireOnCharKO() {
+    for (const q of this.players) await this.fireOnBoard(q, 'onCharKO');
+  }
+
+  async afterCharBattle(attacker, battled = null) {
     if (attacker.zone !== 'characters') return;
     for (const ab of attacker.script?.abilities ?? []) {
-      if (!ab.ops.some((op) => op.op === 'unrestAfterCharBattle')) continue;
       if (ab.donX && attacker.givenDon < ab.donX) continue;
-      if (ab.once && attacker._usedTurn?.afterBattle === this.turn) continue;
-      (attacker._usedTurn ??= {}).afterBattle = this.turn;
-      attacker.rested = false;
-      this.log(`${attacker.name} se endereza tras la batalla.`);
+      if (ab.ops.some((op) => op.op === 'unrestAfterCharBattle')) {
+        if (ab.once && attacker._usedTurn?.afterBattle === this.turn) continue;
+        (attacker._usedTurn ??= {}).afterBattle = this.turn;
+        attacker.rested = false;
+        this.log(`${attacker.name} se endereza tras la batalla.`);
+      }
+      // ST08-013: "al final de una batalla contra un personaje, puedes KO ese personaje".
+      if (ab.when === 'afterBattle' && battled && !battled.isLeader && battled.zone === 'characters') {
+        const p = attacker.owner;
+        const wants = p.isBot ? true : await p.controller.chooseOption(this, {
+          prompt: `¿KO a ${battled.name} tras la batalla?`, options: ['Sí', 'No'],
+        }) === 0;
+        if (wants && this.canBeKOd(battled, { byEffect: true }) && !(await this.tryPreventKO(battled, { byEffect: true }))) {
+          this.log(`💥 ${battled.name} es KO tras la batalla.`);
+          this.koCharacter(battled);
+          await this.fireOnCharKO();
+        }
+      }
     }
   }
 
