@@ -216,6 +216,15 @@
   "quantitiesExact": false
  },
  {
+  "slug": "st-29",
+  "id": "ST-29",
+  "name": "ST-29",
+  "leader": "Monkey.D.Luffy",
+  "color": "Yellow",
+  "image": "https://optcgapi.com/media/static/Card_Images/ST29-001_EZnknPV.jpg",
+  "quantitiesExact": false
+ },
+ {
   "slug": "st-30",
   "id": "ST-30",
   "name": "Starter Deck EX: Luffy & Ace",

@@ -89,11 +89,34 @@ function assignQuantities(cards) {
   return { ok: total === 50, exact: exactStart && !adjusted, total };
 }
 
+// Sondea IDs de mazo que existen por endpoint directo aunque no salgan en el
+// catálogo (p. ej. ST-29 hoy; recogerá ST-31+ en cuanto la API los publique).
+async function probeExtraIds(known) {
+  const extra = [];
+  for (let n = 29; n <= 40; n++) {
+    const id = `ST-${n}`;
+    if (known.includes(id)) continue;
+    try {
+      const raw = await fetchJson(`https://optcgapi.com/api/decks/${id}/`, 1);
+      if (Array.isArray(raw) && raw.some((c) => c.card_type === 'Leader')) extra.push(id);
+    } catch { /* 404: no existe aún */ }
+    await sleep(120);
+  }
+  return extra;
+}
+
 async function main() {
   mkdirSync(OUT_DIR, { recursive: true });
   const catalog = await fetchJson('https://optcgapi.com/api/allDecks/');
-  const ids = (DECK_FILTER.length ? DECK_FILTER : catalog.map((d) => d.structure_deck_id))
-    .filter((id) => catalog.some((d) => d.structure_deck_id === id));
+  const catalogIds = catalog.map((d) => d.structure_deck_id);
+  let ids;
+  if (DECK_FILTER.length) {
+    ids = DECK_FILTER;
+  } else {
+    const extra = await probeExtraIds(catalogIds);
+    if (extra.length) console.log(`Mazos fuera del catálogo detectados: ${extra.join(', ')}`);
+    ids = [...catalogIds, ...extra];
+  }
   console.log(`Catálogo: ${catalog.length} mazos. A importar: ${ids.length}.`);
   const index = [];
   let skipped = 0;
