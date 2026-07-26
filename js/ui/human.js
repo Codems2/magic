@@ -117,7 +117,7 @@ export class HumanController {
     const ids = [...new Set([...counters, ...events].map((c) => c.id))];
     const chosen = await this.ui.chooseCards({
       title: 'Paso de counter',
-      body: `${game.byId(attackerId).name} (${attackPower}) golpea a ${targetName} (${targetPower}). Selecciona counters y/o eventos [Counter].`,
+      body: `${game.byId(attackerId).name} (${attackPower}) golpea a ${targetName} (${targetPower}). En empate gana el ATACANTE: tu defensa debe SUPERAR ${attackPower}.`,
       cardIds: ids,
       confirmLabel: 'Resolver',
       extra: (sel) => {
@@ -127,7 +127,10 @@ export class HumanController {
           if (c.isEvent) bonus += (abilitiesOf(c, 'counter')[0]?.ops ?? []).filter((o) => o.op === 'powerUp').reduce((n, o) => n + o.n, 0);
           else bonus += c.counterValue;
         }
-        return `Defensa: ${targetPower + bonus} vs ${attackPower} → ${targetPower + bonus >= attackPower ? '❌ el golpe NO entra' : '💥 el golpe entra'}`;
+        // En OPTCG el atacante gana los empates: el ataque solo se frena si la
+        // defensa es ESTRICTAMENTE mayor que el poder del atacante.
+        const survives = (targetPower + bonus) > attackPower;
+        return `Defensa: ${targetPower + bonus} vs ${attackPower} → ${survives ? '🛡 el ataque NO entra' : '💥 el ataque ENTRA' + (targetPower + bonus === attackPower ? ' (empate → gana el atacante)' : '')}`;
       },
     });
     const discardIds = [];
@@ -145,6 +148,8 @@ export class HumanController {
       ko: 'KO a un personaje', bounce: 'devolver a la mano', tuckBottom: 'al fondo del mazo',
       rest: 'girar', unrest: 'enderezar', powerUp: 'dar poder', giveDon: 'dar DON!!',
       recover: 'recuperar del descarte', grantNoBlocker: 'imparable este turno',
+      powerDown: 'quitar poder', costDown: 'reducir coste',
+      toLife: 'poner en tu Vida (boca abajo)', lifeToDeck: 'poner en lo alto del mazo',
     };
     const res = await this.ui.pick({
       cardIds: candidateIds,
@@ -172,6 +177,14 @@ export class HumanController {
         { label: 'Activar Trigger', value: true, primary: true },
         { label: 'A mi mano', value: false },
       ],
+    });
+  }
+
+  async chooseOption(game, { prompt, options }) {
+    return this.ui.dialog({
+      title: 'Elige una opción',
+      body: prompt,
+      buttons: options.map((label, i) => ({ label, value: i, primary: i === 0 })),
     });
   }
 

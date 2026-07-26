@@ -138,6 +138,16 @@ export class Game {
     if (this.onNarrate) await this.onNarrate({ actor: player.name, isBot: player.isBot, ...ev });
   }
 
+  // Descripción legible de una lista de ops (para modales de elección).
+  describeOps(ops) {
+    const T = {
+      trashOppLife: 'Descartar 1 carta de tu Vida', lifeAddFromDeck: 'Añadir 1 carta a tu Vida',
+      ko: 'KO a un personaje', draw: 'Robar', bounce: 'Devolver a la mano',
+      powerDown: 'Restar poder', rest: 'Girar un personaje',
+    };
+    return ops.map((o) => T[o.op] ?? o.op).join(' + ') || 'Nada';
+  }
+
   shuffle(arr) {
     for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(this.rng() * (i + 1));
@@ -265,6 +275,7 @@ export class Game {
     if (cost.donRest > p.donActive) return false;
     if (cost.donReturn > p.donActive + p.donRested) return false;
     if (cost.trashHand > p.hand.length) return false;
+    if (cost.trashLife > p.life.length) return false;
     if (cost.restSelf && source.rested) return false;
     return true;
   }
@@ -290,6 +301,15 @@ export class Game {
           this.trashFromHand(c);
           this.log(`${p.name} descarta ${c.name} como coste.`);
         }
+      }
+    }
+    if (cost.trashLife) {
+      // Descartar N cartas de tu Vida (de arriba; el jugador ve cuáles).
+      for (let i = 0; i < cost.trashLife && p.life.length; i++) {
+        const c = p.life.shift();
+        c.zone = 'trash';
+        p.trash.push(c);
+        this.log(`${p.name} descarta una carta de su Vida como coste (${c.name}). Vidas: ${p.life.length}.`);
       }
     }
     if (cost.restSelf) source.rested = true;
@@ -609,17 +629,60 @@ export class Game {
           break;
         }
         case 'handToLife': {
+          // Elige una carta de la mano que cumpla el filtro (el jugador decide).
           const f = op.filter ?? {};
-          const cand = p.hand.find((c) =>
+          const cands = p.hand.filter((c) =>
             (!f.cardType || c.type === f.cardType) &&
             (f.maxCost === undefined || c.cost <= f.maxCost) &&
+            (f.names === undefined || f.names.some((nm) => c.name.toLowerCase().includes(nm.toLowerCase()))) &&
             (f.power === undefined || (c.data.power ?? -1) === f.power));
-          if (cand) {
+          if (!cands.length) break;
+          const id = await p.controller.chooseTarget(this, {
+            purpose: 'toLife', candidateIds: cands.map((c) => c.id), optional: true,
+          });
+          const cand = this.byId(id);
+          if (cand && cand.zone === 'hand' && cand.owner === p) {
             p.hand.splice(p.hand.indexOf(cand), 1);
             cand.zone = 'life';
             p.life.unshift(cand);
-            this.log(`${p.name} pone ${cand.name} en lo alto de su Vida (${p.life.length}).`);
+            this.log(`${p.name} pone ${cand.name} en lo alto de su Vida (ahora ${p.life.length}).`);
           }
+          break;
+        }
+        case 'lifeAddFromDeck': {
+          for (let i = 0; i < op.n && p.library.length; i++) {
+            const c = p.library.shift();
+            c.zone = 'life';
+            p.life.unshift(c);
+          }
+          this.log(`${p.name} añade ${op.n} carta(s) del mazo a lo alto de su Vida (ahora ${p.life.length}).`);
+          break;
+        }
+        case 'lifeToTopDeck': {
+          if (!p.life.length) break;
+          // Miras tus vidas y colocas una en lo alto del mazo.
+          const id = await p.controller.chooseTarget(this, {
+            purpose: 'lifeToDeck', candidateIds: p.life.map((c) => c.id), optional: true,
+          });
+          const c = this.byId(id) ?? p.life[0];
+          if (c && p.life.includes(c)) {
+            p.life.splice(p.life.indexOf(c), 1);
+            c.zone = 'deck';
+            p.library.unshift(c);
+            this.log(`${p.name} pone una carta de su Vida en lo alto del mazo (Vida: ${p.life.length}).`);
+          }
+          break;
+        }
+        case 'oppChoose': {
+          // El rival elige cuál de las opciones sufre; el efecto se resuelve
+          // desde la perspectiva del controlador de la carta (p).
+          const opp2 = this.opponentOf(p);
+          const idx = await opp2.controller.chooseOption(this, {
+            prompt: 'Tu rival te obliga a elegir una opción:',
+            options: op.options.map((ops2) => this.describeOps(ops2)),
+          });
+          const chosen = op.options[Math.max(0, Math.min(idx ?? 0, op.options.length - 1))];
+          await this.resolveOps(chosen, ctx);
           break;
         }
         case 'peekReorder': {

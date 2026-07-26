@@ -208,6 +208,26 @@ button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
   width: 66px; height: 92px;
   background: radial-gradient(circle at 50% 40%, #8a1f2c, #4a0f16);
 }
+/* Pila de vidas: cartas reales boca abajo, apiladas con ligero desfase */
+.lifeStack { position: relative; width: 66px; }
+.lifeCardBack {
+  position: absolute; left: 0; width: 66px; height: 84px; border-radius: 7px;
+  border: 1px solid #7a1420; box-shadow: 0 1px 3px rgba(0,0,0,.5);
+  background:
+    radial-gradient(circle at 50% 38%, rgba(245,197,66,.25), transparent 55%),
+    repeating-linear-gradient(45deg, #7a1a26 0 6px, #93222f 6px 12px);
+}
+.lifeCardBack::after {
+  content: '☠'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: rgba(245,197,66,.35); font-size: 1.4rem;
+}
+.lifeStackCount {
+  position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%); z-index: 5;
+  background: rgba(9,13,20,.9); border: 1px solid var(--gold-d); border-radius: 7px;
+  padding: 1px 7px; display: flex; flex-direction: column; align-items: center; line-height: 1;
+}
+.lifeStackCount span { font-family: 'Cinzel', serif; font-size: 1.15rem; font-weight: 800; color: var(--red); }
+.lifeStackCount small { font-size: .5rem; color: var(--dim); letter-spacing: .04em; }
 .pileCount { position: relative; font-size: 1.3rem; font-weight: 800; color: #fff; text-shadow: 0 1px 4px #000; font-family: 'Cinzel', serif; }
 .pileLabel { position: relative; font-size: .54rem; color: rgba(255,255,255,.82); text-transform: uppercase; letter-spacing: .04em; }
 

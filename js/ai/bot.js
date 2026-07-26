@@ -57,6 +57,16 @@ export class BotController {
     return true;
   }
 
+  async chooseOption(game, { options }) {
+    // El rival elige el mal menor: la opción de menor valor para el que la lanza.
+    // Aproximación: preferir "añadir a tu Vida" (menos malo) sobre "descartar Vida".
+    const bad = options.findIndex((o) => /Descartar 1 carta de tu Vida/i.test(o));
+    const soft = options.findIndex((o) => /Añadir 1 carta a tu Vida/i.test(o));
+    if (soft !== -1) return soft;
+    if (bad !== -1 && game.opponentOf(this.player).life.length > 2) return bad;
+    return 0;
+  }
+
   async payOptionalCost(game, { cardId, when }) {
     const card = game.byId(cardId);
     const ab = abilitiesOf(card, when)[0];

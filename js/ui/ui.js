@@ -193,10 +193,10 @@ export class UI {
     const mat = document.createElement('div');
     mat.className = 'mat' + (isOpp ? ' opp' : '');
 
-    // Columna izquierda: pila de vidas.
+    // Columna izquierda: pila de vidas (cartas reales boca abajo, apiladas).
     const leftCol = document.createElement('div');
     leftCol.className = 'matCol';
-    leftCol.appendChild(this.pileEl('Vidas', p.life.length, 'life'));
+    leftCol.appendChild(this.lifeStack(p));
 
     // Zona de personajes (la línea de batalla): siempre 5 huecos fijos.
     const chars = document.createElement('div');
@@ -260,6 +260,25 @@ export class UI {
     d.className = 'slot';
     if (label) d.textContent = label;
     return d;
+  }
+
+  // Pila de vidas: cada carta de Vida es real (boca abajo), mostradas apiladas.
+  lifeStack(p) {
+    const wrap = document.createElement('div');
+    wrap.className = 'lifeStack';
+    const n = p.life.length;
+    for (let i = 0; i < n; i++) {
+      const card = document.createElement('div');
+      card.className = 'lifeCardBack';
+      card.style.top = `${i * 9}px`;
+      wrap.appendChild(card);
+    }
+    const badge = document.createElement('div');
+    badge.className = 'lifeStackCount';
+    badge.innerHTML = `<span>${n}</span><small>VIDAS</small>`;
+    wrap.appendChild(badge);
+    wrap.style.height = `${Math.max(92, 84 + (n - 1) * 9)}px`;
+    return wrap;
   }
 
   pileEl(label, count, kind, area = null, topCard = null) {

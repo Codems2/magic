@@ -98,9 +98,30 @@ function parseOps(text, unknown) {
     ops.push({ op: 'revealPlay', filter: mm[1] ? parseFilter(mm[1]) : {}, maxCost: mm[2] ? parseInt(mm[2], 10) : null });
     text = text.replace(mm[0], '');
   }
-  // Poner una carta de la mano en lo alto de tu Vida (boca abajo).
-  if ((mm = text.match(/(?:reveal up to 1 |add up to 1 )?(.+?) from your hand and add it to the top of your life cards?(?: face-down)?/i))) {
+  // El rival elige una de dos opciones (modal del oponente) — ANTES que los
+  // patrones sueltos, para no consumir texto de dentro del modal.
+  if ((mm = text.match(/your opponent chooses one:\s*(.+)$/i))) {
+    const options = mm[1].split('•').map((s) => s.trim().replace(/\.$/, '')).filter(Boolean).map((s) => parseOps(s, unknown));
+    ops.push({ op: 'oppChoose', options });
+    text = text.replace(mm[0], '');
+  }
+  // Trash 1 card from the top of your opponent's Life cards (suele ir en modales).
+  if ((mm = text.match(/^trash (\d+) cards? from the top of your opponent's life cards?\.?$/i))) {
+    return [{ op: 'trashOppLife', n: n(mm[1]) }];
+  }
+  // Revelar y poner una carta de la mano en lo alto de tu Vida (Ivankov).
+  if ((mm = text.match(/(?:reveal up to 1 |add up to 1 )?(.+?) from your hand and add it to the top of your life cards?(?: face-down| face-up)?/i))) {
     ops.push({ op: 'handToLife', filter: parseFilter(mm[1]) });
+    text = text.replace(mm[0], '');
+  }
+  // Añadir carta(s) de lo alto del mazo a lo alto de tu Vida (Newgate).
+  if ((mm = text.match(/add (?:up to )?(\d+|1) cards? from the top of your deck to the top of your life cards?/i))) {
+    ops.push({ op: 'lifeAddFromDeck', n: n(mm[1]) });
+    text = text.replace(mm[0], '');
+  }
+  // Mirar toda tu Vida y colocar 1 en lo alto del mazo (reordenar, con elección).
+  if ((mm = text.match(/look at all your life cards[;,.]?\s*place 1 card at the top of your deck[^.]*\.?/i))) {
+    ops.push({ op: 'lifeToTopDeck' });
     text = text.replace(mm[0], '');
   }
   // Revelar la carta superior (informativo) cuando no hay más instrucción.
@@ -269,13 +290,15 @@ function parseOps(text, unknown) {
 // ---- costes internos ("(2)", "DON!! -1", "trash 1 card...", "rest this") --
 
 function parseCost(text) {
-  const cost = { donRest: 0, donReturn: 0, trashHand: 0, restSelf: false, trashSelf: false, optional: true };
+  const cost = { donRest: 0, donReturn: 0, trashHand: 0, restSelf: false, trashSelf: false, trashLife: 0, optional: true };
   const l = text.toLowerCase();
   let m;
   if ((m = l.match(/\((\d+)\)/))) cost.donRest = parseInt(m[1], 10);
   else if ((m = l.match(/rest (\d+) of your don!! cards?/))) cost.donRest = parseInt(m[1], 10);
   if ((m = l.match(/don!!\s*[-−](\d+)/))) cost.donReturn = parseInt(m[1], 10);
-  if ((m = l.match(/trash (\d+) cards? from your hand/))) cost.trashHand = n(m[1]);
+  // Ojo: "trash N ... your life" es un coste distinto de "trash N ... your hand".
+  if ((m = l.match(/trash (\d+) cards? from (?:the top or bottom of )?your life/))) cost.trashLife = n(m[1]);
+  else if ((m = l.match(/trash (\d+) cards? from your hand/))) cost.trashHand = n(m[1]);
   if (/rest this (?:card|stage|character)/.test(l)) cost.restSelf = true;
   if (/trash this character/.test(l)) cost.trashSelf = true;
   return cost;
@@ -360,7 +383,7 @@ export function buildScript(card) {
     // El coste va antes de ':' solo si contiene marcadores de coste reales.
     if (colon !== -1) {
       const head = body.slice(0, colon);
-      if (/\(\d+\)|don!!\s*[-−]\d+|trash \d+ card|rest this|rest \d+ of your don!!|trash this character/i.test(head)) {
+      if (/\(\d+\)|don!!\s*[-−]\d+|trash \d+ card|rest this|rest \d+ of your don!!|trash this character|trash \d+ cards? from (?:the top or bottom of )?your life/i.test(head)) {
         ab.cost = parseCost(head);
         body = body.slice(colon + 1).trim();
       }
@@ -400,6 +423,9 @@ export function opsValue(ops) {
       case 'revealPlay': v += 2; break;
       case 'grantKeywordGroup': v += op.targets * 0.8; break;
       case 'handToLife': v += 0.8; break;
+      case 'lifeAddFromDeck': v += op.n * 1.6; break;
+      case 'lifeToTopDeck': v += 0.5; break;
+      case 'oppChoose': v += 1.5; break;
       case 'ifOppLife': case 'ifYouHaveChar': case 'ifDon': v += opsValue(op.ops) * 0.7; break;
       case 'playFromZone': case 'playSelf': v += 2.5; break;
       case 'noBlocker': case 'grantNoBlocker': v += 1; break;
