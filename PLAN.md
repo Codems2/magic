@@ -139,13 +139,44 @@ la F2 porque cuestan casi nada ahora y evitan una reescritura después:
    servidor es quien conoce las zonas ocultas (manos, mazos, vidas boca
    abajo) y a cada cliente solo le envía **su vista** de la partida.
 
-## 4c. Fases de multijugador (posteriores a v1)
+## 4c. Fases de multijugador (diseño concreto sobre el código actual)
 
-| Fase | Entregable |
-|---|---|
-| **F7. Refactor de red** | Acciones 100% serializables por id + vista filtrada del estado por jugador (`game.viewFor(player)`) + reproducción de partidas por log de acciones (replays gratis) |
-| **F8. Servidor autoritativo** | Node + WebSocket ejecutando el motor; salas por código (amigo vs amigo), reconexión, relojes de turno básicos; el cliente reutiliza la UI de F5 con un `RemoteController` |
-| **F9. Despliegue online** | El estático sigue en Vercel; el servidor WebSocket en un host con procesos persistentes (Fly.io/Railway/Render). Opcional: emparejamiento aleatorio y espectadores |
+**Modelo elegido: servidor autoritativo.** El motor completo corre SOLO en
+el servidor; cada navegador es un cliente "tonto" que (a) recibe su vista
+filtrada (`game.viewFor(player)` — el rival nunca ve tu mano/mazo/vidas, ni
+siquiera en memoria, así que no se puede hacer trampa con las DevTools) y
+(b) responde a las preguntas de decisión. La alternativa lockstep (motor en
+ambos clientes) se descarta: expondría la información oculta del rival.
+
+**La superficie del protocolo ya existe**: son los 10 métodos del
+controlador (`mulligan`, `mainAction`, `chooseTarget`, `chooseBlocker`,
+`counterStep`, `discardFromHand`, `triggerDecision`, `chooseOption`,
+`chooseRevealed`, `payOptionalCost`). Todos reciben y devuelven JSON plano
+por id — el `RemoteController` del servidor es un proxy de ~30 líneas:
+reenvía la pregunta por WebSocket y espera la respuesta.
+
+```
+{ t:'ask',  reqId, method:'chooseTarget', payload:{purpose,candidateIds,optional} }
+{ t:'answer', reqId, value: 512 }
+{ t:'view', state: viewFor(tú) }        // tras cada cambio de estado
+{ t:'log',  line: '⚔ Zoro ataca a...' } // narración compartida
+```
+
+| Fase | Entregable | Trabajo clave |
+|---|---|---|
+| **F7a. Protocolo + loopback** | `js/net/protocol.js` (esquema de mensajes) + `RemoteController` (proxy servidor) + `ClientSeat` (lado navegador que traduce ask→HumanController) + test headless: una partida completa por un socket en memoria, byte a byte JSON | Pequeño: la interfaz ya es serializable; el test demuestra que NADA pasa por referencia |
+| **F7b. UI sobre vista** | La UI pinta desde el JSON de `viewFor` + catálogo local de cartas (`data/decks`), no desde instancias vivas del motor. En local se sigue jugando igual (la vista se genera en el mismo proceso) | El grueso: `ui.js` hoy lee `card.power(game)`, `.script`, `.hasBlocker` de instancias; pasa a un `ClientCard` construido de la vista (poder/coste ya vienen calculados del servidor) |
+| **F7c. Replays** | Grabar `{semilla, mazos, respuestas}` de cada partida y reproducirla headless | Casi gratis con el RNG con semilla; sirve además para depurar bugs reportados |
+| **F8. Servidor de salas** | `server/index.mjs`: Node + `ws`. Crear sala → código de 4 letras → el amigo entra con el código. Tokens de re-entrada (recargar la página no pierde la partida), relojes de turno suaves, chat mínimo | El servidor importa `js/engine/` TAL CUAL (es JS puro sin DOM ni deps) |
+| **F9. Despliegue** | El estático sigue en Vercel; el servidor WS en un host con procesos persistentes y `wss://` | Recomendado: Render (gratis, se duerme tras inactividad — bien para jugar con amigos) o Fly.io; el cliente apunta al servidor por variable de config |
+
+Riesgos conocidos y respuesta:
+- **Desconexiones**: el servidor guarda la partida y el log de acciones; al
+  reconectar con el token se reenvía `view` completo y la pregunta pendiente.
+- **Latencia en pasos frecuentes** (counter/bloqueo): son 1-2 mensajes por
+  decisión, nada de tiempo real continuo — jugable incluso con 200 ms.
+- **Vercel no soporta WebSockets persistentes**: por eso el servidor va
+  aparte (ya previsto en §4b).
 
 ## 5. Fases y criterios de éxito
 
