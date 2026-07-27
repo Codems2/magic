@@ -260,7 +260,7 @@ function parseOps(text, unknown) {
   }
   // Manipulación de vidas: "añade 1 carta de tu Vida a la mano".
   if ((mm = text.match(/add 1 card from the top or bottom of your life (?:cards |area )?to your hand/i))) {
-    ops.push({ op: 'lifeToHand', n: 1 });
+    ops.push({ op: 'lifeToHand', n: 1, pick: true });
     text = text.replace(mm[0], '');
   }
   if ((mm = text.match(/add up to (\d+) cards? from the top of your life[^.]*?to (?:your|its owner'?s?) hand/i))) {
@@ -622,7 +622,7 @@ function parseOps(text, unknown) {
       if (/rest this character/.test(alt)) rep.action = 'rest';
       else if (/trash this character and draw (\d+)/.test(alt)) { rep.action = 'trashDraw'; rep.draw = parseInt(alt.match(/draw (\d+)/)[1], 10); }
       else if ((m = alt.match(/trash (\d+) cards? from your hand/))) { rep.action = 'pay'; rep.trashHand = parseInt(m[1], 10); }
-      else if (/trash \d+ cards? from (?:the top or bottom of )?your life/.test(alt)) { rep.action = 'pay'; rep.trashLife = 1; }
+      else if (/trash \d+ cards? from (?:the top or bottom of )?your life/.test(alt)) { rep.action = 'pay'; rep.trashLife = 1; rep.trashLifePick = /top or bottom/.test(alt); }
       else if (/turn 1 card from the top of your life cards face-up/.test(alt)) { rep.action = 'pay'; rep.trashLife = 0; }
       else rep.action = 'pay';
       ops.push(rep);
@@ -709,12 +709,12 @@ function parseCost(text) {
   if (/return (?:\d+ or more|any number of) don!! cards?/.test(l)) cost.donReturnVar = true;
   if ((m = l.match(/return (\d+) total of your currently given don!! cards?/))) cost.returnGivenDon = parseInt(m[1], 10);
   // Ojo: "trash N ... your life" es un coste distinto de "trash N ... your hand".
-  if ((m = l.match(/trash (\d+) cards? from (?:the top or bottom of )?your life/))) cost.trashLife = n(m[1]);
+  if ((m = l.match(/trash (\d+) cards? from (the top or bottom of )?your life/))) { cost.trashLife = n(m[1]); cost.trashLifePick = !!m[2]; }
   else if (/trash any number of .*cards? from your hand/.test(l)) cost.trashHandAny = true;
   else if ((m = text.match(/trash (\d+) (.+?) cards? from your hand/i))) { cost.trashHand = n(m[1]); cost.trashHandFilter = parseTargetFilter(m[2]); }
   else if ((m = text.match(/trash (\d+) cards? with (.+?) from your hand/i))) { cost.trashHand = n(m[1]); }
   else if ((m = l.match(/trash (\d+) cards? from your hand/))) cost.trashHand = n(m[1]);
-  if ((m = l.match(/add (\d+) cards? from (?:the top|the top or bottom) of your life cards? to your hand/))) cost.lifeToHand = n(m[1]);
+  if ((m = l.match(/add (\d+) cards? from (the top or bottom|the top) of your life cards? to your hand/))) { cost.lifeToHand = n(m[1]); cost.lifeToHandPick = m[2] === 'the top or bottom'; }
   if ((m = text.match(/rest (\d+) of your (.+?) cards?(?::|$)/i)) && /rest \d+ of your/i.test(text) && !/don!!/i.test(m[2])) cost.restOwn = { n: n(m[1]), filter: parseTargetFilter(m[2]) };
   if ((m = text.match(/return (\d+) of your (.+?) to the owner'?s hand/i))) cost.bounceOwn = { n: n(m[1]), filter: parseTargetFilter(m[2]) };
   if ((m = l.match(/place (\d+) cards? from your trash at the bottom of your deck/))) cost.trashToBottom = n(m[1]);

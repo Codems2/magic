@@ -241,7 +241,7 @@ export class Game {
         if (op.op !== 'koReplace') continue;
         if (op.trigger === 'remove' && !byEffect) continue;
         const owner = card.owner;
-        const cost = { trashHand: op.trashHand ?? 0, trashLife: op.trashLife ?? 0 };
+        const cost = { trashHand: op.trashHand ?? 0, trashLife: op.trashLife ?? 0, trashLifePick: !!op.trashLifePick };
         if (op.action === 'pay' && !this.canPayAbilityCost(owner, card, cost)) continue;
         const wants = owner.isBot
           ? (op.action === 'rest' || (owner.hand.length > (op.trashHand ?? 0) + 1))
@@ -462,9 +462,10 @@ export class Game {
       }
     }
     if (cost.trashLife) {
-      // Descartar N cartas de tu Vida (de arriba; el jugador ve cuáles).
+      // Descartar N cartas de tu Vida (de arriba o de abajo, si el texto lo permite).
       for (let i = 0; i < cost.trashLife && p.life.length; i++) {
-        const c = p.life.shift();
+        const idx = await this.pickLifeIndex(p, cost.trashLifePick);
+        const c = p.life.splice(idx, 1)[0];
         c.zone = 'trash';
         p.trash.push(c);
         this.log(`${p.name} descarta una carta de su Vida como coste (${c.name}). Vidas: ${p.life.length}.`);
@@ -487,9 +488,10 @@ export class Game {
     }
     if (cost.lifeToHand) {
       for (let i = 0; i < cost.lifeToHand && p.life.length; i++) {
-        const c = p.life.shift(); c.zone = 'hand'; p.hand.push(c);
+        const idx = await this.pickLifeIndex(p, cost.lifeToHandPick);
+        const c = p.life.splice(idx, 1)[0]; c.zone = 'hand'; p.hand.push(c);
+        this.log(`${p.name} añade a la mano ${c.name} desde su Vida (Vida: ${p.life.length}).`);
       }
-      this.log(`${p.name} añade ${cost.lifeToHand} carta(s) de su Vida a la mano como coste (Vida: ${p.life.length}).`);
     }
     if (cost.trashToBottom) {
       for (let i = 0; i < cost.trashToBottom && p.trash.length; i++) {
@@ -580,6 +582,18 @@ export class Game {
   }
 
   costReturnsDon(cost) { return !!(cost && (cost.donReturn || cost.donReturnVar || cost.returnGivenDon)); }
+
+  // Elige el índice de la carta de Vida a usar. Cuando el efecto permite
+  // "de arriba o de abajo", el dueño decide (a ciegas: no ve las cartas).
+  async pickLifeIndex(player, pick) {
+    if (!player.life.length) return -1;
+    if (!pick || player.life.length < 2) return 0;
+    const idx = await player.controller.chooseOption(this, {
+      prompt: `Tu Vida (${player.life.length} cartas boca abajo): ¿cuál usas?`,
+      options: ['La de ARRIBA', 'La de ABAJO'],
+    });
+    return idx === 1 ? player.life.length - 1 : 0;
+  }
 
   async runTaggedAbilities(card, when, ctx = {}) {
     for (const ab of abilitiesOf(card, when)) {
@@ -997,10 +1011,11 @@ export class Game {
         }
         case 'lifeToHand': {
           for (let i = 0; i < op.n && p.life.length; i++) {
-            const c = p.life.shift();
+            const idx = await this.pickLifeIndex(p, op.pick);
+            const c = p.life.splice(idx, 1)[0];
             c.zone = 'hand';
             p.hand.push(c);
-            this.log(`${p.name} añade una carta de Vida a su mano. Le quedan ${p.life.length}.`);
+            this.log(`${p.name} añade ${c.name} de su Vida a la mano. Le quedan ${p.life.length}.`);
           }
           break;
         }
