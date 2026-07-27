@@ -46,8 +46,14 @@ function parseFilter(text) {
 const COLORS = ['red', 'blue', 'green', 'purple', 'black', 'yellow'];
 function parseTargetFilter(text) {
   const f = {};
-  const l = text.toLowerCase();
   let m;
+  // "other than [X]" se extrae ANTES de recoger nombres: si no, X quedaría a
+  // la vez requerido y excluido y el filtro sería imposible de cumplir.
+  if ((m = text.match(/other than \[([^\]]+)\]/i))) {
+    f.notName = m[1];
+    text = text.replace(m[0], ' ');
+  }
+  const l = text.toLowerCase();
   const names = [...text.matchAll(/\[([^\]]+)\]/g)].map((x) => x[1]).filter((x) => !/^(don!!|blocker|rush|double attack|banish|trigger)/i.test(x));
   if (names.length) f.names = names;
   const types = [...text.matchAll(/["“]([^"”]+)["”]|\{([^}]+)\}/g)].map((x) => x[1] ?? x[2]);
@@ -57,7 +63,6 @@ function parseTargetFilter(text) {
   if ((m = l.match(/with (\d+) base power(?: or (less|more))?/))) f.basePower = { v: parseInt(m[1], 10), dir: m[2] ?? 'eq' };
   else if ((m = l.match(/with (\d+) power(?: or (less|more))?/))) f.power = { v: parseInt(m[1], 10), dir: m[2] ?? 'eq' };
   if ((m = l.match(/with a cost of (\d+)(?: or (less|more))?/))) f.cost = { v: parseInt(m[1], 10), dir: m[2] ?? 'eq' };
-  if ((m = text.match(/other than \[([^\]]+)\]/i))) f.notName = m[1];
   return f;
 }
 
@@ -713,6 +718,8 @@ function parseCost(text) {
   else if (/trash any number of .*cards? from your hand/.test(l)) cost.trashHandAny = true;
   else if ((m = text.match(/trash (\d+) (.+?) cards? from your hand/i))) { cost.trashHand = n(m[1]); cost.trashHandFilter = parseTargetFilter(m[2]); }
   else if ((m = text.match(/trash (\d+) cards? with (.+?) from your hand/i))) { cost.trashHand = n(m[1]); }
+  // "trash 1 Character card with 6000 power from your hand" (el filtro va DESPUÉS de "card").
+  else if ((m = text.match(/trash (\d+) (.+? cards?) (with .+?) from your hand/i))) { cost.trashHand = n(m[1]); cost.trashHandFilter = parseTargetFilter(m[2] + ' ' + m[3]); }
   else if ((m = l.match(/trash (\d+) cards? from your hand/))) cost.trashHand = n(m[1]);
   if ((m = l.match(/add (\d+) cards? from (the top or bottom|the top) of your life cards? to your hand/))) { cost.lifeToHand = n(m[1]); cost.lifeToHandPick = m[2] === 'the top or bottom'; }
   if ((m = text.match(/rest (\d+) of your (.+?) cards?(?::|$)/i)) && /rest \d+ of your/i.test(text) && !/don!!/i.test(m[2])) cost.restOwn = { n: n(m[1]), filter: parseTargetFilter(m[2]) };

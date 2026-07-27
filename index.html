@@ -19,6 +19,7 @@
     <h2>Mazo del bot</h2>
     <div id="botDecks" class="deck-grid"></div>
     <button id="startBtn" class="primary" disabled>¡Zarpar!</button>
+    <button id="sandboxBtn" title="Modo pruebas: rival pasivo, DON!! de sobra y cualquier carta del catálogo en tu mano">🧪 Sandbox</button>
   </div>
 
   <div id="game" class="screen hidden">
@@ -32,6 +33,12 @@
         <button data-sp="0.5">⏩</button>
       </span>
       <button id="logToggle" title="Registro">📜</button>
+      <span id="sandboxBar" class="hidden">
+        <button id="sbAddCard" title="Buscar cualquier carta del catálogo y añadirla a tu mano">➕ Carta</button>
+        <button id="sbDraw" title="Robar 1 carta">🃏 Robar</button>
+        <button id="sbDon" title="+2 DON!! activos">🔶 +DON</button>
+        <button id="sbLife" title="+1 carta de Vida (del mazo)">❤️ +Vida</button>
+      </span>
     </div>
     <div id="banner" class="hidden"></div>
     <div id="table">

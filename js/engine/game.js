@@ -47,13 +47,14 @@ export class Player {
 }
 
 export class Game {
-  constructor(configs, { seed = 42, onLog = null, onAnimate = null, onNarrate = null, maxTurns = 60 } = {}) {
+  constructor(configs, { seed = 42, onLog = null, onAnimate = null, onNarrate = null, maxTurns = 60, sandbox = false } = {}) {
     resetIds();
     this.rng = mulberry32(seed);
     this.onLog = onLog;
     this.onAnimate = onAnimate;   // hook opcional para animaciones de la UI
     this.onNarrate = onNarrate;   // hook opcional: la UI narra las jugadas
     this.maxTurns = maxTurns;
+    this.sandbox = sandbox;       // modo pruebas: DON!! garantizado y herramientas extra
     this.turn = 0;
     this.phase = 'setup';
     this.activeIdx = 0;
@@ -371,6 +372,8 @@ export class Game {
     const real = Math.min(gain, p.donDeck);
     p.donDeck -= real;
     p.donActive += real;
+    // Sandbox: DON!! de sobra cada turno para poder probar cualquier carta.
+    if (this.sandbox) p.donActive = Math.max(p.donActive, 10);
 
     // 4. Main.
     this.phase = 'main';
@@ -431,7 +434,9 @@ export class Game {
     if (cost.turnLifeDown && p.life.length < cost.turnLifeDown) return false;
     if (cost.restSelf && source.rested) return false;
     if (cost.trashHandFilter && p.hand.filter((c) => this.matchesFilter(c, cost.trashHandFilter)).length < cost.trashHand) return false;
-    if (cost.restOwn && p.characters.filter((c) => !c.rested && this.matchesFilter(c, cost.restOwn.filter)).length < cost.restOwn.n) return false;
+    // "rest N of your [X] cards" puede referirse a personajes, escenario o líder.
+    if (cost.restOwn && [...p.characters, p.stage, p.leader].filter(Boolean)
+      .filter((c) => !c.rested && this.matchesFilter(c, cost.restOwn.filter)).length < cost.restOwn.n) return false;
     if (cost.bounceOwn && p.characters.filter((c) => this.matchesFilter(c, cost.bounceOwn.filter)).length < cost.bounceOwn.n) return false;
     if (cost.charToLife && p.characters.filter((c) => this.matchesFilter(c, cost.charToLife.filter)).length < cost.charToLife.n) return false;
     if (cost.revealHand && p.hand.filter((c) => this.matchesFilter(c, cost.revealHand.filter)).length < cost.revealHand.n) return false;
@@ -508,7 +513,9 @@ export class Game {
       for (const c of cands) { this.trashFromHand(c); this.log(`${p.name} descarta ${c.name} como coste.`); }
     }
     if (cost.restOwn) {
-      for (const c of p.characters.filter((c2) => !c2.rested && this.matchesFilter(c2, cost.restOwn.filter)).slice(0, cost.restOwn.n)) {
+      const pool = [...p.characters, p.stage, p.leader].filter(Boolean)
+        .filter((c2) => !c2.rested && this.matchesFilter(c2, cost.restOwn.filter));
+      for (const c of pool.slice(0, cost.restOwn.n)) {
         c.rested = true; this.log(`${p.name} gira ${c.name} como coste.`);
       }
     }
@@ -597,7 +604,9 @@ export class Game {
 
   async runTaggedAbilities(card, when, ctx = {}) {
     for (const ab of abilitiesOf(card, when)) {
-      if (ab.donX && card.givenDon < ab.donX) continue;
+      // [On K.O.]: los DON dados ya volvieron al coste; usa los que tenía al morir.
+      const effDon = when === 'onKO' ? (card._givenDonAtKO ?? card.givenDon) : card.givenDon;
+      if (ab.donX && effDon < ab.donX) continue;
       if (ab.once && card._usedTurn?.[when] === this.turn) continue;
       const p = card.owner;
       if (ab.cost) {
@@ -620,6 +629,8 @@ export class Game {
     const opp = this.opponentOf(p);
     for (const op of ops) {
       if (this.over) return;
+      // Traza de depuración (sandbox): registra cada op que llega a ejecutarse.
+      if (this.opTrace) this.opTrace.push(op.op);
       switch (op.op) {
         case 'giveRestedDon': {
           const give = Math.min(op.n, ctx.source.isLeader || true ? p.donRested : p.donRested);
@@ -726,7 +737,13 @@ export class Game {
               (!op.blockerOnly || c.hasBlocker) &&
               this.canBeKOd(c, { byEffect: true }));
           };
-          if (op.all) { for (const c of pool()) { this.log(`💥 ${c.name} es KO por efecto.`); this.koCharacter(c); } if (!op._noTrigger) await this.fireOnCharKO(); break; }
+          if (op.all) {
+            const dead = pool();
+            for (const c of dead) { this.log(`💥 ${c.name} es KO por efecto.`); this.koCharacter(c); }
+            for (const c of dead) await this.runTaggedAbilities(c, 'onKO');
+            if (dead.length) await this.fireOnCharKO();
+            break;
+          }
           let anyKO = false;
           for (let i = 0; i < op.targets; i++) {
             const cands = pool();
@@ -738,6 +755,7 @@ export class Game {
             if (t && cands.includes(t)) {
               if (await this.tryPreventKO(t, { byEffect: true })) continue;
               this.log(`💥 ${t.name} es KO por efecto.`); this.koCharacter(t); anyKO = true;
+              await this.runTaggedAbilities(t, 'onKO');   // [On K.O.] de la víctima
             }
           }
           if (anyKO) await this.fireOnCharKO();
@@ -1374,6 +1392,8 @@ export class Game {
     card.zone = 'stage';
     p.stage = card;
     this.log(`${p.name} juega el escenario ${card.name}.`);
+    await this.narrate(p, { kind: 'play', card: card.name });
+    await this.runTaggedAbilities(card, 'onPlay');   // los escenarios también tienen [On Play]
   }
 
   giveDon(p, { cardId, n = 1 }) {
@@ -1410,6 +1430,10 @@ export class Game {
     // [When Attacking] (con condición [DON!! xN]); puede vetar bloqueadores.
     const battle = { noBlocker: null };
     await this.runTaggedAbilities(attacker, 'whenAttacking', { battle });
+    if (this.over) return;
+
+    // [On Your Opponent's Attack]: habilidades del DEFENSOR al declararse el ataque.
+    await this.fireOnBoard(opp, 'onOppAttack', { battle });
     if (this.over) return;
 
     // Paso de bloqueo (respetando vetos de la batalla y del turno).
@@ -1504,6 +1528,7 @@ export class Game {
       } else {
         this.log(`💥 ${target.name} es KO.`);
         this.koCharacter(target);
+        await this.runTaggedAbilities(target, 'onKO');   // [On K.O.] del caído
         // ST02-010: "si esta carta batalla contra un personaje, enderézala".
         await this.afterCharBattle(attacker, target);
         await this.fireOnCharKO();
@@ -1540,6 +1565,7 @@ export class Game {
         if (wants && this.canBeKOd(battled, { byEffect: true }) && !(await this.tryPreventKO(battled, { byEffect: true }))) {
           this.log(`💥 ${battled.name} es KO tras la batalla.`);
           this.koCharacter(battled);
+          await this.runTaggedAbilities(battled, 'onKO');
           await this.fireOnCharKO();
         }
       }
@@ -1561,11 +1587,13 @@ export class Game {
     this.log(`💔 ${defender.name} pierde 1 vida (${lifeCard.name}). Le quedan ${defender.life.length}.`);
     // [Trigger]: el defensor decide si lo activa en lugar de llevársela a la mano.
     const trigAb = abilitiesOf(lifeCard, 'trigger')[0];
-    if (trigAb && (trigAb.ops.length)) {
+    // Solo se ofrece si su coste (si lo tiene) es pagable ahora mismo.
+    if (trigAb && trigAb.ops.length && this.canPayAbilityCost(defender, lifeCard, trigAb.cost)) {
       const wants = await defender.controller.triggerDecision(this, { cardId: lifeCard.id });
       if (wants) {
         this.log(`✨ ${defender.name} activa el [Trigger] de ${lifeCard.name}.`);
         lifeCard.zone = 'trigger';
+        await this.payAbilityCost(defender, lifeCard, trigAb.cost);
         await this.resolveOps(trigAb.ops, { source: lifeCard, p: defender, toHandFallback: true });
         // Si el trigger no la puso en juego, va al descarte.
         if (lifeCard.zone === 'trigger') {
@@ -1596,6 +1624,9 @@ export class Game {
 
   koCharacter(c) {
     const p = c.owner;
+    // Recuerda los DON que tenía al morir: [DON!! xN] [On K.O.] se evalúa
+    // con el estado en el momento del KO, no después de devolverlos.
+    c._givenDonAtKO = c.givenDon;
     p.donActive += c.givenDon; // los DON dados vuelven al coste... (girados por regla; simplificado)
     c.givenDon = 0;
     const i = p.characters.indexOf(c);
@@ -1630,6 +1661,17 @@ export class Game {
     loser.lost = true;
     loser.lossReason = reason;
     this.log(`🏆 ¡${winner.name} gana! (${reason}).`);
+  }
+
+  // Herramienta del modo sandbox: crea una instancia nueva de cualquier carta
+  // del catálogo y la pone en la mano del jugador.
+  addCardToHand(p, data) {
+    const c = this.register(new CardInstance(data, p));
+    c.script = buildScript(data);
+    c.zone = 'hand';
+    p.hand.push(c);
+    this.log(`🧪 ${p.name} añade ${c.name} a su mano (sandbox).`);
+    return c;
   }
 
   // Vista serializable de la partida para un jugador (base para F7:

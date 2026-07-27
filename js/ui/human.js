@@ -153,9 +153,26 @@ export class HumanController {
       toLife: 'poner en tu Vida (boca abajo)', lifeToDeck: 'poner en lo alto del mazo',
       playFree: 'poner en juego gratis', trashLifeTarget: 'descartar de tu Vida',
     };
+    const label = LABELS[purpose] ?? purpose;
+    // Cartas en zonas ocultas (descarte, mazo, Vida) no están pintadas en el
+    // tapete y no se pueden señalar: se eligen en un modal que las muestra.
+    const cands = candidateIds.map((id) => game.byId(id)).filter(Boolean);
+    const onMat = (c) => ['characters', 'leader', 'stage'].includes(c.zone) ||
+      (c.zone === 'hand' && c.owner === this.player);
+    if (!cands.length) return null;
+    if (cands.some((c) => !onMat(c))) {
+      const chosen = await this.ui.chooseCards({
+        title: `Elige: ${label}`,
+        body: optional ? 'Puedes confirmar sin seleccionar nada para no aplicarlo.' : '',
+        cardIds: candidateIds,
+        max: 1, min: optional ? 0 : 1,
+        confirmLabel: 'Confirmar',
+      });
+      return chosen[0] ?? null;
+    }
     const res = await this.ui.pick({
       cardIds: candidateIds,
-      text: `Elige objetivo: ${LABELS[purpose] ?? purpose}.`,
+      text: `Elige objetivo: ${label}.`,
       buttons: optional ? [{ label: 'No usar', value: null }] : [],
     });
     return res.type === 'card' ? res.id : null;
