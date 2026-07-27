@@ -53,11 +53,14 @@ export class BotController {
     }
   }
 
-  async discardFromHand(game, n) {
-    return this.player.hand.slice()
-      .sort((a, b) => this.handValue(a) - this.handValue(b))
-      .slice(0, n)
-      .map((c) => c.id);
+  async discardFromHand(game, n, opts = {}) {
+    const pool = (opts.fromIds
+      ? opts.fromIds.map((id) => game.byId(id)).filter(Boolean)
+      : this.player.hand.slice())
+      .sort((a, b) => this.handValue(a) - this.handValue(b));
+    // Descarte opcional ("any number"): suelta hasta 2 cartas flojas.
+    const take = opts.min === 0 ? Math.min(2, pool.length, n) : n;
+    return pool.slice(0, take).map((c) => c.id);
   }
 
   async triggerDecision(game, { cardId }) {

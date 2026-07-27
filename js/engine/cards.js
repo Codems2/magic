@@ -33,7 +33,10 @@ export class CardInstance {
 
   get name() { return this.data.name; }
   get type() { return this.data.type; }       // Leader | Character | Event | Stage
-  get cost() { return Math.max(0, (this.data.cost ?? 0) + this.tempCost + this.modCost()); }
+  get cost() {
+    const staticDelta = this.game?.staticCostFor ? this.game.staticCostFor(this) : 0;
+    return Math.max(0, (this.data.cost ?? 0) + this.tempCost + this.modCost() + staticDelta);
+  }
   get color() { return this.data.color; }
   get counterValue() { return this.data.counter ?? 0; }
   get text() { return this.data.text ?? ''; }
@@ -48,6 +51,8 @@ export class CardInstance {
     if (this.text.includes(`[${kw}]`)) return true;
     if (this._tempKw?.has(kw)) return true;
     if (this.mods.some((m) => m.stat === 'kw' && m.kw === kw)) return true;
+    // Concedida por una estática (propia o de grupo), p. ej. "gains [Blocker]".
+    if (this.zone !== 'deck' && this.zone !== 'life' && this.game?.staticKeyword?.(this, kw)) return true;
     return false;
   }
   get hasRush() { return this.hasKeyword('Rush'); }

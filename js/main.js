@@ -86,7 +86,10 @@ function passiveRival() {
     async chooseTarget(game, { candidateIds }) { return candidateIds[0] ?? null; },
     async chooseBlocker() { return null; },
     async counterStep() { return { discardIds: [], eventIds: [] }; },
-    async discardFromHand(game, n) { return (this.player?.hand ?? []).slice(0, n).map((c) => c.id); },
+    async discardFromHand(game, n, opts = {}) {
+      const pool = opts.fromIds ?? (this.player?.hand ?? []).map((c) => c.id);
+      return pool.slice(0, opts.min ?? n);
+    },
     async triggerDecision() { return false; },
     async payOptionalCost() { return true; },
     async chooseOption() { return 0; },

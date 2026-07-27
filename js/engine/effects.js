@@ -62,7 +62,8 @@ function parseTargetFilter(text) {
   if (cols.length) f.colors = cols;
   if ((m = l.match(/with (\d+) base power(?: or (less|more))?/))) f.basePower = { v: parseInt(m[1], 10), dir: m[2] ?? 'eq' };
   else if ((m = l.match(/with (\d+) power(?: or (less|more))?/))) f.power = { v: parseInt(m[1], 10), dir: m[2] ?? 'eq' };
-  if ((m = l.match(/with a cost of (\d+)(?: or (less|more))?/))) f.cost = { v: parseInt(m[1], 10), dir: m[2] ?? 'eq' };
+  if ((m = l.match(/with a base cost of (\d+)(?: or (less|more))?/))) f.baseCost = { v: parseInt(m[1], 10), dir: m[2] ?? 'eq' };
+  else if ((m = l.match(/with a cost of (\d+)(?: or (less|more))?/))) f.cost = { v: parseInt(m[1], 10), dir: m[2] ?? 'eq' };
   return f;
 }
 
@@ -78,21 +79,32 @@ function scopeOf(l) {
 // Duración de un modificador a partir de la coletilla temporal.
 function durOf(l) {
   if (!l) return 'turn';
-  if (/until the start of your next turn|until the end of your opponent'?s next turn|until the end of your next turn/.test(l)) return 'next';
-  return 'turn'; // "during this turn/battle" o "until the end of (this) turn"
+  if (/until the start of your next turn|until the end of your opponent'?s next (?:turn|end phase)|until the end of your next turn/.test(l)) return 'next';
+  if (/during this battle/.test(l)) return 'battle';
+  return 'turn'; // "during this turn" o "until the end of (this) turn"
 }
 
-// "+2000 power and [Rush]" → {changes:[{stat,delta}], kws:[...]}.
+// "+2000 power and [Rush]" → {changes:[{stat,delta}], kws:[...], per}.
+// `per` es un multiplicador "for every N <cosa>" que escala los deltas.
 function parseGrant(text) {
+  let per = null;
+  let m;
+  if ((m = text.match(/for every (\d+ )?(cards? in your trash|returned characters?|cards? trashed|rested don!! cards?)/i))) {
+    const n = m[1] ? parseInt(m[1], 10) : 1;
+    const kind = /trash$|in your trash/i.test(m[2]) ? 'trash'
+      : /returned/i.test(m[2]) ? 'returned'
+        : /trashed/i.test(m[2]) ? 'trashed' : 'restedDon';
+    per = { n, kind };
+    text = text.replace(m[0], ' ');
+  }
   const changes = [];
   const kws = [];
   for (const part of text.split(/\s+and\s+/i)) {
-    let m;
     if ((m = part.match(/([+-]?\d+)\s*power/i))) changes.push({ stat: 'power', delta: parseInt(m[1], 10) });
     else if ((m = part.match(/([+-]?\d+)\s*cost/i))) changes.push({ stat: 'cost', delta: parseInt(m[1], 10) });
     else if ((m = part.match(/\[([\w ]+)\]/))) kws.push(m[1].trim());
   }
-  return { changes, kws };
+  return { changes, kws, per };
 }
 
 // Buff/debuff a un GRUPO de cartas del tablero. Devuelve una op `buff` o null.
@@ -107,7 +119,8 @@ function parseBuff(sentence) {
     return {
       op: 'buff', side: 'opp', all: false, targets: n(m[1]),
       scope: scopeOf(m[2]), filter: parseTargetFilter(m[2]),
-      changes: grant.changes, kws: grant.kws, dur: durOf(m[4]),
+      changes: grant.changes, kws: grant.kws, per: grant.per,
+      dur: durOf((m[4] || sentence).toLowerCase()),
     };
   }
   // Propio: "(all of your | up to N of your | your) <scope> gain(s) <grant> [dur]".
@@ -121,7 +134,8 @@ function parseBuff(sentence) {
       op: 'buff', side: 'own', all: /^all of your/i.test(m[1]),
       targets: m[2] ? n(m[2]) : 1,
       scope: scopeOf(scopeText.toLowerCase()), filter: parseTargetFilter(scopeText),
-      changes: grant.changes, kws: grant.kws, dur: durOf((m[5] ?? '').toLowerCase()),
+      changes: grant.changes, kws: grant.kws, per: grant.per,
+      dur: durOf((m[5] ?? sentence).toLowerCase()),
     };
   }
   return null;
@@ -457,11 +471,11 @@ function parseOps(text, unknown) {
     if ((m = l.match(/^this (?:character|leader|card) gains (.+?)(?:\s+(during this turn|during this battle|until the start of your next turn|until the end of your opponent'?s next turn|until the end of (?:your |this )?turn))?$/))) {
       const grant = parseGrant(m[1]);
       if (grant.changes.length || grant.kws.length) {
-        const dur = durOf((m[2] ?? '').toLowerCase());
-        const isStatic = !m[2] && grant.changes.length === 1 && grant.changes[0].stat === 'power' && !grant.kws.length;
+        const dur = durOf((m[2] ?? s).toLowerCase());
+        const isStatic = !m[2] && grant.changes.length === 1 && grant.changes[0].stat === 'power' && !grant.kws.length && !grant.per;
         // Sin coletilla temporal y solo +poder ⇒ estática (aura de sí misma).
         if (isStatic) ops.push({ op: 'powerSelf', n: grant.changes[0].delta });
-        else ops.push({ op: 'selfGrant', changes: grant.changes, kws: grant.kws, dur });
+        else ops.push({ op: 'selfGrant', changes: grant.changes, kws: grant.kws, per: grant.per, dur, static: !m[2] });
         continue;
       }
     }
@@ -633,7 +647,12 @@ function parseOps(text, unknown) {
       ops.push(rep);
       continue;
     }
-    if (/^you may trash any number of .*cards? from your hand$/i.test(s)) { continue; } // coste sin efecto asociado
+    // "You may trash any number of X cards from your hand" como FRASE (sin ':'):
+    // descarte opcional que alimenta "for every card trashed" de la frase siguiente.
+    if ((m = s.match(/^you may trash any number of (.*?) ?cards? from your hand$/i))) {
+      ops.push({ op: 'trashAnyNow', filter: m[1] ? parseTargetFilter(m[1]) : null });
+      continue;
+    }
     if (/^shuffle your deck$/.test(l)) continue;
     if (/^play this card$/.test(l)) { ops.push({ op: 'playSelf' }); continue; }
     if ((m = l.match(/^play this character(?: card)? from your trash( rested)?$/))) { ops.push({ op: 'playSelf', fromTrash: true, rested: !!m[1] }); continue; }
@@ -715,7 +734,7 @@ function parseCost(text) {
   if ((m = l.match(/return (\d+) total of your currently given don!! cards?/))) cost.returnGivenDon = parseInt(m[1], 10);
   // Ojo: "trash N ... your life" es un coste distinto de "trash N ... your hand".
   if ((m = l.match(/trash (\d+) cards? from (the top or bottom of )?your life/))) { cost.trashLife = n(m[1]); cost.trashLifePick = !!m[2]; }
-  else if (/trash any number of .*cards? from your hand/.test(l)) cost.trashHandAny = true;
+  else if ((m = text.match(/trash any number of (.*?) ?cards? from your hand/i))) { cost.trashHandAny = true; cost.trashAnyFilter = m[1] ? parseTargetFilter(m[1]) : null; }
   else if ((m = text.match(/trash (\d+) (.+?) cards? from your hand/i))) { cost.trashHand = n(m[1]); cost.trashHandFilter = parseTargetFilter(m[2]); }
   else if ((m = text.match(/trash (\d+) cards? with (.+?) from your hand/i))) { cost.trashHand = n(m[1]); }
   // "trash 1 Character card with 6000 power from your hand" (el filtro va DESPUÉS de "card").
@@ -750,6 +769,9 @@ export function buildScript(card) {
   if (!text || text === 'NULL') return script;
   text = text
     .replace(/K\.O\./g, 'KO')                                   // que el punto no rompa frases
+    // Punto sin espacio entre frases ("effects.If your...") → añade el espacio.
+    // La lista de arranques evita romper nombres como "Monkey.D.Luffy".
+    .replace(/\.(?=(?:If|When|Then|You|Your|This|These|At|All|Set|Give|Draw|Add|KO|Rest|Play|Trash|Look|Reveal|Select|Place|Up)\b)/g, '. ')
     .replace(/[–—−]/g, '-')                                     // guiones tipográficos → '-'
     .replace(/([a-z])[-](\d)/gi, '$1 -$2')                       // "Characters-1000" → "Characters -1000"
     .replace(/\[Activate:Main\]/gi, '[Activate: Main]')          // etiqueta sin espacio
@@ -890,6 +912,7 @@ export function opsValue(ops) {
       case 'setBasePower': v += 1; break;
       case 'selfCost': v += -op.delta * 0.3; break;
       case 'trashThenDraw': v += op.n * 1.2 - op.trash * 0.4; break;
+      case 'trashAnyNow': v += 0.5; break;
       case 'selfDiscard': v -= op.n * 0.3; break;
       case 'cannotKO': v += 1.2; break;
       case 'canAttackActive': v += 0.5; break;

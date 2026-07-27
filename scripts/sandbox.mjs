@@ -14,6 +14,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Game } from '../js/engine/game.js';
 import { abilitiesOf } from '../js/engine/effects.js';
+import { snap, checkOp, WRAPPERS } from './opcheck.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = join(ROOT, 'data', 'decks');
@@ -43,7 +44,10 @@ function autoCtrl(overrides = {}) {
     async chooseTarget(g, { candidateIds }) { return candidateIds[0] ?? null; },
     async chooseBlocker() { return null; },
     async counterStep() { return { discardIds: [], eventIds: [] }; },
-    async discardFromHand(g, n) { return (this.player?.hand ?? []).slice(0, n).map((c) => c.id); },
+    async discardFromHand(g, n, opts = {}) {
+      const pool = opts.fromIds ?? (this.player?.hand ?? []).map((c) => c.id);
+      return pool.slice(0, Math.max(opts.min ?? n, Math.min(n, 2)));
+    },
     async triggerDecision() { return true; },
     async payOptionalCost() { return true; },
     async chooseOption() { return 0; },
@@ -158,21 +162,38 @@ function satisfyCost(g, p, ab) {
   if (cost.revealHand) needHand(cost.revealHand.filter, cost.revealHand.n);
 }
 
-// Ejecuta un escenario comprobando que la habilidad realmente se despacha.
+// Ejecuta un escenario comprobando (1) que la habilidad se despacha y
+// (2) que CADA op produce el cambio de estado que promete (opcheck.mjs).
 async function runScenario(name, g, expectedOps, fn) {
   const before = g.logLines.length;
   g.opTrace = [];
+  const badOps = [];
+  let pending = null;
+  const flush = () => {
+    if (!pending) return;
+    const msg = checkOp(pending.op, pending.before, snap(g), g, pending.i, pending.srcId);
+    if (msg) badOps.push(msg);
+    pending = null;
+  };
+  g.opProbe = (op, ctx) => {
+    flush();
+    if (!op || WRAPPERS.has(op.op)) return;   // null = cierre de resolveOps
+    pending = { op, before: snap(g), i: g.players.indexOf(ctx.p), srcId: ctx.source?.id ?? null };
+  };
   try {
     await fn();
+    flush();
     const activity = g.logLines.length - before;
     if (expectedOps?.length && !expectedOps.some((o) => g.opTrace.includes(o))) {
       return { name, status: 'MISS', activity, lines: g.logLines.slice(before) };
     }
+    if (badOps.length) return { name, status: 'BADOP', error: badOps.join(' || ') };
     return { name, status: activity > 0 ? 'OK' : 'NOOP', activity };
   } catch (err) {
     return { name, status: 'ERR', error: err.message };
   } finally {
     g.opTrace = null;
+    g.opProbe = null;
   }
 }
 
@@ -443,7 +464,7 @@ async function testCard(entry) {
 
 // ---- bucle principal ------------------------------------------------------
 const ids = onlyIds.length ? onlyIds : [...catalog.keys()];
-const tally = { OK: 0, NOOP: 0, ERR: 0, MISS: 0, SKIP: 0 };
+const tally = { OK: 0, NOOP: 0, ERR: 0, MISS: 0, SKIP: 0, BADOP: 0 };
 const problems = [];
 const minors = [];
 for (const id of ids) {
@@ -460,12 +481,12 @@ for (const id of ids) {
   for (const r of results) {
     tally[r.status] = (tally[r.status] ?? 0) + 1;
     const line = `[${id}] ${entry.card.name} :: ${r.name}: ${r.status}${r.error ? ` (${r.error})` : ''}`;
-    if (r.status === 'ERR' || r.status === 'MISS') problems.push(line);
+    if (r.status === 'ERR' || r.status === 'MISS' || r.status === 'BADOP') problems.push(line);
     else if (r.status === 'NOOP' || r.status === 'SKIP') minors.push(line);
   }
 }
 
-console.log(`\nEscenarios → OK ${tally.OK} · MISS ${tally.MISS} · ERR ${tally.ERR} · NOOP ${tally.NOOP} · SKIP ${tally.SKIP}\n`);
+console.log(`\nEscenarios → OK ${tally.OK} · BADOP ${tally.BADOP} · MISS ${tally.MISS} · ERR ${tally.ERR} · NOOP ${tally.NOOP} · SKIP ${tally.SKIP}\n`);
 if (problems.length) {
   console.log('=== PROBLEMAS (ERR/MISS) ===');
   for (const p of problems) console.log(p);

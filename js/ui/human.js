@@ -178,11 +178,14 @@ export class HumanController {
     return res.type === 'card' ? res.id : null;
   }
 
-  async discardFromHand(game, n) {
+  async discardFromHand(game, n, opts = {}) {
+    const pool = opts.fromIds ?? this.player.hand.map((c) => c.id);
+    const min = opts.min ?? Math.min(n, pool.length);
     const chosen = await this.ui.chooseCards({
-      title: `Descarta ${n} carta(s)`,
-      cardIds: this.player.hand.map((c) => c.id),
-      max: n, min: Math.min(n, this.player.hand.length),
+      title: min === 0 ? `Descarta hasta ${n} carta(s) (opcional)` : `Descarta ${n} carta(s)`,
+      body: min === 0 ? 'Puedes confirmar sin seleccionar ninguna.' : '',
+      cardIds: pool,
+      max: n, min: Math.min(min, pool.length),
     });
     return chosen;
   }

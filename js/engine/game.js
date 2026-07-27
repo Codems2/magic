@@ -100,6 +100,7 @@ export class Game {
     if (f.colors && !f.colors.some((c) => (card.color ?? '').toLowerCase().includes(c))) return false;
     if (f.basePower && !cmp(card.data.power ?? 0, f.basePower)) return false;
     if (f.power && !cmp(card.data.power ?? 0, f.power)) return false;
+    if (f.baseCost && !cmp(card.data.cost ?? 0, f.baseCost)) return false;
     if (f.cost && !cmp(card.data.cost ?? 0, f.cost)) return false;
     return true;
   }
@@ -110,35 +111,99 @@ export class Game {
     return inScope && this.matchesFilterStatic(card, op.filter);
   }
 
+  // Multiplicador "for every N <cosa>" de un grant.
+  perFactor(per, p, ctx = {}) {
+    if (!per) return 1;
+    switch (per.kind) {
+      case 'trash': return Math.floor(p.trash.length / per.n);
+      case 'returned': return Math.floor((ctx.returnedNow ?? 0) / per.n);
+      case 'trashed': return Math.floor((ctx.trashedNow ?? 0) / per.n);
+      case 'restedDon': return Math.floor(p.donRested / per.n);
+      default: return 1;
+    }
+  }
+
+  // Recorre las habilidades estáticas de `holder` que aplican ahora mismo y
+  // llama a visit(op, holder, isSelf) por cada op, entrando en condicionales.
+  walkStatics(card, visit) {
+    const p = card.owner;
+    const runOps = (ops, holder, self) => {
+      for (const op of ops) {
+        if (op.op === 'ifCond') {
+          // Guarda de reentrada: una condición que consulte poder/coste de
+          // otras cartas no debe reevaluar estáticas en cadena sin fin.
+          if (this._inStaticCond) continue;
+          this._inStaticCond = true;
+          let ok = false;
+          try { ok = this.evalCond(op.cond, { p: holder.owner, source: holder }); }
+          finally { this._inStaticCond = false; }
+          if (ok) runOps(op.ops, holder, self);
+          continue;
+        }
+        visit(op, holder, self);
+      }
+    };
+    const walk = (holder, self) => {
+      for (const ab of holder.script?.abilities ?? []) {
+        if (ab.when !== 'static') continue;
+        if (ab.donX && holder.givenDon < ab.donX) continue;
+        if (ab.yourTurn && this.activePlayer !== holder.owner) continue;
+        if (ab.oppTurn && this.activePlayer === holder.owner) continue;
+        runOps(ab.ops, holder, self);
+      }
+    };
+    walk(card, true);
+    for (const other of p.board()) if (other !== card) walk(other, false);
+  }
+
   staticPowerFor(card) {
     let bonus = 0;
     const p = card.owner;
+    // Estáticas no-[static] propias (ligadas a DON!! xN con otro timing raro).
     for (const ab of card.script?.abilities ?? []) {
+      if (ab.when === 'static') continue;
       if (ab.donX && card.givenDon < ab.donX) continue;
-      if (ab.oppTurn && this.activePlayer === p) continue;
-      if (ab.yourTurn && this.activePlayer !== p) continue;
       for (const op of ab.ops) {
-        if (op.op === 'powerSelf' && ab.when === 'static') bonus += op.n;
-        else if (op.op === 'staticSelfPower' && p.characters.length >= (op.cond?.minChars ?? 0)) bonus += op.n;
+        if (op.op === 'staticSelfPower' && p.characters.length >= (op.cond?.minChars ?? 0)) bonus += op.n;
       }
     }
-    // Auras estáticas de cartas del mismo jugador: "si está girada +1000" y
-    // buffs de grupo ("all of your X gain +N power", "[Opponent's Turn] ...").
-    for (const other of p.board()) {
-      for (const ab of other.script?.abilities ?? []) {
-        if (ab.when !== 'static') continue;
-        if (ab.donX && other.givenDon < ab.donX) continue;
-        if (ab.yourTurn && this.activePlayer !== p) continue;
-        if (ab.oppTurn && this.activePlayer === p) continue;
-        for (const op of ab.ops) {
-          if (op.op === 'auraWhileRested' && other !== card && other.rested) bonus += op.n;
-          if (op.op === 'buff' && op.side === 'own' && this.buffInScope(op, card)) {
-            for (const ch of op.changes) if (ch.stat === 'power') bonus += ch.delta;
-          }
-        }
+    this.walkStatics(card, (op, holder, self) => {
+      if (self && op.op === 'powerSelf') bonus += op.n;
+      if (self && op.op === 'staticSelfPower' && p.characters.length >= (op.cond?.minChars ?? 0)) bonus += op.n;
+      if (self && op.op === 'selfGrant' && op.static) {
+        const f = this.perFactor(op.per, p);
+        for (const ch of op.changes) if (ch.stat === 'power') bonus += ch.delta * f;
       }
-    }
+      if (!self && op.op === 'auraWhileRested' && holder.rested) bonus += op.n;
+      if (!self && op.op === 'buff' && op.side === 'own' && this.buffInScope(op, card)) {
+        const f = this.perFactor(op.per, holder.owner);
+        for (const ch of op.changes) if (ch.stat === 'power') bonus += ch.delta * f;
+      }
+    });
     return bonus;
+  }
+
+  // Delta de COSTE por estáticas ("gain +1 cost", propias o de grupo).
+  staticCostFor(card) {
+    if (!['characters', 'leader', 'stage'].includes(card.zone)) return 0;
+    if (this._inStaticCost) return 0;   // corta ciclos coste→condición→coste
+    this._inStaticCost = true;
+    let delta = 0;
+    try {
+      this.walkStatics(card, (op, holder, self) => {
+        if (self && op.op === 'selfGrant' && op.static) {
+          const f = this.perFactor(op.per, holder.owner);
+          for (const ch of op.changes) if (ch.stat === 'cost') delta += ch.delta * f;
+        }
+        if (!self && op.op === 'buff' && op.side === 'own' && this.buffInScope(op, card)) {
+          const f = this.perFactor(op.per, holder.owner);
+          for (const ch of op.changes) if (ch.stat === 'cost') delta += ch.delta * f;
+        }
+      });
+    } finally {
+      this._inStaticCost = false;
+    }
+    return delta;
   }
 
   // ¿La carta cumple un filtro de objetivo (color/subtipo/nombre/poder/coste)?
@@ -151,6 +216,7 @@ export class Game {
     if (f.colors && !f.colors.some((c) => (card.color ?? '').toLowerCase().includes(c))) return false;
     if (f.basePower && !cmp(card.data.power ?? 0, f.basePower)) return false;
     if (f.power && !cmp(card.power(this), f.power)) return false;
+    if (f.baseCost && !cmp(card.data.cost ?? 0, f.baseCost)) return false;
     if (f.cost && !cmp(card.cost, f.cost)) return false;
     return true;
   }
@@ -195,25 +261,16 @@ export class Game {
   }
 
   staticKeyword(card, kw) {
-    for (const ab of card.script?.abilities ?? []) {
-      if (ab.when !== 'static') continue;
-      if (ab.donX && card.givenDon < ab.donX) continue;
-      if (ab.ops.some((op) => op.op === 'gainKeyword' && op.kw === kw)) return true;
-    }
-    // Auras de grupo estáticas que otorgan palabras clave.
-    const p = card.owner;
-    for (const other of p.board()) {
-      for (const ab of other.script?.abilities ?? []) {
-        if (ab.when !== 'static') continue;
-        if (ab.donX && other.givenDon < ab.donX) continue;
-        if (ab.yourTurn && this.activePlayer !== p) continue;
-        if (ab.oppTurn && this.activePlayer === p) continue;
-        for (const op of ab.ops) {
-          if (op.op === 'buff' && op.side === 'own' && (op.kws ?? []).some((k) => k.toLowerCase() === kw.toLowerCase()) && this.buffInScope(op, card)) return true;
-        }
-      }
-    }
-    return false;
+    let found = false;
+    const want = kw.toLowerCase();
+    this.walkStatics(card, (op, holder, self) => {
+      if (found) return;
+      if (self && op.op === 'gainKeyword' && op.kw.toLowerCase() === want) found = true;
+      if (self && op.op === 'selfGrant' && op.static && (op.kws ?? []).some((k) => k.toLowerCase() === want)) found = true;
+      if (!self && op.op === 'buff' && op.side === 'own' &&
+        (op.kws ?? []).some((k) => k.toLowerCase() === want) && this.buffInScope(op, card)) found = true;
+    });
+    return found;
   }
 
   // ¿Puede esta carta ser KO en este contexto? Consulta protecciones estáticas
@@ -268,6 +325,7 @@ export class Game {
 
   register(card) {
     this.cardsById.set(card.id, card);
+    card.game = this;   // backref: el coste efectivo consulta estáticas
     return card;
   }
   byId(id) { return this.cardsById.get(id) ?? null; }
@@ -445,7 +503,7 @@ export class Game {
 
   effectiveTrashHand(p, cost) { return cost?.trashHand ?? 0; }
 
-  async payAbilityCost(p, source, cost) {
+  async payAbilityCost(p, source, cost, ctx = {}) {
     if (!cost) return;
     if (cost.donRest) { p.donActive -= cost.donRest; p.donRested += cost.donRest; }
     if (cost.donReturn) {
@@ -505,8 +563,22 @@ export class Game {
       this.log(`${p.name} pone ${cost.trashToBottom} carta(s) del descarte al fondo del mazo.`);
     }
     if (cost.trashHandAny) {
-      // Descarta las que el jugador elija (0 o más) — se simplifica a ninguna
-      // salvo que el efecto lo requiera; el bot no descarta de más.
+      // "Trash any number of X cards": el jugador elige cuántas (incluso 0);
+      // el número descartado alimenta multiplicadores "for every card trashed".
+      const pool = p.hand.filter((c) => this.matchesFilter(c, cost.trashAnyFilter));
+      let trashed = 0;
+      if (pool.length) {
+        const ids = await p.controller.discardFromHand(this, pool.length, { min: 0, fromIds: pool.map((c) => c.id) });
+        for (const id of ids ?? []) {
+          const c = this.byId(id);
+          if (c && c.zone === 'hand' && c.owner === p && pool.includes(c)) {
+            this.trashFromHand(c);
+            trashed++;
+            this.log(`${p.name} descarta ${c.name} como coste.`);
+          }
+        }
+      }
+      ctx.trashedNow = trashed;
     }
     if (cost.trashHandFilter) {
       const cands = p.hand.filter((c) => this.matchesFilter(c, cost.trashHandFilter)).slice(0, cost.trashHand);
@@ -555,9 +627,10 @@ export class Game {
     p.hand.splice(p.hand.indexOf(card), 1);
     this.log(`${p.name} juega el evento ${card.name}.`);
     await this.narrate(p, { kind: 'event', card: card.name });
-    await this.payAbilityCost(p, card, main.cost);
+    const rctx = { source: card, p };
+    await this.payAbilityCost(p, card, main.cost, rctx);
     if (this.costReturnsDon(main.cost)) await this.fireOnBoard(p, 'onDonReturn');
-    await this.resolveOps(main.ops, { source: card, p });
+    await this.resolveOps(main.ops, rctx);
     card.zone = 'trash';
     p.trash.push(card);
   }
@@ -575,9 +648,10 @@ export class Game {
     card._activatedTurn = this.turn;
     this.log(`${p.name} activa ${card.name}.`);
     await this.narrate(p, { kind: 'ability', card: card.name });
-    await this.payAbilityCost(p, card, ab.cost);
+    const rctx = { source: card, p };
+    await this.payAbilityCost(p, card, ab.cost, rctx);
     if (this.costReturnsDon(ab.cost)) await this.fireOnBoard(p, 'onDonReturn');
-    await this.resolveOps(ab.ops, { source: card, p });
+    await this.resolveOps(ab.ops, rctx);
   }
 
   // Dispara un timing en todas las cartas del tablero de un jugador.
@@ -614,8 +688,12 @@ export class Game {
         if (!this.canPayAbilityCost(p, card, ab.cost)) continue;
         const wants = await p.controller.payOptionalCost(this, { cardId: card.id, when });
         if (!wants) continue;
-        await this.payAbilityCost(p, card, ab.cost);
+        const rctx = { source: card, p, ...ctx };
+        await this.payAbilityCost(p, card, ab.cost, rctx);
         if (this.costReturnsDon(ab.cost) && when !== 'onDonReturn') await this.fireOnBoard(p, 'onDonReturn');
+        (card._usedTurn ??= {})[when] = this.turn;
+        await this.resolveOps(ab.ops, rctx);
+        continue;
       }
       (card._usedTurn ??= {})[when] = this.turn;
       await this.resolveOps(ab.ops, { source: card, p, ...ctx });
@@ -627,10 +705,14 @@ export class Game {
   async resolveOps(ops, ctx) {
     const p = ctx.p;
     const opp = this.opponentOf(p);
+    try {
     for (const op of ops) {
       if (this.over) return;
       // Traza de depuración (sandbox): registra cada op que llega a ejecutarse.
       if (this.opTrace) this.opTrace.push(op.op);
+      // Sonda semántica del sandbox: verifica el efecto de la op anterior y
+      // captura el estado previo de la siguiente.
+      if (this.opProbe) this.opProbe(op, ctx);
       switch (op.op) {
         case 'giveRestedDon': {
           const give = Math.min(op.n, ctx.source.isLeader || true ? p.donRested : p.donRested);
@@ -670,7 +752,9 @@ export class Game {
         }
         case 'buff': {
           const expireTurn = op.dur === 'next' ? this.turn + 1 : this.turn;
+          const inBattle = op.dur === 'battle';
           const owner = op.side === 'opp' ? opp : p;
+          const factor = this.perFactor(op.per, p, ctx);
           const poolAll = () => {
             let arr;
             if (op.scope === 'leader') arr = [owner.leader];
@@ -678,15 +762,17 @@ export class Game {
             else arr = [...owner.characters];
             return arr.filter(Boolean).filter((c) => this.matchesFilter(c, op.filter));
           };
-          const label = (t) => {
-            const parts = op.changes.map((ch) => `${ch.delta >= 0 ? '+' : ''}${ch.delta} ${ch.stat === 'power' ? 'poder' : 'coste'}`);
+          const label = () => {
+            const parts = op.changes.filter(() => factor > 0)
+              .map((ch) => `${ch.delta * factor >= 0 ? '+' : ''}${ch.delta * factor} ${ch.stat === 'power' ? 'poder' : 'coste'}`);
             for (const kw of op.kws) parts.push(`[${kw}]`);
             return parts.join(' y ');
           };
           const apply = (t) => {
-            for (const ch of op.changes) t.addMod({ stat: ch.stat, delta: ch.delta, expireTurn });
-            for (const kw of op.kws) t.addMod({ stat: 'kw', kw, expireTurn });
-            this.log(`${t.name} recibe ${label(t)} (${t.power(this)}).`);
+            for (const ch of op.changes) if (factor > 0) t.addMod({ stat: ch.stat, delta: ch.delta * factor, expireTurn, battle: inBattle });
+            for (const kw of op.kws) t.addMod({ stat: 'kw', kw, expireTurn, battle: inBattle });
+            const lbl = label();
+            if (lbl) this.log(`${t.name} recibe ${lbl} (${t.power(this)}).`);
           };
           if (op.all) { poolAll().forEach(apply); break; }
           const chosen = new Set();
@@ -705,11 +791,17 @@ export class Game {
           break;
         }
         case 'selfGrant': {
+          if (op.static) break;   // las estáticas se evalúan en staticPowerFor/staticCostFor
           const expireTurn = op.dur === 'next' ? this.turn + 1 : this.turn;
+          const inBattle = op.dur === 'battle';
           const t = op.target === 'leader' ? p.leader : ctx.source;
-          for (const ch of op.changes) t.addMod({ stat: ch.stat, delta: ch.delta, expireTurn });
-          for (const kw of op.kws) t.addMod({ stat: 'kw', kw, expireTurn });
-          this.log(`${t.name} gana ${op.changes.map((c) => `${c.delta >= 0 ? '+' : ''}${c.delta} ${c.stat === 'power' ? 'poder' : 'coste'}`).concat(op.kws.map((k) => `[${k}]`)).join(' y ')} (${t.power(this)}).`);
+          const f = this.perFactor(op.per, p, ctx);
+          for (const ch of op.changes) if (f > 0) t.addMod({ stat: ch.stat, delta: ch.delta * f, expireTurn, battle: inBattle });
+          for (const kw of op.kws) t.addMod({ stat: 'kw', kw, expireTurn, battle: inBattle });
+          const parts = op.changes.filter(() => f > 0)
+            .map((c) => `${c.delta * f >= 0 ? '+' : ''}${c.delta * f} ${c.stat === 'power' ? 'poder' : 'coste'}`)
+            .concat(op.kws.map((k) => `[${k}]`));
+          if (parts.length) this.log(`${t.name} gana ${parts.join(' y ')} (${t.power(this)}).`);
           break;
         }
         case 'powerUp': {
@@ -840,6 +932,8 @@ export class Game {
             t.zone = 'hand'; p.hand.push(t);
             this.log(`↩ ${t.name} vuelve a tu mano.`);
           }
+          // Alimenta multiplicadores "for every returned Character".
+          ctx.returnedNow = (ctx.returnedNow ?? 0) + list.length;
           break;
         }
         case 'oppDiscard': {
@@ -899,6 +993,23 @@ export class Game {
           const ids = await p.controller.discardFromHand(this, op.trash);
           for (const id of ids.slice(0, op.trash)) { const c = this.byId(id); if (c && c.zone === 'hand' && c.owner === p) this.trashFromHand(c); }
           this.draw(p, op.n);
+          break;
+        }
+        case 'trashAnyNow': {
+          const pool = p.hand.filter((c) => this.matchesFilter(c, op.filter));
+          let trashed = 0;
+          if (pool.length) {
+            const ids = await p.controller.discardFromHand(this, pool.length, { min: 0, fromIds: pool.map((c) => c.id) });
+            for (const id of ids ?? []) {
+              const c = this.byId(id);
+              if (c && c.zone === 'hand' && c.owner === p && pool.includes(c)) {
+                this.trashFromHand(c);
+                trashed++;
+                this.log(`${p.name} descarta ${c.name}.`);
+              }
+            }
+          }
+          ctx.trashedNow = (ctx.trashedNow ?? 0) + trashed;
           break;
         }
         case 'ownChoose': {
@@ -1348,6 +1459,11 @@ export class Game {
         default: break;
       }
     }
+    } finally {
+      // Cierra la ventana de verificación de la última op de esta lista antes
+      // de que sigan otros eventos (daño, triggers, descarte del evento...).
+      if (this.opProbe) this.opProbe(null, ctx);
+    }
   }
 
   payDon(p, cost) {
@@ -1492,8 +1608,9 @@ export class Game {
       this.payDon(opp, c.cost);
       opp.hand.splice(opp.hand.indexOf(c), 1);
       this.log(`⚡ ${opp.name} juega el evento counter ${c.name}.`);
-      await this.payAbilityCost(opp, c, ab.cost);
-      await this.resolveOps(ab.ops, { source: c, p: opp, battle: { defenderId: target.id } });
+      const cctx = { source: c, p: opp, battle: { defenderId: target.id } };
+      await this.payAbilityCost(opp, c, ab.cost, cctx);
+      await this.resolveOps(ab.ops, cctx);
       c.zone = 'trash';
       opp.trash.push(c);
       if (this.over) return;
@@ -1539,6 +1656,12 @@ export class Game {
     }
     // El bono de counter dura solo esta batalla.
     if (target.zone !== 'trash') target.tempPower -= counterBonus;
+    // Los modificadores "durante esta batalla" expiran al terminar el combate.
+    for (const q of this.players) {
+      for (const c of [...q.board(), q.stage].filter(Boolean)) {
+        c.mods = c.mods.filter((m) => !m.battle);
+      }
+    }
     this.checkState();
   }
 
@@ -1593,8 +1716,9 @@ export class Game {
       if (wants) {
         this.log(`✨ ${defender.name} activa el [Trigger] de ${lifeCard.name}.`);
         lifeCard.zone = 'trigger';
-        await this.payAbilityCost(defender, lifeCard, trigAb.cost);
-        await this.resolveOps(trigAb.ops, { source: lifeCard, p: defender, toHandFallback: true });
+        const tctx = { source: lifeCard, p: defender, toHandFallback: true };
+        await this.payAbilityCost(defender, lifeCard, trigAb.cost, tctx);
+        await this.resolveOps(trigAb.ops, tctx);
         // Si el trigger no la puso en juego, va al descarte.
         if (lifeCard.zone === 'trigger') {
           lifeCard.zone = 'trash';
