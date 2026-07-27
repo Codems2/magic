@@ -157,17 +157,64 @@ async function main() {
   };
 }
 
+// Sala de espera: overlay con el código EN GRANDE hasta que entra el rival.
+function showLobbyWait({ connecting = false, code = null, seat = 0, onCancel }) {
+  const ov = $('overlay');
+  ov.classList.remove('hidden');
+  ov.innerHTML = '';
+  const dlg = document.createElement('div');
+  dlg.className = 'dialog';
+  if (connecting) {
+    dlg.innerHTML = '<h2>🌐 Conectando…</h2><p>Contactando con el servidor.</p>';
+  } else if (code) {
+    dlg.innerHTML = `
+      <h2>⚓ Sala creada</h2>
+      <p>Comparte este código con tu rival:</p>
+      <div class="roomCode" id="roomCode">${code}</div>
+      <p class="waitDots">Esperando a que se una tu rival…</p>`;
+    const copy = document.createElement('button');
+    copy.className = 'primary';
+    copy.textContent = '📋 Copiar código';
+    copy.onclick = () => {
+      navigator.clipboard?.writeText(code).catch(() => {});
+      copy.textContent = '✓ Copiado';
+      setTimeout(() => { copy.textContent = '📋 Copiar código'; }, 1500);
+    };
+    dlg.appendChild(copy);
+  }
+  const cancel = document.createElement('button');
+  cancel.textContent = 'Cancelar';
+  cancel.onclick = () => { onCancel?.(); location.reload(); };
+  dlg.appendChild(cancel);
+  ov.appendChild(dlg);
+}
+
 // Partida online: la UI de siempre, pero el estado llega del servidor.
 function startOnline({ url, mode, code, name, deckSlug }) {
-  $('setup').classList.add('hidden');
-  $('game').classList.remove('hidden');
-
   const ui = new UI(ctrl);
   const human = new HumanController(ui);
+  let started = false;
+
+  showLobbyWait({ connecting: true, onCancel: () => conn?.close?.() });
 
   const conn = connectOnline({
     url, mode, code, name, deckSlug, human, ui,
+    onCode: (roomCode, seat) => {
+      // El que crea la sala ve el código y espera; el que se une, "conectando".
+      if (mode === 'create') showLobbyWait({ code: roomCode, seat, onCancel: () => conn.close() });
+      else showLobbyWait({ connecting: true, onCancel: () => conn.close() });
+    },
     onStatus: (msg) => ui.logLine(`🌐 ${msg}`),
+    onFirstView: () => {
+      // Rival dentro: cerramos la sala de espera y mostramos el tablero.
+      if (started) return;
+      started = true;
+      $('overlay').classList.add('hidden');
+      $('overlay').innerHTML = '';
+      $('setup').classList.add('hidden');
+      $('game').classList.remove('hidden');
+      ui.render();
+    },
     onEnd: async (m, mySeat) => {
       const won = m.winnerSeat === mySeat;
       await ui.dialog({
@@ -178,14 +225,11 @@ function startOnline({ url, mode, code, name, deckSlug }) {
       location.reload();
     },
     onError: (msg) => {
-      ui.logLine(`(!) ${msg}`);
-      ui.dialog({ title: 'Error de conexión', body: msg, buttons: [{ label: 'Volver', value: true, primary: true }] })
-        .then(() => location.reload());
+      $('overlay').classList.add('hidden'); $('overlay').innerHTML = '';
+      $('onStatus').textContent = `⚠ ${msg}`;
     },
   });
   ui.bind(conn.cg, human);
-  ui.logLine('🌐 Conectando…');
-  ui.render();
 }
 
 // Catálogo global de cartas únicas (para el buscador del sandbox).

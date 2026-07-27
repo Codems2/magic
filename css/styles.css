@@ -357,6 +357,15 @@ button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
 #onAdv { flex-basis: 100%; color: var(--dim); font-size: .85rem; }
 #onAdv input { width: min(340px, 90vw); margin-top: 6px; }
 #onStatus { flex-basis: 100%; color: var(--gold); font-weight: 700; min-height: 22px; }
+.roomCode {
+  font-family: 'Pirata One', cursive; font-size: 3.6rem; letter-spacing: 10px;
+  color: var(--gold); background: rgba(0,0,0,.35); border: 2px dashed var(--gold-d);
+  border-radius: 12px; padding: 10px 8px 6px 18px; margin: 10px auto; display: inline-block;
+  text-shadow: 0 2px 0 var(--red-d), 0 3px 12px rgba(0,0,0,.6);
+}
+.waitDots { color: var(--dim); }
+.waitDots::after { content: ''; animation: dots 1.4s steps(4,end) infinite; }
+@keyframes dots { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} }
 @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 .card.hand-card.selectable { animation: none; }
 

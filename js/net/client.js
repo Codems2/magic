@@ -4,13 +4,14 @@
 import { ClientGame } from './clientGame.js';
 import { makeSeat } from './seat.js';
 
-export function connectOnline({ url, mode, code = '', name, deckSlug, human, ui, onStatus, onEnd, onError }) {
+export function connectOnline({ url, mode, code = '', name, deckSlug, human, ui, onStatus, onCode, onFirstView, onEnd, onError }) {
   const cg = new ClientGame();
   const ws = new WebSocket(url);
   const send = (obj) => { if (ws.readyState === 1) ws.send(JSON.stringify(obj)); };
   const seat = makeSeat(human, send, cg);
   let myToken = sessionStorage.getItem('opToken') ?? null;
   let helloSeat = null;
+  let firstView = false;
 
   ws.onopen = () => {
     if (mode === 'rejoin' && myToken) send({ t: 'rejoin', token: myToken });
@@ -28,7 +29,7 @@ export function connectOnline({ url, mode, code = '', name, deckSlug, human, ui,
         helloSeat = m.seat;
         myToken = m.token;
         sessionStorage.setItem('opToken', m.token);
-        onStatus?.(`Sala ${m.code} · eres el jugador ${m.seat + 1}`, m.code);
+        onCode?.(m.code, m.seat);
         break;
       case 'status':
         onStatus?.(m.msg);
@@ -36,6 +37,7 @@ export function connectOnline({ url, mode, code = '', name, deckSlug, human, ui,
       case 'view':
         cg.update(m.view);
         human.player = cg.players[m.view.youIdx];
+        if (!firstView) { firstView = true; onFirstView?.(); }
         ui.render();
         break;
       case 'ask':
