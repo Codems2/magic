@@ -11,6 +11,69 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Control de ritmo compartido entre el bot y la UI (lo cambia el selector).
 const ctrl = { speed: 1 };
 
+// ---- tapetes (persistentes en localStorage) --------------------------------
+const MATS = [
+  { id: 'altamar', name: '🌊 Alta mar' },
+  { id: 'madera', name: '🪵 Cubierta' },
+  { id: 'wanted', name: '📜 Se busca' },
+  { id: 'marina', name: '⚓ Marina' },
+  { id: 'grandline', name: '🌅 Grand Line' },
+  { id: 'custom', name: '🖼 Tu imagen' },
+];
+
+function applyMat() {
+  const mat = localStorage.getItem('opMat') ?? 'altamar';
+  const url = localStorage.getItem('opMatUrl') ?? '';
+  if (mat === 'altamar') delete document.body.dataset.mat;
+  else document.body.dataset.mat = mat;
+  document.body.style.setProperty('--matimg', url ? `url("${url}")` : 'none');
+}
+
+function openMatPicker() {
+  document.getElementById('matModal')?.remove();
+  const modal = document.createElement('div');
+  modal.id = 'matModal';
+  const dlg = document.createElement('div');
+  dlg.className = 'dialog';
+  dlg.innerHTML = '<h2>🎨 Elige tu tapete</h2><p>Se guarda en este navegador.</p>';
+  const grid = document.createElement('div');
+  grid.className = 'matGrid';
+  const current = localStorage.getItem('opMat') ?? 'altamar';
+  for (const m of MATS) {
+    const sw = document.createElement('div');
+    sw.className = 'matSwatch' + (m.id === current ? ' on' : '');
+    sw.dataset.mat = m.id;
+    sw.innerHTML = `<span>${m.name}</span>`;
+    sw.onclick = () => {
+      localStorage.setItem('opMat', m.id);
+      grid.querySelectorAll('.matSwatch').forEach((x) => x.classList.toggle('on', x === sw));
+      urlBox.classList.toggle('hidden', m.id !== 'custom');
+      applyMat();
+    };
+    grid.appendChild(sw);
+  }
+  dlg.appendChild(grid);
+  // Imagen propia: pega la URL de cualquier imagen que quieras usar de fondo.
+  const urlBox = document.createElement('div');
+  urlBox.classList.toggle('hidden', current !== 'custom');
+  urlBox.innerHTML = '<p style="margin:0">Pega la URL de una imagen (tuya o de donde quieras):</p>';
+  const input = document.createElement('input');
+  input.id = 'matUrl';
+  input.type = 'url';
+  input.placeholder = 'https://…/mi-tapete.jpg';
+  input.value = localStorage.getItem('opMatUrl') ?? '';
+  input.oninput = () => { localStorage.setItem('opMatUrl', input.value.trim()); applyMat(); };
+  urlBox.appendChild(input);
+  dlg.appendChild(urlBox);
+  const close = document.createElement('button');
+  close.textContent = 'Listo';
+  close.onclick = () => modal.remove();
+  dlg.appendChild(close);
+  modal.appendChild(dlg);
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  document.body.appendChild(modal);
+}
+
 // Bot con pausas escaladas por el selector de velocidad.
 function watchableBot() {
   const bot = new BotController('Bot');
@@ -26,6 +89,9 @@ function watchableBot() {
 const noCache = { cache: 'no-cache' };
 
 async function main() {
+  applyMat();
+  document.getElementById('matBtnSetup').onclick = openMatPicker;
+  document.getElementById('matBtn').onclick = openMatPicker;
   const index = await (await fetch('data/decks/index.json', noCache)).json();
   const decks = {};
   await Promise.all(index.map(async (d) => {

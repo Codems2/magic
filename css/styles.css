@@ -26,6 +26,68 @@ body {
 }
 .hidden { display: none !important; }
 
+/* ---- tapetes (temas de fondo, elegibles y persistentes) ---- */
+body[data-mat="madera"] {
+  background:
+    linear-gradient(rgba(10,6,2,.30), rgba(6,3,1,.55)),
+    repeating-linear-gradient(90deg, #5a3b1e 0 90px, #4c3016 90px 96px, #63431f 96px 180px, #3f2a12 180px 186px),
+    linear-gradient(180deg, #4a2f14, #2c1b09);
+}
+body[data-mat="wanted"] {
+  background:
+    radial-gradient(1200px 700px at 50% 18%, rgba(140,100,38,.42), transparent 70%),
+    repeating-linear-gradient(0deg, rgba(0,0,0,.14) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, #66502a, #46340f 65%, #2e2008);
+}
+body[data-mat="marina"] {
+  background:
+    radial-gradient(1000px 520px at 50% -10%, #274f86 0%, transparent 60%),
+    repeating-linear-gradient(135deg, rgba(255,255,255,.05) 0 26px, transparent 26px 52px),
+    linear-gradient(180deg, #0a1c3a, #081430 60%, #050d22);
+}
+body[data-mat="grandline"] {
+  background:
+    radial-gradient(1100px 600px at 50% -10%, rgba(179,83,43,.42), transparent 62%),
+    radial-gradient(700px 400px at 15% 105%, rgba(120,40,110,.35), transparent 60%),
+    linear-gradient(180deg, #3b1c3f, #23163b 45%, #0c1030);
+}
+body[data-mat="custom"] {
+  background:
+    linear-gradient(rgba(5,13,24,.72), rgba(4,10,19,.84)),
+    var(--matimg, none) center / cover fixed no-repeat,
+    #05121f;
+}
+
+/* Selector de tapete */
+#matModal {
+  position: fixed; inset: 0; background: rgba(4,10,18,.84); z-index: 300;
+  display: flex; align-items: center; justify-content: center; padding: 14px;
+}
+.matGrid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 14px 0; }
+.matSwatch {
+  width: 130px; height: 84px; border-radius: 12px; cursor: pointer;
+  border: 2px solid #2b567a; position: relative; overflow: hidden;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.matSwatch:hover { border-color: var(--gold-d); }
+.matSwatch.on { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold); }
+.matSwatch span {
+  width: 100%; padding: 3px 0; font-size: .74rem; font-weight: 700; text-align: center;
+  background: rgba(4,10,18,.72); color: var(--ink);
+}
+#matUrl {
+  width: 100%; box-sizing: border-box; margin-top: 8px; padding: 8px 10px;
+  border-radius: 8px; border: 1px solid var(--gold-d);
+  background: rgba(0,0,0,.35); color: inherit; font: inherit; font-size: .85rem;
+}
+/* miniaturas de cada tema */
+.matSwatch[data-mat="altamar"] { background: radial-gradient(90px 46px at 50% -6%, #12395c, transparent 65%), linear-gradient(180deg, #061626, #071a2e 60%, #05121f); }
+.matSwatch[data-mat="madera"] { background: repeating-linear-gradient(90deg, #5a3b1e 0 22px, #4c3016 22px 24px, #63431f 24px 46px, #3f2a12 46px 48px); }
+.matSwatch[data-mat="wanted"] { background: radial-gradient(120px 70px at 50% 18%, rgba(140,100,38,.5), transparent 70%), linear-gradient(180deg, #66502a, #46340f 65%, #2e2008); }
+.matSwatch[data-mat="marina"] { background: repeating-linear-gradient(135deg, rgba(255,255,255,.07) 0 10px, transparent 10px 20px), linear-gradient(180deg, #0a1c3a, #081430 60%, #050d22); }
+.matSwatch[data-mat="grandline"] { background: radial-gradient(110px 60px at 50% -8%, rgba(179,83,43,.5), transparent 62%), linear-gradient(180deg, #3b1c3f, #23163b 45%, #0c1030); }
+.matSwatch[data-mat="custom"] { background: linear-gradient(135deg, #123, #345), repeating-linear-gradient(45deg, rgba(255,255,255,.08) 0 8px, transparent 8px 16px); }
+
 /* ---- pantalla de configuración ---- */
 #setup { max-width: 1040px; margin: 0 auto; padding: 40px 18px 60px; text-align: center; }
 #setup h1 {
@@ -64,9 +126,10 @@ button.primary:hover:not(:disabled) { transform: translateY(-2px); }
 button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
 
 /* ---- partida ---- */
-#game { display: flex; flex-direction: column; height: 100vh; }
+#game { display: flex; flex-direction: column; min-height: 100vh; }
 #topbar {
   display: flex; align-items: center; gap: 12px; padding: 8px 14px; min-height: 50px; z-index: 20;
+  position: sticky; top: 0;
   background: linear-gradient(180deg, #0c2a45, #0a2035);
   border-bottom: 2px solid var(--gold-d);
 }
@@ -99,7 +162,10 @@ button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
 #banner .bText b { color: var(--gold); }
 #banner .bWho { color: var(--red); font-weight: 800; font-family: 'Cinzel', serif; }
 
-#table { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+#table {
+  flex: 1; display: flex; flex-direction: column; overflow: visible;
+  width: 100%; max-width: 1340px; margin: 0 auto;   /* centrado en pantalla grande */
+}
 .side { padding: 6px 12px; }
 #oppArea { background: linear-gradient(180deg, rgba(183,31,44,.12), transparent 70%); }
 #selfArea { background: linear-gradient(0deg, rgba(31,122,140,.14), transparent 70%); }
@@ -116,10 +182,12 @@ button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
   content: '☠ LÍNEA DE BATALLA ☠'; font-family: 'Cinzel', serif;
   color: #241a02; font-size: .72rem; font-weight: 800; letter-spacing: 3px;
 }
+/* En escritorio el historial vive DEBAJO de la mano (no tapa al rival). */
 #log {
-  position: fixed; right: 10px; top: 58px; width: 268px; max-height: 42vh; z-index: 30;
+  width: calc(100% - 20px); max-width: 1340px; margin: 6px auto 10px;
+  flex: 0 0 auto; max-height: 15vh; min-height: 56px;
   background: rgba(9,26,42,.95); border: 1px solid var(--gold-d); border-radius: 12px;
-  padding: 9px 10px; overflow-y: auto; font-size: .78rem; color: #cdd8e6; line-height: 1.45;
+  padding: 9px 12px; overflow-y: auto; font-size: .78rem; color: #cdd8e6; line-height: 1.45;
   box-shadow: 0 8px 26px rgba(0,0,0,.5);
 }
 #log .trn { color: var(--gold); font-weight: 700; }
@@ -295,6 +363,7 @@ button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
 
 #hand {
   display: flex; gap: 6px; padding: 9px 12px 13px; overflow-x: auto; min-height: 154px;
+  justify-content: safe center;   /* mano centrada; con muchas cartas, scroll */
   background: linear-gradient(180deg, rgba(15,49,79,.6), rgba(7,20,34,.9));
   border-top: 2px solid var(--gold-d);
 }
