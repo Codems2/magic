@@ -198,9 +198,12 @@ button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
 .matCenter { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
 .mat.opp .matCenter { flex-direction: column-reverse; }
 
-.leaderRow { display: flex; align-items: center; gap: 8px; }
+/* Líder + escenario centrados; la identidad del jugador va anclada a la
+   derecha (posición absoluta) para no descentrar el grupo. */
+.leaderRow { display: flex; align-items: center; gap: 8px; justify-content: center; position: relative; }
 .nameBar {
-  display: flex; align-items: center; gap: 8px; font-size: .9rem; color: var(--dim); margin-left: auto;
+  display: flex; align-items: center; gap: 8px; font-size: .9rem; color: var(--dim);
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
   font-family: 'Cinzel', serif;
 }
 .nameBar b { color: var(--ink); font-size: 1rem; }
@@ -216,10 +219,10 @@ button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
   content: attr(data-label); position: absolute; top: 3px; left: 9px; white-space: nowrap;
   font-size: .56rem; letter-spacing: .06em; color: var(--gold-d); text-transform: uppercase; font-weight: 700;
 }
-.charZone { justify-content: flex-start; overflow-x: auto; min-height: 110px; }
+.charZone { justify-content: safe center; overflow-x: auto; min-height: 110px; }
 .leaderZone, .stageZone { justify-content: center; flex: 0 0 auto; min-height: 110px; }
 .leaderZone { border-color: rgba(230,57,70,.4); }
-.costZone { flex-wrap: wrap; gap: 4px; min-height: 56px; align-content: flex-start; border-color: rgba(31,122,140,.4); }
+.costZone { flex-wrap: wrap; gap: 4px; min-height: 56px; justify-content: center; align-content: center; border-color: rgba(31,122,140,.4); }
 
 .slot {
   width: 62px; height: 88px; border: 1px dashed rgba(157,180,207,.22); border-radius: 7px;
@@ -409,8 +412,12 @@ button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
   #table { overflow-y: auto; }
   #oppArea, #selfArea { overflow-x: auto; }
   .mat { gap: 6px; }
-  .nameBar { font-size: .76rem; gap: 5px; }
+  /* En móvil la fila casi llena el ancho: identidad en flujo normal. */
+  .leaderRow { justify-content: flex-start; }
+  .nameBar { position: static; transform: none; margin-left: auto; font-size: .76rem; gap: 5px; }
   .nameBar b { font-size: .85rem; }
+  .charZone { justify-content: flex-start; }
+  .costZone { justify-content: flex-start; }
   .charZone, .leaderZone, .stageZone { min-height: 84px; }
   .card { width: 54px; height: 76px; }
   .card.hand-card { width: 80px; height: 112px; }
