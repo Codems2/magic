@@ -2,6 +2,10 @@
 
 const $ = (id) => document.getElementById(id);
 const failedImages = new Set();
+// Arte oficial de la carta DON!! (TCGCSV/tcgplayer, producto 672598). Si no
+// carga, el CSS de .donTok (estallido dorado) queda como respaldo.
+const DON_IMG = 'assets/don.jpg';
+let donImgFailed = false;
 const IS_TOUCH = window.matchMedia?.('(hover: none)').matches ?? false;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -240,6 +244,12 @@ export class UI {
       const tok = document.createElement('div');
       tok.className = 'donTok' + (i >= p.donActive ? ' rested' : '');
       tok.textContent = 'DON';
+      if (!donImgFailed) {
+        const im = document.createElement('img');
+        im.src = DON_IMG; im.alt = 'DON!!'; im.loading = 'lazy';
+        im.onerror = () => { donImgFailed = true; im.remove(); };
+        tok.appendChild(im);
+      }
       cost.appendChild(tok);
     }
     if (totalDon === 0) cost.appendChild(this.slotEl('sin DON!!'));
@@ -292,6 +302,9 @@ export class UI {
     if (area) d.style.gridArea = area;
     if (kind === 'trash' && topCard?.data.image && !failedImages.has(topCard.data.image)) {
       d.innerHTML = `<img src="${topCard.data.image}" alt="descarte">`;
+    }
+    if (kind === 'don' && !donImgFailed) {
+      d.innerHTML = `<img src="${DON_IMG}" alt="DON!!" loading="lazy" onerror="this.remove()">`;
     }
     d.innerHTML += `<span class="pileCount">${count}</span><span class="pileLabel">${label}</span>`;
     if (kind === 'trash' && topCard) {

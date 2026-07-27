@@ -260,6 +260,8 @@ button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
   text-shadow: 0 1px 0 rgba(255,255,255,.5);
 }
 .donTok.rested { transform: rotate(90deg); filter: brightness(.72) saturate(.7); }
+/* Arte oficial de la carta DON!! sobre el respaldo CSS. */
+.donTok img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 2; }
 
 /* ---- pilas laterales (reverso de carta pirata) ---- */
 .pile {
