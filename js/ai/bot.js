@@ -65,6 +65,13 @@ export class BotController {
     return true;
   }
 
+  async chooseRevealed(game, { pickableIds, min = 0, max = 1 }) {
+    // Coge las mejores cartas elegibles (por valor de mano).
+    const cards = pickableIds.map((id) => game.byId(id)).filter(Boolean)
+      .sort((a, b) => this.handValue(b) - this.handValue(a));
+    return cards.slice(0, Math.max(min, Math.min(max, cards.length))).map((c) => c.id);
+  }
+
   async chooseOption(game, { options }) {
     // El rival elige el mal menor: la opción de menor valor para el que la lanza.
     // Aproximación: preferir "añadir a tu Vida" (menos malo) sobre "descartar Vida".

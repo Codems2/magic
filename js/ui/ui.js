@@ -115,7 +115,7 @@ export class UI {
   }
 
   // Diálogo de selección múltiple de cartas (mulligan-descartes-counters).
-  chooseCards({ title, body = '', cardIds, max = 99, min = 0, confirmLabel = 'Confirmar', extra = null }) {
+  chooseCards({ title, body = '', cardIds, selectableIds = null, max = 99, min = 0, confirmLabel = 'Confirmar', extra = null }) {
     return new Promise((resolve) => {
       const ov = $('overlay');
       ov.classList.remove('hidden');
@@ -127,16 +127,21 @@ export class UI {
       dlg.appendChild(info);
       const wrap = document.createElement('div');
       wrap.className = 'cards';
+      const canPick = selectableIds ? new Set(selectableIds) : null;
       const chosen = new Set();
       const update = () => { if (extra) info.textContent = extra(chosen); };
       for (const id of cardIds) {
         const el = this.cardEl(this.game.byId(id), {});
-        el.classList.add('selectable');
-        el.onclick = () => {
-          if (chosen.has(id)) { chosen.delete(id); el.classList.remove('selected'); }
-          else if (chosen.size < max) { chosen.add(id); el.classList.add('selected'); }
-          update();
-        };
+        if (canPick && !canPick.has(id)) {
+          el.classList.add('notSelectable');   // visible pero no elegible
+        } else {
+          el.classList.add('selectable');
+          el.onclick = () => {
+            if (chosen.has(id)) { chosen.delete(id); el.classList.remove('selected'); }
+            else if (chosen.size < max) { chosen.add(id); el.classList.add('selected'); }
+            update();
+          };
+        }
         wrap.appendChild(el);
       }
       update();

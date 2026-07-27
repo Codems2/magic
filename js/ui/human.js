@@ -182,6 +182,20 @@ export class HumanController {
     });
   }
 
+  // Miras N cartas reveladas y eliges hasta `max` de entre las elegibles;
+  // las no elegibles se ven pero no se pueden seleccionar (como en el juego real).
+  async chooseRevealed(game, { revealedIds, pickableIds, min = 0, max = 1, prompt = '' }) {
+    return this.ui.chooseCards({
+      title: 'Miras la cima de tu mazo',
+      body: prompt,
+      cardIds: revealedIds,
+      selectableIds: pickableIds,
+      min: Math.min(min, pickableIds.length),
+      max,
+      confirmLabel: pickableIds.length ? 'Añadir a la mano' : 'Entendido',
+    });
+  }
+
   async chooseOption(game, { prompt, options }) {
     return this.ui.dialog({
       title: 'Elige una opción',

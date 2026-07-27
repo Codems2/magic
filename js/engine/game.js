@@ -919,6 +919,7 @@ export class Game {
         }
         case 'tutorTop': {
           const seen = p.library.splice(0, Math.min(op.n, p.library.length));
+          if (!seen.length) break;
           const f = op.filter ?? (op.type ? { types: [op.type] } : {});
           const matches = (c) => {
             if (f.names && !f.names.some((nm) => c.name.toLowerCase().includes(nm.toLowerCase()))) return false;
@@ -928,17 +929,26 @@ export class Game {
             if (f.maxCost !== undefined && c.cost > f.maxCost) return false;
             return true;
           };
-          const hit = seen.find(matches);
-          if (hit) {
-            seen.splice(seen.indexOf(hit), 1);
-            hit.zone = 'hand';
-            p.hand.push(hit);
-            this.log(`${p.name} revela ${hit.name} y lo añade a su mano.`);
-          } else {
-            this.log(`${p.name} no encuentra nada al mirar ${seen.length} carta(s).`);
+          const pickable = seen.filter(matches);
+          this.log(`${p.name} mira ${seen.length} carta(s): ${seen.map((c) => c.name).join(', ')}.`);
+          // El jugador ve TODAS las reveladas y elige 1 de entre las que cumplen.
+          const chosenIds = await p.controller.chooseRevealed(this, {
+            revealedIds: seen.map((c) => c.id),
+            pickableIds: pickable.map((c) => c.id),
+            min: 0, max: op.take ?? 1,
+            prompt: pickable.length
+              ? `Añade hasta ${op.take ?? 1} a tu mano; el resto irá al fondo del mazo.`
+              : 'Ninguna cumple los requisitos; todas irán al fondo del mazo.',
+          });
+          const chosen = (chosenIds ?? []).map((id) => this.byId(id)).filter((c) => c && seen.includes(c) && pickable.includes(c));
+          for (const c of chosen) {
+            seen.splice(seen.indexOf(c), 1);
+            c.zone = 'hand'; p.hand.push(c);
+            this.log(`${p.name} añade ${c.name} a su mano.`);
           }
-          this.shuffle(seen);
-          p.library.push(...seen);
+          if (!chosen.length) this.log(`${p.name} no añade ninguna carta.`);
+          // El resto va al fondo del mazo (en el orden revelado).
+          for (const c of seen) { c.zone = 'deck'; p.library.push(c); }
           break;
         }
         case 'powerDown': {
