@@ -89,6 +89,8 @@ export class HumanController {
   }
 
   canActivate(game, card) {
+    // Online: el servidor ya calculó si la habilidad es usable ahora mismo.
+    if (card._srvCanActivate !== undefined) return !!card._srvCanActivate;
     const ab = abilitiesOf(card, 'activateMain')[0];
     if (!ab) return false;
     if (ab.once && card._activatedTurn === game.turn) return false;

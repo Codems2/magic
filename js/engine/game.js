@@ -337,7 +337,12 @@ export class Game {
 
   // Narración estructurada de una jugada (la UI decide si mostrar cartel).
   async narrate(player, ev) {
-    if (this.onNarrate) await this.onNarrate({ actor: player.name, isBot: player.isBot, ...ev });
+    if (this.onNarrate) {
+      await this.onNarrate({
+        actor: player.name, isBot: player.isBot,
+        actorIdx: this.players.indexOf(player), ...ev,
+      });
+    }
   }
 
   // Descripción legible de una lista de ops (para modales de elección).

@@ -1,0 +1,13 @@
+{
+  "name": "optcg-sim-server",
+  "private": true,
+  "type": "module",
+  "description": "Servidor autoritativo de salas para el simulador de One Piece TCG",
+  "main": "index.mjs",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

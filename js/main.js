@@ -4,6 +4,7 @@ import { Game } from './engine/game.js';
 import { BotController } from './ai/bot.js';
 import { UI } from './ui/ui.js';
 import { HumanController } from './ui/human.js';
+import { connectOnline } from './net/client.js';
 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -129,6 +130,62 @@ async function main() {
     decks[botSlug ?? 'st-02'],
     { sandbox: true, decks, index },
   );
+
+  // --- lobby online ---
+  const nameBox = $('onName');
+  const serverBox = $('onServer');
+  nameBox.value = localStorage.getItem('opName') ?? '';
+  serverBox.value = localStorage.getItem('opServer') ?? '';
+  nameBox.oninput = () => localStorage.setItem('opName', nameBox.value.trim());
+  serverBox.oninput = () => localStorage.setItem('opServer', serverBox.value.trim());
+  const serverUrl = () => serverBox.value.trim() ||
+    (location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? 'ws://localhost:8765' : '');
+  const startNet = (mode) => {
+    const url = serverUrl();
+    if (!url) { $('onStatus').textContent = 'Configura la URL del servidor (desplegable "Servidor").'; return; }
+    startOnline({
+      url, mode,
+      code: $('onCode').value.trim().toUpperCase(),
+      name: nameBox.value.trim() || 'Pirata',
+      deckSlug: mySlug ?? 'st-01',
+    });
+  };
+  $('onCreate').onclick = () => startNet('create');
+  $('onJoin').onclick = () => {
+    if ($('onCode').value.trim().length !== 4) { $('onStatus').textContent = 'El código tiene 4 letras.'; return; }
+    startNet('join');
+  };
+}
+
+// Partida online: la UI de siempre, pero el estado llega del servidor.
+function startOnline({ url, mode, code, name, deckSlug }) {
+  $('setup').classList.add('hidden');
+  $('game').classList.remove('hidden');
+
+  const ui = new UI(ctrl);
+  const human = new HumanController(ui);
+
+  const conn = connectOnline({
+    url, mode, code, name, deckSlug, human, ui,
+    onStatus: (msg) => ui.logLine(`🌐 ${msg}`),
+    onEnd: async (m, mySeat) => {
+      const won = m.winnerSeat === mySeat;
+      await ui.dialog({
+        title: won ? '🏆 ¡Victoria!' : '☠ Derrota',
+        body: m.reason || '',
+        buttons: [{ label: 'Volver al puerto', value: true, primary: true }],
+      });
+      location.reload();
+    },
+    onError: (msg) => {
+      ui.logLine(`(!) ${msg}`);
+      ui.dialog({ title: 'Error de conexión', body: msg, buttons: [{ label: 'Volver', value: true, primary: true }] })
+        .then(() => location.reload());
+    },
+  });
+  ui.bind(conn.cg, human);
+  ui.logLine('🌐 Conectando…');
+  ui.render();
 }
 
 // Catálogo global de cartas únicas (para el buscador del sandbox).

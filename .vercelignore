@@ -1,0 +1,5 @@
+# El servidor de salas NO forma parte del estático de Vercel
+# (se despliega aparte, en un host con procesos persistentes).
+server/node_modules
+server
+scripts

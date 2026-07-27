@@ -35,9 +35,11 @@ export class UI {
     }
   }
 
-  // Cartel grande y legible con lo que hace el rival (el bot).
+  // Cartel grande y legible con lo que hace el rival (bot o humano remoto).
   async banner(ev) {
-    if (!ev.isBot) return; // solo narramos las jugadas del rival
+    const remoteRival = typeof ev.actorIdx === 'number' &&
+      this.game?.youIdx !== undefined && ev.actorIdx !== this.game.youIdx;
+    if (!ev.isBot && !remoteRival) return; // solo narramos las jugadas del rival
     const me = this.human?.player;
     const ICON = { play: '🃏', event: '🎴', ability: '✨', don: '🔶', attack: '⚔️' };
     let text;
@@ -170,6 +172,7 @@ export class UI {
     const g = this.game;
     if (!g) return;
     const me = this.human.player;
+    if (!me || !me.leader) return;   // online: aún sin primera vista
     const opp = g.opponentOf(me);
     const PH = { setup: 'Preparación', refresh: 'Refresh', draw: 'Robo', don: 'DON!!', main: 'Principal', end: 'Final' };
     $('turnInfo').textContent = `Turno ${g.turn} · ${g.activePlayer?.name ?? ''} · ${PH[g.phase] ?? g.phase}`;

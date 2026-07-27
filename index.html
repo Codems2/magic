@@ -21,6 +21,20 @@
     <button id="startBtn" class="primary" disabled>¡Zarpar!</button>
     <button id="sandboxBtn" title="Modo pruebas: rival pasivo, DON!! de sobra y cualquier carta del catálogo en tu mano">🧪 Sandbox</button>
     <button id="matBtnSetup" title="Elegir tapete">🎨 Tapete</button>
+
+    <h2>🌐 Jugar online (1v1 con un amigo)</h2>
+    <p class="subtitle">Elige arriba TU mazo, pon tu nombre y crea una sala — o únete con el código de tu amigo.</p>
+    <div id="onlinePanel">
+      <input id="onName" placeholder="Tu nombre" maxlength="16">
+      <button id="onCreate">⚓ Crear sala</button>
+      <span class="onSep">o</span>
+      <input id="onCode" placeholder="CÓDIGO" maxlength="4" style="text-transform:uppercase">
+      <button id="onJoin">Unirse</button>
+      <details id="onAdv"><summary>Servidor</summary>
+        <input id="onServer" placeholder="ws://localhost:8765">
+      </details>
+      <div id="onStatus"></div>
+    </div>
   </div>
 
   <div id="game" class="screen hidden">

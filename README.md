@@ -19,6 +19,42 @@ Abre <http://localhost:8000>, elige tu mazo y el del bot, y a jugar.
 Funciona en escritorio y **móvil** (mantén pulsada una carta para verla en
 grande; el botón 📜 muestra u oculta el registro).
 
+## 🌐 Multijugador online (1v1 con un amigo)
+
+El online usa un **servidor autoritativo**: el motor corre solo en el
+servidor y cada navegador recibe únicamente SU vista (la mano y las vidas
+del rival nunca llegan a tu navegador — no se puede hacer trampa).
+
+### Probarlo en local
+
+```bash
+# terminal 1: el servidor de salas
+cd server && npm install && npm start        # ws://localhost:8765
+
+# terminal 2: el estático
+python3 -m http.server 8000
+```
+
+Abre dos pestañas en <http://localhost:8000>: en una elige mazo, pon tu
+nombre y **⚓ Crear sala** (te da un código de 4 letras); en la otra pega el
+código y **Unirse**. Recargar la página no pierde la partida (reconexión
+por token de sesión).
+
+### Desplegarlo en Internet
+
+- El **estático** sigue en Vercel tal cual (el `.vercelignore` excluye el
+  servidor).
+- El **servidor** necesita procesos persistentes (Vercel no vale). En
+  [Render](https://render.com) (gratis): *New Web Service* → este repo →
+  Root Directory `server` → Build `npm install` → Start `npm start`.
+  Render te da una URL `https://tu-app.onrender.com`.
+- En el juego, desplegable **"Servidor"** del lobby online → escribe
+  `wss://tu-app.onrender.com` (con `wss://`, no `ws://`). Se guarda en el
+  navegador.
+
+En el plan gratuito de Render el servidor se duerme tras 15 min de
+inactividad: la primera conexión del día tarda ~30 s en despertarlo.
+
 Necesitas conexión a Internet para las imágenes (se cargan de OPTCG API);
 sin ellas el juego funciona igual mostrando el texto de cada carta.
 
