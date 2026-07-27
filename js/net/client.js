@@ -6,7 +6,13 @@ import { makeSeat } from './seat.js';
 
 export function connectOnline({ url, mode, code = '', name, deckSlug, human, ui, onStatus, onCode, onFirstView, onEnd, onError }) {
   const cg = new ClientGame();
-  const ws = new WebSocket(url);
+  let ws;
+  try {
+    ws = new WebSocket(url);      // puede lanzar (mixed content, URL inválida)
+  } catch (err) {
+    onError?.(`No se pudo abrir la conexión (${url}): ${err.message}`);
+    return { cg, ws: null, close() {} };
+  }
   const send = (obj) => { if (ws.readyState === 1) ws.send(JSON.stringify(obj)); };
   const seat = makeSeat(human, send, cg);
   let myToken = sessionStorage.getItem('opToken') ?? null;

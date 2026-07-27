@@ -138,11 +138,32 @@ async function main() {
   serverBox.value = localStorage.getItem('opServer') ?? '';
   nameBox.oninput = () => localStorage.setItem('opName', nameBox.value.trim());
   serverBox.oninput = () => localStorage.setItem('opServer', serverBox.value.trim());
-  const serverUrl = () => serverBox.value.trim() ||
-    (location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? 'ws://localhost:8765' : '');
+  // Normaliza lo que escriba el usuario a un ws://host o wss://host válido, y
+  // ajusta el esquema al de la página (HTTPS exige wss://; HTTP admite ws://).
+  const normalizeServerUrl = (raw) => {
+    let s = (raw ?? '').trim();
+    const pageSecure = location.protocol === 'https:';
+    if (!s) {
+      // Por defecto: en local, servidor local; en HTTPS no hay default posible.
+      if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return { url: 'ws://localhost:8765' };
+      return { error: 'Escribe la URL de tu servidor (desplegable "Servidor"). Ej: wss://tu-app.onrender.com' };
+    }
+    // Admite pegar http(s):// o una URL sin esquema.
+    s = s.replace(/^http:\/\//i, 'ws://').replace(/^https:\/\//i, 'wss://');
+    if (!/^wss?:\/\//i.test(s)) s = (pageSecure ? 'wss://' : 'ws://') + s;
+    // Mixed content: página HTTPS + ws:// → el navegador lo bloquea.
+    if (pageSecure && /^ws:\/\//i.test(s)) {
+      if (/localhost|127\.0\.0\.1/i.test(s)) {
+        return { error: 'Estás en HTTPS: el navegador bloquea servidores locales (ws://). Abre el juego por http://localhost para probar en local, o despliega el servidor con wss://.' };
+      }
+      s = s.replace(/^ws:\/\//i, 'wss://');   // fuerza wss:// en producción
+    }
+    try { new URL(s); } catch { return { error: 'La URL del servidor no es válida.' }; }
+    return { url: s };
+  };
   const startNet = (mode) => {
-    const url = serverUrl();
-    if (!url) { $('onStatus').textContent = 'Configura la URL del servidor (desplegable "Servidor").'; return; }
+    const { url, error } = normalizeServerUrl(serverBox.value);
+    if (error) { $('onStatus').textContent = `⚠ ${error}`; return; }
     startOnline({
       url, mode,
       code: $('onCode').value.trim().toUpperCase(),
