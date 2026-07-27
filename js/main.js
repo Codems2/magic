@@ -246,9 +246,28 @@ function startOnline({ url, mode, code, name, deckSlug }) {
       });
       location.reload();
     },
-    onError: (msg) => {
+    onError: (info) => {
       $('overlay').classList.add('hidden'); $('overlay').innerHTML = '';
-      $('onStatus').textContent = `⚠ ${msg}`;
+      if (started) return;   // ya en partida: un corte se maneja aparte
+      $('setup').classList.remove('hidden');
+      $('game').classList.add('hidden');
+      const saved = (localStorage.getItem('opServer') ?? '').trim();
+      if (info && info.kind === 'noconnect') {
+        const body = `No hay ningún servidor de salas en <b>${info.url}</b>.` +
+          (saved
+            ? ' Esa dirección la escribiste tú en el campo "Servidor". Si es antigua o de prueba, bórrala.'
+            : ' Aún no has desplegado el servidor: mira el README (Render, 1 clic) o ejecútalo en local.');
+        const buttons = [{ label: 'Entendido', value: 'ok', primary: true }];
+        if (saved) buttons.unshift({ label: '🗑 Borrar dirección guardada', value: 'clear' });
+        ui.dialog({ title: '🌐 Sin servidor', body, buttons }).then((v) => {
+          if (v === 'clear') { localStorage.removeItem('opServer'); $('onServer').value = ''; }
+          $('onStatus').textContent = saved
+            ? 'Campo "Servidor" vacío: se usará este mismo sitio (necesita el servidor unificado).'
+            : '';
+        });
+      } else {
+        $('onStatus').textContent = `⚠ ${typeof info === 'string' ? info : 'Error de conexión.'}`;
+      }
     },
   });
   ui.bind(conn.cg, human);

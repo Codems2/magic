@@ -18,14 +18,22 @@ export function connectOnline({ url, mode, code = '', name, deckSlug, human, ui,
   let myToken = sessionStorage.getItem('opToken') ?? null;
   let helloSeat = null;
   let firstView = false;
+  let connected = false;
+  let reported = false;
+  const failNoConnect = () => { if (!reported) { reported = true; onError?.({ kind: 'noconnect', url }); } };
 
   ws.onopen = () => {
+    connected = true;
     if (mode === 'rejoin' && myToken) send({ t: 'rejoin', token: myToken });
     else if (mode === 'join') send({ t: 'join', code, name, deckSlug });
     else send({ t: 'create', name, deckSlug });
   };
-  ws.onerror = () => onError?.('No se pudo conectar con el servidor. ¿Está la URL bien y el servidor encendido?');
-  ws.onclose = () => onStatus?.('Conexión cerrada.');
+  // No pudo ni abrir el socket: casi siempre no hay servidor en esa dirección.
+  ws.onerror = () => { if (!connected) failNoConnect(); };
+  ws.onclose = () => {
+    if (!connected) failNoConnect();
+    else onStatus?.('Conexión cerrada.');
+  };
 
   ws.onmessage = async (e) => {
     let m;
