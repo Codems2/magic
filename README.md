@@ -25,35 +25,41 @@ El online usa un **servidor autoritativo**: el motor corre solo en el
 servidor y cada navegador recibe únicamente SU vista (la mano y las vidas
 del rival nunca llegan a tu navegador — no se puede hacer trampa).
 
+El servidor es **unificado**: un mismo proceso sirve el juego Y las salas
+online. Así el multijugador funciona **sin configurar nada** (la página y el
+WebSocket salen del mismo origen, `wss://` automático).
+
+### Desplegarlo en Internet (recomendado, 1 clic)
+
+El estático de Vercel no soporta WebSockets, así que el online vive en el
+servidor. Con [Render](https://render.com) (gratis) y el `render.yaml` del
+repo es un clic:
+
+1. En Render: **New → Blueprint** → elige este repositorio → **Apply**.
+2. Render provisiona un servicio y te da una URL
+   `https://optcg-simulator.onrender.com`.
+3. Abre esa URL y juega: **⚓ Crear sala** te da un código; tu amigo lo pega
+   en **Unirse**. Nada más — el campo "Servidor" se deja vacío.
+
+Recargar la página no pierde la partida (reconexión por token). En el plan
+gratuito el servidor se duerme tras 15 min de inactividad: la primera
+conexión del día tarda ~30 s en despertarlo.
+
 ### Probarlo en local
 
 ```bash
-# terminal 1: el servidor de salas
-cd server && npm install && npm start        # ws://localhost:8765
-
-# terminal 2: el estático
-python3 -m http.server 8000
+cd server && npm install && npm start     # sirve juego + salas en :8765
 ```
 
-Abre dos pestañas en <http://localhost:8000>: en una elige mazo, pon tu
-nombre y **⚓ Crear sala** (te da un código de 4 letras); en la otra pega el
-código y **Unirse**. Recargar la página no pierde la partida (reconexión
-por token de sesión).
+Abre dos pestañas en <http://localhost:8765> (el mismo servidor sirve el
+juego): crea sala en una, únete con el código en la otra.
 
-### Desplegarlo en Internet
+### Variante: juego en Vercel + servidor aparte
 
-- El **estático** sigue en Vercel tal cual (el `.vercelignore` excluye el
-  servidor).
-- El **servidor** necesita procesos persistentes (Vercel no vale). En
-  [Render](https://render.com) (gratis): *New Web Service* → este repo →
-  Root Directory `server` → Build `npm install` → Start `npm start`.
-  Render te da una URL `https://tu-app.onrender.com`.
-- En el juego, desplegable **"Servidor"** del lobby online → escribe
-  `wss://tu-app.onrender.com` (con `wss://`, no `ws://`). Se guarda en el
-  navegador.
-
-En el plan gratuito de Render el servidor se duerme tras 15 min de
-inactividad: la primera conexión del día tarda ~30 s en despertarlo.
+Si prefieres seguir sirviendo el estático desde Vercel, despliega solo el
+servidor y en el lobby, desplegable **"Servidor"**, escribe
+`wss://tu-app.onrender.com`. Debe ser `wss://` (una web HTTPS no puede
+hablar con `ws://`).
 
 Necesitas conexión a Internet para las imágenes (se cargan de OPTCG API);
 sin ellas el juego funciona igual mostrando el texto de cada carta.

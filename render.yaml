@@ -1,0 +1,14 @@
+# Despliegue en Render (https://render.com) con un clic:
+#   Dashboard → New → Blueprint → elige este repositorio → Apply.
+# Render provisiona un único servicio que sirve EL JUEGO y las SALAS online
+# desde la misma URL https://<tu-app>.onrender.com — el multijugador funciona
+# sin configurar nada (mismo origen, wss:// automático).
+services:
+  - type: web
+    name: optcg-simulator
+    runtime: node
+    plan: free
+    buildCommand: cd server && npm install
+    startCommand: node server/index.mjs
+    healthCheckPath: /index.html
+    autoDeploy: true

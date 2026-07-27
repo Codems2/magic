@@ -144,9 +144,10 @@ async function main() {
     let s = (raw ?? '').trim();
     const pageSecure = location.protocol === 'https:';
     if (!s) {
-      // Por defecto: en local, servidor local; en HTTPS no hay default posible.
-      if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return { url: 'ws://localhost:8765' };
-      return { error: 'Escribe la URL de tu servidor (desplegable "Servidor"). Ej: wss://tu-app.onrender.com' };
+      // Por defecto: el MISMO origen que sirve la página. Si desplegaste el
+      // servidor unificado, esto ya funciona sin tocar nada. (file:// no vale.)
+      if (location.host) return { url: `${pageSecure ? 'wss' : 'ws'}://${location.host}` };
+      return { error: 'Abre el juego desde el servidor (una URL http/https), no como archivo local.' };
     }
     // Admite pegar http(s):// o una URL sin esquema.
     s = s.replace(/^http:\/\//i, 'ws://').replace(/^https:\/\//i, 'wss://');

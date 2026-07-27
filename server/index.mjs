@@ -8,8 +8,9 @@
 // Uso:  cd server && npm install && npm start     (PORT=8765 por defecto)
 
 import { WebSocketServer } from 'ws';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { createServer } from 'node:http';
+import { readFileSync, existsSync, statSync } from 'node:fs';
+import { dirname, join, normalize, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { Game } from '../js/engine/game.js';
@@ -22,6 +23,33 @@ const DECKS = {};
 for (const d of index) DECKS[d.slug] = JSON.parse(readFileSync(join(DIR, `${d.slug}.json`), 'utf8'));
 
 const PORT = parseInt(process.env.PORT ?? '8765', 10);
+
+// ---- servidor HTTP: sirve el juego estático (mismo origen que el WebSocket,
+// para que el online funcione sin configurar nada) ------------------------
+const MIME = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+  '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webp': 'image/webp',
+};
+// Solo estas carpetas/archivos del repo se sirven (nunca server/ ni .git).
+const SERVE_OK = /^(index\.html|js\/|css\/|data\/|assets\/|favicon)/;
+
+const httpServer = createServer((req, res) => {
+  let rel = decodeURIComponent((req.url || '/').split('?')[0]).replace(/^\/+/, '');
+  if (rel === '' || rel === '/') rel = 'index.html';
+  const safe = normalize(rel).replace(/^(\.\.(\/|\\|$))+/, '');
+  if (!SERVE_OK.test(safe)) { res.writeHead(404); return res.end('Not found'); }
+  const file = join(ROOT, safe);
+  if (!file.startsWith(ROOT) || !existsSync(file) || !statSync(file).isFile()) {
+    res.writeHead(404); return res.end('Not found');
+  }
+  res.writeHead(200, {
+    'content-type': MIME[extname(file).toLowerCase()] ?? 'application/octet-stream',
+    'cache-control': safe === 'index.html' ? 'no-cache' : 'public, max-age=300',
+  });
+  res.end(readFileSync(file));
+});
 const rooms = new Map();          // code → room
 const byToken = new Map();        // token → {room, seatIdx}
 const ROOM_TTL_MS = 45 * 60 * 1000;
@@ -111,8 +139,12 @@ function closeRoom(room) {
   rooms.delete(room.code);
 }
 
-const wss = new WebSocketServer({ port: PORT });
-console.log(`⚓ Servidor OPTCG escuchando en ws://0.0.0.0:${PORT} (${index.length} mazos cargados)`);
+// El WebSocket comparte el mismo servidor/puerto que el estático: así la
+// página y el juego online salen del MISMO origen (wss:// automático).
+const wss = new WebSocketServer({ server: httpServer });
+httpServer.listen(PORT, () => {
+  console.log(`⚓ Servidor OPTCG escuchando en http://0.0.0.0:${PORT} (juego + salas, ${index.length} mazos)`);
+});
 
 wss.on('connection', (ws) => {
   ws.on('message', (raw) => {

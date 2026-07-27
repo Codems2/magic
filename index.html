@@ -30,11 +30,12 @@
       <span class="onSep">o</span>
       <input id="onCode" placeholder="CÓDIGO" maxlength="4" style="text-transform:uppercase">
       <button id="onJoin">Unirse</button>
-      <details id="onAdv"><summary>Servidor</summary>
-        <input id="onServer" placeholder="wss://tu-app.onrender.com">
-        <div class="onHint">Necesitas un servidor de salas propio (el estático de Vercel no lo incluye).
-        En una web <b>HTTPS</b> la URL debe empezar por <b>wss://</b>. Para probar en local,
-        abre el juego por <b>http://localhost</b> y usa <code>ws://localhost:8765</code>.
+      <details id="onAdv"><summary>Servidor (avanzado)</summary>
+        <input id="onServer" placeholder="(vacío = este mismo servidor)">
+        <div class="onHint">Si abriste el juego desde el <b>servidor unificado</b> (una sola URL
+        que sirve el juego y las salas), déjalo <b>vacío</b>: se conecta solo.
+        Rellénalo solo si el servidor de salas está en otra dirección
+        (p. ej. juego en Vercel + servidor en Render: <code>wss://tu-app.onrender.com</code>).
         Guía completa en el README.</div>
       </details>
       <div id="onStatus"></div>
