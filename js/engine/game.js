@@ -1798,21 +1798,44 @@ export class Game {
     return c;
   }
 
-  // Vista serializable de la partida para un jugador (base para F7:
-  // el servidor enviará exactamente esto, sin zonas ocultas del rival).
+  // Descriptor público y serializable de una carta, con lo que el cliente
+  // necesita para pintarla y ofrecer acciones (sin información oculta).
+  pubCard(c, { forOwner = false } = {}) {
+    if (!c) return null;
+    const onField = ['characters', 'leader', 'stage'].includes(c.zone);
+    const d = {
+      id: c.id, dataId: c.data.id, name: c.name, type: c.type, color: c.color,
+      cost: c.cost, power: onField ? c.power(this) : (c.data.power ?? null),
+      basePower: c.data.power ?? null, counter: c.counterValue,
+      rested: !!c.rested, givenDon: c.givenDon, text: c.text, image: c.data.image,
+      zone: c.zone, ownerIdx: this.players.indexOf(c.owner),
+      subTypes: c.data.subTypes ?? [],
+      hasBlocker: c.hasBlocker, hasRush: c.hasRush,
+    };
+    if (forOwner && onField) {
+      d.canAttack = c.canAttack(this);
+      const ab = abilitiesOf(c, 'activateMain')[0];
+      d.canActivate = !!ab && !(ab.once && c._activatedTurn === this.turn) &&
+        !(ab.donX && c.givenDon < ab.donX) && this.canPayAbilityCost(c.owner, c, ab.cost);
+    }
+    return d;
+  }
+
+  // Vista serializable de la partida para un jugador. Es EXACTAMENTE lo que
+  // el servidor de F8 envía a cada cliente: sin zonas ocultas del rival.
   viewFor(p) {
     const opp = this.opponentOf(p);
-    const pub = (c) => c && {
-      id: c.id, name: c.name, type: c.type, cost: c.cost, color: c.color,
-      power: c.power(this), basePower: c.data.power, counter: c.counterValue,
-      rested: c.rested, givenDon: c.givenDon, text: c.text, image: c.data.image,
-    };
+    const mine = (c) => this.pubCard(c, { forOwner: true });
+    const pub = (c) => this.pubCard(c);
     return {
-      turn: this.turn, phase: this.phase, active: this.activePlayer.name,
+      turn: this.turn, phase: this.phase,
+      activeIdx: this.activeIdx, youIdx: this.players.indexOf(p),
+      over: this.over, winnerIdx: this.winner ? this.players.indexOf(this.winner) : null,
       you: {
-        name: p.name, hand: p.hand.map(pub), leader: pub(p.leader),
-        characters: p.characters.map(pub), stage: pub(p.stage),
-        life: p.life.length, deck: p.library.length, trash: p.trash.map(pub),
+        name: p.name, hand: p.hand.map(mine), leader: mine(p.leader),
+        characters: p.characters.map(mine), stage: mine(p.stage),
+        life: p.life.length, lifeIds: p.life.map((c) => c.id), deck: p.library.length,
+        trash: p.trash.map(pub),
         don: { deck: p.donDeck, active: p.donActive, rested: p.donRested, given: p.donGiven },
       },
       opponent: {
