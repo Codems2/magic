@@ -19,6 +19,24 @@ Abre <http://localhost:8000>, elige tu mazo y el del bot, y a jugar.
 Funciona en escritorio y **móvil** (mantén pulsada una carta para verla en
 grande; el botón 📜 muestra u oculta el registro).
 
+### 🛠 Mazos custom (todo el pool)
+
+`data/cards/catalog.json` contiene el pool completo en inglés (2.721 cartas
+únicas de los 84 sets, importadas con `node scripts/fetch-all.mjs`). El botón
+**🛠 Mis mazos** abre el constructor: elige líder, busca por nombre/ID/tipo/
+subtipo con filtros de color, y monta el mazo con las reglas reales (50
+cartas exactas, máx. 4 copias, colores del líder). Los mazos se guardan en tu
+navegador, aparecen en el selector (etiqueta CUSTOM), se pueden duplicar,
+exportar/importar como JSON, y valen contra el bot, en sandbox (cuyo buscador
+ahora usa el catálogo completo) y **online** (el cliente envía la lista y el
+servidor la valida y materializa).
+
+Cobertura de efectos sobre el pool completo: **~82% de las cartas totalmente
+simuladas** (82,4% de las frases de reglas). El resto muestra ⚠ con la frase
+exacta que aún no se simula y juega con normalidad todo lo demás (cuerpo,
+counter y las habilidades que sí se reconocen). `node scripts/catalog-smoke.mjs`
+juega las 2.721 cartas en el motor real: 0 errores.
+
 ### 🏆 Niveles del bot
 
 En la pantalla de mazos eliges el nivel del rival:

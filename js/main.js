@@ -7,6 +7,7 @@ import { SearchBot } from './ai/searchbot.js';
 import { UI } from './ui/ui.js';
 import { HumanController } from './ui/human.js';
 import { Coach } from './ui/coach.js';
+import { openDeckBuilder, loadSpecs, materializeDeck } from './ui/builder.js';
 import { connectOnline } from './net/client.js';
 
 const $ = (id) => document.getElementById(id);
@@ -104,15 +105,33 @@ async function main() {
     decks[d.slug] = await (await fetch(`data/decks/${d.slug}.json`, noCache)).json();
   }));
 
+  // --- catálogo completo (2700+ cartas) y mazos custom ---
+  let catalogList = null;
+  const getCatalog = async () => (catalogList ??= await (await fetch('data/cards/catalog.json', noCache)).json());
+  let customDecks = [];
+  const customEntries = () => customDecks.map((d) => ({
+    slug: d.slug, id: 'CUSTOM', name: d.name, leader: d.leader.name,
+    color: d.leader.color, image: d.leader.image, custom: true,
+  }));
+  const allIndex = () => [...index, ...customEntries()];
+  const getDeck = (slug) => decks[slug] ?? customDecks.find((d) => d.slug === slug) ?? null;
+  async function refreshCustoms() {
+    const specs = loadSpecs();
+    if (!specs.length) { customDecks = []; return; }
+    const byId = new Map((await getCatalog()).map((c) => [c.id, c]));
+    customDecks = specs.map((sp) => materializeDeck(sp, byId)).filter(Boolean);
+  }
+  await refreshCustoms();
+
   // --- selección de mazos: dos "huecos" compactos que abren un buscador ---
   let mySlug = null;
   let botSlug = null;
-  const valid = (s) => index.some((d) => d.slug === s);
+  const valid = (s) => allIndex().some((d) => d.slug === s);
 
   const updateSlot = (which) => {
     const slug = which === 'my' ? mySlug : botSlug;
     const el = $(which === 'my' ? 'slotMy' : 'slotBot');
-    const d = index.find((x) => x.slug === slug);
+    const d = allIndex().find((x) => x.slug === slug);
     if (!d) {
       el.innerHTML = '<span class="slotEmpty">➕<br>Elegir<br>mazo</span>';
     } else {
@@ -171,7 +190,7 @@ async function main() {
     const refresh = () => {
       const q = search.value.trim().toLowerCase();
       grid.innerHTML = '';
-      const hits = index.filter((d) =>
+      const hits = allIndex().filter((d) =>
         (!colorSel || (d.color ?? '').includes(colorSel)) &&
         (!q || d.leader.toLowerCase().includes(q) || d.name.toLowerCase().includes(q) ||
           d.id.toLowerCase().includes(q) || d.slug.includes(q)));
@@ -197,7 +216,7 @@ async function main() {
 
   $('slotMy').onclick = () => openDeckPicker('my');
   $('slotBot').onclick = () => openDeckPicker('bot');
-  $('botRandom').onclick = () => pickDeck('bot', index[(Math.random() * index.length) | 0].slug);
+  $('botRandom').onclick = () => { const list = allIndex(); pickDeck('bot', list[(Math.random() * list.length) | 0].slug); };
   $('botMirror').onclick = () => { if (mySlug) pickDeck('bot', mySlug); };
 
   // Recuerda los últimos mazos usados: en la segunda visita, un clic y a jugar.
@@ -216,12 +235,31 @@ async function main() {
   });
   const botLevel = () => document.querySelector('input[name="botLevel"]:checked')?.value ?? 'search';
 
-  $('startBtn').onclick = () => startGame(decks[mySlug], decks[botSlug], null, botLevel());
+  const deckSizeOf = (d) => d.cards.reduce((n, c) => n + c.count, 0);
+  $('startBtn').onclick = () => {
+    const my = getDeck(mySlug);
+    const bd = getDeck(botSlug);
+    const bad = [my, bd].find((d) => d?.custom && deckSizeOf(d) !== 50);
+    if (!my || !bd) return;
+    if (bad) { $('onStatus').textContent = `⚠ "${bad.name}" no es legal: necesita exactamente 50 cartas (tiene ${deckSizeOf(bad)}).`; return; }
+    startGame(my, bd, null, botLevel());
+  };
+
+  // Constructor de mazos custom.
+  $('builderBtn').onclick = async () => openDeckBuilder({
+    catalog: await getCatalog(),
+    onChanged: async () => {
+      await refreshCustoms();
+      if (mySlug && !getDeck(mySlug)) mySlug = null;
+      if (botSlug && !getDeck(botSlug)) botSlug = null;
+      updateSlot('my'); updateSlot('bot');
+    },
+  });
   // Sandbox: no exige elegir mazos (usa ST-01/ST-02 si no marcaste ninguno).
-  $('sandboxBtn').onclick = () => startGame(
-    decks[mySlug ?? 'st-01'],
-    decks[botSlug ?? 'st-02'],
-    { sandbox: true, decks, index },
+  $('sandboxBtn').onclick = async () => startGame(
+    getDeck(mySlug) ?? decks['st-01'],
+    getDeck(botSlug) ?? decks['st-02'],
+    { sandbox: true, decks, index, catalogList: await getCatalog() },
   );
 
   // --- lobby online ---
@@ -258,11 +296,15 @@ async function main() {
   const startNet = (mode) => {
     const { url, error } = normalizeServerUrl(serverBox.value);
     if (error) { $('onStatus').textContent = `⚠ ${error}`; return; }
+    const spec = loadSpecs().find((x) => x.slug === mySlug) ?? null;
+    const my = getDeck(mySlug);
+    if (my?.custom && deckSizeOf(my) !== 50) { $('onStatus').textContent = `⚠ "${my.name}" no es legal para jugar online (50 cartas exactas).`; return; }
     startOnline({
       url, mode,
       code: $('onCode').value.trim().toUpperCase(),
       name: nameBox.value.trim() || 'Pirata',
       deckSlug: mySlug ?? 'st-01',
+      deckSpec: spec ? { name: spec.name, leader: spec.leader, cards: spec.cards } : null,
     });
   };
   $('onCreate').onclick = () => startNet('create');
@@ -305,7 +347,7 @@ function showLobbyWait({ connecting = false, code = null, seat = 0, onCancel }) 
 }
 
 // Partida online: la UI de siempre, pero el estado llega del servidor.
-function startOnline({ url, mode, code, name, deckSlug }) {
+function startOnline({ url, mode, code, name, deckSlug, deckSpec = null }) {
   const ui = new UI(ctrl);
   const human = new HumanController(ui);
   if (deckSlug === 'st-36') human.coach = new Coach(human);
@@ -314,7 +356,7 @@ function startOnline({ url, mode, code, name, deckSlug }) {
   showLobbyWait({ connecting: true, onCancel: () => conn?.close?.() });
 
   const conn = connectOnline({
-    url, mode, code, name, deckSlug, human, ui,
+    url, mode, code, name, deckSlug, deckSpec, human, ui,
     onCode: (roomCode, seat) => {
       // El que crea la sala ve el código y espera; el que se une, "conectando".
       if (mode === 'create') showLobbyWait({ code: roomCode, seat, onCancel: () => conn.close() });
@@ -498,7 +540,7 @@ async function startGame(myDeck, botDeck, sandboxOpts = null, level = 'search') 
       rival.donActive = 5;
       game.log('🧪 Sandbox: rival pasivo con tablero poblado. Usa ➕ Carta para probar lo que quieras.');
     };
-    const catalog = buildCatalog(sandboxOpts.decks, sandboxOpts.index);
+    const catalog = sandboxOpts.catalogList ?? buildCatalog(sandboxOpts.decks, sandboxOpts.index);
     $('sandboxBar').classList.remove('hidden');
     $('sbAddCard').onclick = () => sandboxSearchModal(catalog, game, human, ui);
     $('sbDraw').onclick = () => { game.draw(human.player, 1); if (ui.pickState) human.player.hand.forEach((c) => ui.pickState.cards.add(c.id)); ui.render(); };

@@ -21,6 +21,33 @@ const DIR = join(ROOT, 'data', 'decks');
 const index = JSON.parse(readFileSync(join(DIR, 'index.json'), 'utf8'));
 const DECKS = {};
 for (const d of index) DECKS[d.slug] = JSON.parse(readFileSync(join(DIR, `${d.slug}.json`), 'utf8'));
+// Catálogo completo: valida y materializa los mazos CUSTOM que envían los clientes.
+const CATALOG = new Map(
+  JSON.parse(readFileSync(join(ROOT, 'data', 'cards', 'catalog.json'), 'utf8')).map((c) => [c.id, c]),
+);
+
+// {name, leader: id, cards: {id: count}} → mazo jugable, o null si es ilegal
+// (líder inválido, más de 4 copias, total ≠ 50 o ids inexistentes).
+function deckFromSpec(spec) {
+  if (!spec || typeof spec !== 'object') return null;
+  const leader = CATALOG.get(spec.leader);
+  if (!leader || leader.type !== 'Leader') return null;
+  let total = 0;
+  const cards = [];
+  for (const [id, cnt] of Object.entries(spec.cards ?? {})) {
+    const c = CATALOG.get(id);
+    const nCopies = Math.floor(Number(cnt));
+    if (!c || c.type === 'Leader' || !(nCopies >= 1 && nCopies <= 4)) return null;
+    total += nCopies;
+    cards.push({ ...c, count: nCopies });
+  }
+  if (total !== 50) return null;
+  return {
+    slug: 'custom', id: 'CUSTOM',
+    name: String(spec.name ?? 'Mazo custom').slice(0, 40),
+    leader: { ...leader, count: 1 }, altLeaders: [], cards,
+  };
+}
 
 const PORT = parseInt(process.env.PORT ?? '8765', 10);
 
@@ -96,7 +123,7 @@ async function startGame(room) {
   };
   const configs = room.seats.map((seat, idx) => ({
     name: seat.name || `Jugador ${idx + 1}`,
-    deck: DECKS[seat.deckSlug] ?? DECKS[index[0].slug],
+    deck: deckFromSpec(seat.deckSpec) ?? DECKS[seat.deckSlug] ?? DECKS[index[0].slug],
     controller: mk(idx),
     isBot: false,
   }));
@@ -163,7 +190,7 @@ function handle(ws, msg) {
       const code = newCode();
       const token = newToken();
       const room = { code, seats: [null, null], game: null, started: false, log: [], createdAt: Date.now() };
-      room.seats[0] = { ws, token, name: String(msg.name ?? '').slice(0, 24), deckSlug: msg.deckSlug, rc: null };
+      room.seats[0] = { ws, token, name: String(msg.name ?? '').slice(0, 24), deckSlug: msg.deckSlug, deckSpec: msg.deck ?? null, rc: null };
       rooms.set(code, room);
       byToken.set(token, { room, seatIdx: 0 });
       send(ws, { t: 'hello', seat: 0, code, token });
@@ -175,7 +202,7 @@ function handle(ws, msg) {
       if (!room) return send(ws, { t: 'error', msg: 'No existe ninguna sala con ese código.' });
       if (room.seats[1]) return send(ws, { t: 'error', msg: 'La sala ya está completa.' });
       const token = newToken();
-      room.seats[1] = { ws, token, name: String(msg.name ?? '').slice(0, 24), deckSlug: msg.deckSlug, rc: null };
+      room.seats[1] = { ws, token, name: String(msg.name ?? '').slice(0, 24), deckSlug: msg.deckSlug, deckSpec: msg.deck ?? null, rc: null };
       byToken.set(token, { room, seatIdx: 1 });
       send(ws, { t: 'hello', seat: 1, code: room.code, token });
       startGame(room);

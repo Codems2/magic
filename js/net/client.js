@@ -4,7 +4,7 @@
 import { ClientGame } from './clientGame.js';
 import { makeSeat } from './seat.js';
 
-export function connectOnline({ url, mode, code = '', name, deckSlug, human, ui, onStatus, onCode, onFirstView, onEnd, onError }) {
+export function connectOnline({ url, mode, code = '', name, deckSlug, deckSpec = null, human, ui, onStatus, onCode, onFirstView, onEnd, onError }) {
   const cg = new ClientGame();
   let ws;
   try {
@@ -25,8 +25,8 @@ export function connectOnline({ url, mode, code = '', name, deckSlug, human, ui,
   ws.onopen = () => {
     connected = true;
     if (mode === 'rejoin' && myToken) send({ t: 'rejoin', token: myToken });
-    else if (mode === 'join') send({ t: 'join', code, name, deckSlug });
-    else send({ t: 'create', name, deckSlug });
+    else if (mode === 'join') send({ t: 'join', code, name, deckSlug, deck: deckSpec });
+    else send({ t: 'create', name, deckSlug, deck: deckSpec });
   };
   // No pudo ni abrir el socket: casi siempre no hay servidor en esa dirección.
   ws.onerror = () => { if (!connected) failNoConnect(); };
