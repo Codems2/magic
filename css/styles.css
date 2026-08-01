@@ -45,35 +45,43 @@ button:disabled { opacity: .5; cursor: default; }
 /* Barra superior: botones compactos para que quepan en una línea. */
 #topbar button { padding: 6px 10px; font-size: .9rem; }
 
-/* ---- tapetes (temas de fondo, elegibles y persistentes) ---- */
-body[data-mat="madera"] {
+/* ---- tapetes: el tema elegido cubre SOLO tu zona de juego, como un tapete
+   físico puesto sobre la mesa; el rival juega directamente sobre la mesa. */
+#selfArea .mat {
+  border-radius: 14px; padding: 8px; position: relative;
+  border: 1px solid rgba(245,197,66,.28);
+  box-shadow: 0 4px 18px rgba(0,0,0,.5), inset 0 0 48px rgba(0,0,0,.28);
+  background: radial-gradient(70% 90% at 50% -10%, #12395c, transparent 65%),
+    linear-gradient(180deg, #0a2a47, #082036 60%, #061a2c);   /* alta mar */
+}
+body[data-mat="madera"] #selfArea .mat {
   background:
-    linear-gradient(rgba(10,6,2,.30), rgba(6,3,1,.55)),
-    repeating-linear-gradient(90deg, #5a3b1e 0 90px, #4c3016 90px 96px, #63431f 96px 180px, #3f2a12 180px 186px),
+    linear-gradient(rgba(10,6,2,.28), rgba(6,3,1,.5)),
+    repeating-linear-gradient(90deg, #5a3b1e 0 64px, #4c3016 64px 68px, #63431f 68px 128px, #3f2a12 128px 132px),
     linear-gradient(180deg, #4a2f14, #2c1b09);
 }
-body[data-mat="wanted"] {
+body[data-mat="wanted"] #selfArea .mat {
   background:
-    radial-gradient(1200px 700px at 50% 18%, rgba(140,100,38,.42), transparent 70%),
+    radial-gradient(80% 70% at 50% 18%, rgba(140,100,38,.42), transparent 72%),
     repeating-linear-gradient(0deg, rgba(0,0,0,.14) 0 2px, transparent 2px 5px),
     linear-gradient(180deg, #66502a, #46340f 65%, #2e2008);
 }
-body[data-mat="marina"] {
+body[data-mat="marina"] #selfArea .mat {
   background:
-    radial-gradient(1000px 520px at 50% -10%, #274f86 0%, transparent 60%),
-    repeating-linear-gradient(135deg, rgba(255,255,255,.05) 0 26px, transparent 26px 52px),
+    radial-gradient(90% 60% at 50% -10%, #274f86 0%, transparent 62%),
+    repeating-linear-gradient(135deg, rgba(255,255,255,.05) 0 22px, transparent 22px 44px),
     linear-gradient(180deg, #0a1c3a, #081430 60%, #050d22);
 }
-body[data-mat="grandline"] {
+body[data-mat="grandline"] #selfArea .mat {
   background:
-    radial-gradient(1100px 600px at 50% -10%, rgba(179,83,43,.42), transparent 62%),
-    radial-gradient(700px 400px at 15% 105%, rgba(120,40,110,.35), transparent 60%),
+    radial-gradient(85% 70% at 50% -10%, rgba(179,83,43,.42), transparent 64%),
+    radial-gradient(55% 50% at 15% 105%, rgba(120,40,110,.35), transparent 60%),
     linear-gradient(180deg, #3b1c3f, #23163b 45%, #0c1030);
 }
-body[data-mat="custom"] {
+body[data-mat="custom"] #selfArea .mat {
   background:
-    linear-gradient(rgba(5,13,24,.72), rgba(4,10,19,.84)),
-    var(--matimg, none) center / cover fixed no-repeat,
+    linear-gradient(rgba(5,13,24,.42), rgba(4,10,19,.55)),
+    var(--matimg, none) center / cover no-repeat,
     #05121f;
 }
 
@@ -99,6 +107,7 @@ body[data-mat="custom"] {
   border-radius: 8px; border: 1px solid var(--gold-d);
   background: rgba(0,0,0,.35); color: inherit; font: inherit; font-size: .85rem;
 }
+.matUpRow { display: flex; gap: 8px; justify-content: center; margin: 8px 0 2px; }
 /* miniaturas de cada tema */
 .matSwatch[data-mat="altamar"] { background: radial-gradient(90px 46px at 50% -6%, #12395c, transparent 65%), linear-gradient(180deg, #061626, #071a2e 60%, #05121f); }
 .matSwatch[data-mat="madera"] { background: repeating-linear-gradient(90deg, #5a3b1e 0 22px, #4c3016 22px 24px, #63431f 24px 46px, #3f2a12 46px 48px); }

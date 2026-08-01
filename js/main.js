@@ -28,10 +28,11 @@ const MATS = [
 
 function applyMat() {
   const mat = localStorage.getItem('opMat') ?? 'altamar';
-  const url = localStorage.getItem('opMatUrl') ?? '';
+  // La imagen subida manda; la URL pegada es la alternativa.
+  const img = localStorage.getItem('opMatData') || localStorage.getItem('opMatUrl') || '';
   if (mat === 'altamar') delete document.body.dataset.mat;
   else document.body.dataset.mat = mat;
-  document.body.style.setProperty('--matimg', url ? `url("${url}")` : 'none');
+  document.body.style.setProperty('--matimg', img ? `url("${img}")` : 'none');
 }
 
 function openMatPicker() {
@@ -40,7 +41,7 @@ function openMatPicker() {
   modal.id = 'matModal';
   const dlg = document.createElement('div');
   dlg.className = 'dialog';
-  dlg.innerHTML = '<h2>🎨 Elige tu tapete</h2><p>Se guarda en este navegador.</p>';
+  dlg.innerHTML = '<h2>🎨 Elige tu tapete</h2><p>Cubre solo tu zona de juego, como un tapete de verdad. Se guarda en este navegador.</p>';
   const grid = document.createElement('div');
   grid.className = 'matGrid';
   const current = localStorage.getItem('opMat') ?? 'altamar';
@@ -52,24 +53,86 @@ function openMatPicker() {
     sw.onclick = () => {
       localStorage.setItem('opMat', m.id);
       grid.querySelectorAll('.matSwatch').forEach((x) => x.classList.toggle('on', x === sw));
-      urlBox.classList.toggle('hidden', m.id !== 'custom');
+      customBox.classList.toggle('hidden', m.id !== 'custom');
       applyMat();
     };
     grid.appendChild(sw);
   }
   dlg.appendChild(grid);
-  // Imagen propia: pega la URL de cualquier imagen que quieras usar de fondo.
-  const urlBox = document.createElement('div');
-  urlBox.classList.toggle('hidden', current !== 'custom');
-  urlBox.innerHTML = '<p style="margin:0">Pega la URL de una imagen (tuya o de donde quieras):</p>';
+  // Imagen propia: sube un archivo desde el dispositivo o pega una URL.
+  const customBox = document.createElement('div');
+  customBox.classList.toggle('hidden', current !== 'custom');
+  customBox.innerHTML = '<p style="margin:0">Sube una imagen desde tu dispositivo, o pega una URL:</p>';
+  const row = document.createElement('div');
+  row.className = 'matUpRow';
+  const fileIn = document.createElement('input');
+  fileIn.type = 'file';
+  fileIn.accept = 'image/*';
+  fileIn.classList.add('hidden');
+  const fileBtn = document.createElement('button');
+  fileBtn.type = 'button';
+  fileBtn.textContent = '📁 Subir imagen';
+  fileBtn.onclick = () => fileIn.click();
+  const clearBtn = document.createElement('button');
+  clearBtn.type = 'button';
+  clearBtn.textContent = '🗑 Quitar imagen';
+  clearBtn.classList.toggle('hidden', !localStorage.getItem('opMatData'));
+  row.append(fileBtn, fileIn, clearBtn);
+  customBox.appendChild(row);
+  // La miniatura del tema "Tu imagen" enseña lo que hay guardado.
+  const refreshCustomSwatch = () => {
+    const img = localStorage.getItem('opMatData') || localStorage.getItem('opMatUrl') || '';
+    const sw = grid.querySelector('.matSwatch[data-mat="custom"]');
+    if (sw) sw.style.background = img ? `url("${img}") center / cover` : '';
+  };
+  fileIn.onchange = () => {
+    const f = fileIn.files?.[0];
+    if (!f) return;
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(img.src);
+      // Reescala en canvas: localStorage tiene poco sitio y de fondo no se
+      // nota nada por encima de 1920px.
+      const MAX = 1920;
+      const k = Math.min(1, MAX / Math.max(img.width, img.height));
+      const cv = document.createElement('canvas');
+      cv.width = Math.max(1, Math.round(img.width * k));
+      cv.height = Math.max(1, Math.round(img.height * k));
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      let data = cv.toDataURL('image/jpeg', 0.85);
+      if (data.length > 3_500_000) data = cv.toDataURL('image/jpeg', 0.6);
+      try {
+        localStorage.setItem('opMatData', data);
+      } catch {
+        alert('No cabe esa imagen en el almacenamiento del navegador; prueba con una más pequeña.');
+        return;
+      }
+      localStorage.setItem('opMat', 'custom');
+      grid.querySelectorAll('.matSwatch').forEach((x) => x.classList.toggle('on', x.dataset.mat === 'custom'));
+      customBox.classList.remove('hidden');
+      clearBtn.classList.remove('hidden');
+      refreshCustomSwatch();
+      applyMat();
+    };
+    img.onerror = () => alert('No he podido leer esa imagen.');
+    img.src = URL.createObjectURL(f);
+  };
+  clearBtn.onclick = () => {
+    localStorage.removeItem('opMatData');
+    fileIn.value = '';
+    clearBtn.classList.add('hidden');
+    refreshCustomSwatch();
+    applyMat();
+  };
   const input = document.createElement('input');
   input.id = 'matUrl';
   input.type = 'url';
   input.placeholder = 'https://…/mi-tapete.jpg';
   input.value = localStorage.getItem('opMatUrl') ?? '';
-  input.oninput = () => { localStorage.setItem('opMatUrl', input.value.trim()); applyMat(); };
-  urlBox.appendChild(input);
-  dlg.appendChild(urlBox);
+  input.oninput = () => { localStorage.setItem('opMatUrl', input.value.trim()); refreshCustomSwatch(); applyMat(); };
+  customBox.appendChild(input);
+  dlg.appendChild(customBox);
+  refreshCustomSwatch();
   const close = document.createElement('button');
   close.textContent = 'Listo';
   close.onclick = () => modal.remove();
