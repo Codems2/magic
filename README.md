@@ -31,8 +31,8 @@ exportar/importar como JSON, y valen contra el bot, en sandbox (cuyo buscador
 ahora usa el catálogo completo) y **online** (el cliente envía la lista y el
 servidor la valida y materializa).
 
-Cobertura de efectos sobre el pool completo: **~82% de las cartas totalmente
-simuladas** (82,4% de las frases de reglas). El resto muestra ⚠ con la frase
+Cobertura de efectos sobre el pool completo: **~89% de las cartas totalmente
+simuladas** (88,7% de las frases de reglas). El resto muestra ⚠ con la frase
 exacta que aún no se simula y juega con normalidad todo lo demás (cuerpo,
 counter y las habilidades que sí se reconocen). `node scripts/catalog-smoke.mjs`
 juega las 2.721 cartas en el motor real: 0 errores.
