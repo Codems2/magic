@@ -280,22 +280,51 @@ export class UI {
     return d;
   }
 
-  // Pila de vidas: cada carta de Vida es real (boca abajo), mostradas apiladas.
+  // Pila de vidas: cartas reales apiladas de arriba (i=0) a abajo. Las que
+  // están boca arriba (mecánica del ST-36) muestran su arte: son públicas.
   lifeStack(p) {
     const wrap = document.createElement('div');
     wrap.className = 'lifeStack';
     const n = p.life.length;
+    // Offline: p.life[i] es la carta (con .faceUp). Online: p.life.faces[i]
+    // es la carta pública si esa posición está boca arriba, o null.
+    const faceCard = (i) => {
+      if (Array.isArray(p.life)) return p.life[i]?.faceUp ? p.life[i] : null;
+      return p.life.faces?.[i] ?? null;
+    };
+    const anyUp = Array.from({ length: n }, (_, i) => faceCard(i)).some(Boolean);
     for (let i = 0; i < n; i++) {
+      const up = faceCard(i);
       const card = document.createElement('div');
-      card.className = 'lifeCardBack';
-      card.style.top = `${i * 9}px`;
+      if (up) {
+        card.className = 'lifeCardBack lifeCardUp';
+        const img = up.data?.image;
+        if (img && !failedImages.has(img)) {
+          card.innerHTML = `<img src="${img}" alt="${up.name}" loading="lazy">`;
+          card.querySelector('img').onerror = (e) => {
+            failedImages.add(img);
+            e.target.remove();
+            card.innerHTML = `<span class="lifeUpName">${up.name}</span>`;
+          };
+        } else {
+          card.innerHTML = `<span class="lifeUpName">${up.name}</span>`;
+        }
+        card.title = `${up.name} (boca arriba)`;
+        card.onmouseenter = () => this.showPreview(up);
+        card.onmouseleave = () => { $('preview').innerHTML = ''; };
+        card.onclick = () => this.showPreviewModal(up);
+      } else {
+        card.className = 'lifeCardBack';
+      }
+      card.style.top = `${i * (anyUp ? 14 : 9)}px`;
+      card.style.zIndex = String(n - i);   // la superior (próxima en perderse) delante
       wrap.appendChild(card);
     }
     const badge = document.createElement('div');
     badge.className = 'lifeStackCount';
     badge.innerHTML = `<span>${n}</span><small>VIDAS</small>`;
     wrap.appendChild(badge);
-    wrap.style.height = `${Math.max(92, 84 + (n - 1) * 9)}px`;
+    wrap.style.height = `${Math.max(92, 84 + (n - 1) * (anyUp ? 14 : 9))}px`;
     return wrap;
   }
 

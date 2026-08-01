@@ -160,6 +160,13 @@ function satisfyCost(g, p, ab) {
   };
   if (cost.trashHandFilter) needHand(cost.trashHandFilter, cost.trashHand);
   if (cost.revealHand) needHand(cost.revealHand.filter, cost.revealHand.n);
+  // Voltear Vida boca abajo exige cartas boca arriba en la posición permitida.
+  if (cost.turnLifeDown && p.life.length) {
+    const idxs = cost.turnLifeEnds === 'top' ? [0]
+      : cost.turnLifeEnds === 'both' ? [...new Set([0, p.life.length - 1])]
+      : p.life.map((_, i) => i);
+    for (const i of idxs.slice(0, cost.turnLifeDown)) p.life[i].faceUp = true;
+  }
 }
 
 // Ejecuta un escenario comprobando (1) que la habilidad se despacha y

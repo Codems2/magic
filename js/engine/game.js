@@ -415,6 +415,7 @@ export class Game {
       for (let i = 0; i < n; i++) {
         const c = p.library.shift();
         c.zone = 'life';
+        c.faceUp = false;
         p.life.push(c);
       }
     }
@@ -526,8 +527,8 @@ export class Game {
     if (cost.trashLife > p.life.length) return false;
     if (cost.lifeToHand > p.life.length) return false;
     if (cost.trashToBottom > p.trash.length) return false;
-    if (cost.turnLifeDown && p.life.length < cost.turnLifeDown) return false;
-    if (cost.turnLifeUp && p.life.length < cost.turnLifeUp) return false;
+    if (cost.turnLifeDown && this.lifeFlipCandidates(p, cost.turnLifeEnds, true).length < cost.turnLifeDown) return false;
+    if (cost.turnLifeUp && this.lifeFlipCandidates(p, cost.turnLifeEnds, false).length < cost.turnLifeUp) return false;
     if (cost.restSelf && source.rested) return false;
     if (cost.restLeaderOrDon && p.donActive < 1 && p.leader.rested) return false;
     if (cost.trashHandFilter && p.hand.filter((c) => this.matchesFilter(c, cost.trashHandFilter)).length < cost.trashHand) return false;
@@ -569,6 +570,7 @@ export class Game {
         const idx = await this.pickLifeIndex(p, cost.trashLifePick);
         const c = p.life.splice(idx, 1)[0];
         c.zone = 'trash';
+        c.faceUp = false;
         p.trash.push(c);
         this.log(`${p.name} descarta una carta de su Vida como coste (${c.name}). Vidas: ${p.life.length}.`);
       }
@@ -591,7 +593,7 @@ export class Game {
     if (cost.lifeToHand) {
       for (let i = 0; i < cost.lifeToHand && p.life.length; i++) {
         const idx = await this.pickLifeIndex(p, cost.lifeToHandPick);
-        const c = p.life.splice(idx, 1)[0]; c.zone = 'hand'; p.hand.push(c);
+        const c = p.life.splice(idx, 1)[0]; c.zone = 'hand'; c.faceUp = false; p.hand.push(c);
         this.log(`${p.name} añade a la mano ${c.name} desde su Vida (Vida: ${p.life.length}).`);
       }
     }
@@ -643,7 +645,7 @@ export class Game {
       for (const c of p.characters.filter((c2) => this.matchesFilter(c2, cost.charToLife.filter)).slice(0, cost.charToLife.n)) {
         p.donActive += c.givenDon; c.givenDon = 0;
         p.characters.splice(p.characters.indexOf(c), 1);
-        c.rested = false; c.tempPower = 0; c.mods = [];
+        c.rested = false; c.tempPower = 0; c.mods = []; c.faceUp = false;
         c.zone = 'life'; p.life.unshift(c);
         this.log(`${p.name} pone ${c.name} en lo alto de su Vida como coste (Vida: ${p.life.length}).`);
       }
@@ -654,8 +656,8 @@ export class Game {
       ctx.revealedIds = pool.map((c) => c.id);
       this.log(`${p.name} revela como coste: ${pool.map((c) => c.name).join(', ') || 'nada'}.`);
     }
-    if (cost.turnLifeDown) this.log(`${p.name} gira ${cost.turnLifeDown} carta(s) de su Vida boca abajo.`);
-    if (cost.turnLifeUp) this.log(`${p.name} gira ${cost.turnLifeUp} carta(s) de su Vida boca arriba.`);
+    if (cost.turnLifeDown) await this.flipLifeCards(p, cost.turnLifeDown, cost.turnLifeEnds, false);
+    if (cost.turnLifeUp) await this.flipLifeCards(p, cost.turnLifeUp, cost.turnLifeEnds, true);
     if (cost.restLeaderOrDon) {
       // Coste alternativo: girar 1 DON!! (preferido) o girar tu líder.
       if (p.donActive >= 1) {
@@ -716,6 +718,38 @@ export class Game {
   }
 
   costReturnsDon(cost) { return !!(cost && (cost.donReturn || cost.donReturnVar || cost.returnGivenDon)); }
+
+  // Índices de la Vida elegibles para voltear: `ends` limita la posición
+  // ('top' = solo la superior, 'both' = superior o inferior, 'any' = todas)
+  // y `wantUp` filtra por el estado actual (voltear boca abajo exige boca arriba).
+  lifeFlipCandidates(p, ends, wantUp) {
+    const n = p.life.length;
+    if (!n) return [];
+    const idxs = ends === 'top' ? [0] : ends === 'both' ? [...new Set([0, n - 1])] : p.life.map((_, i) => i);
+    return idxs.filter((i) => !!p.life[i].faceUp === wantUp);
+  }
+
+  // Voltea `count` cartas de Vida (coste): si ambos extremos valen, el dueño
+  // elige. Boca arriba es información pública: se revela el nombre a ambos.
+  async flipLifeCards(p, count, ends, toUp) {
+    for (let i = 0; i < count; i++) {
+      const cands = this.lifeFlipCandidates(p, ends, !toUp);
+      if (!cands.length) break;
+      let idx = cands[0];
+      if (cands.length > 1 && ends === 'both') {
+        const pick = await p.controller.chooseOption(this, {
+          prompt: `¿Qué carta de tu Vida volteas boca ${toUp ? 'arriba' : 'abajo'}?`,
+          options: ['La SUPERIOR', 'La INFERIOR'],
+        });
+        idx = pick === 1 ? cands[cands.length - 1] : cands[0];
+      }
+      const c = p.life[idx];
+      c.faceUp = toUp;
+      const pos = idx === 0 ? 'superior' : idx === p.life.length - 1 ? 'inferior' : `${idx + 1}ª`;
+      if (toUp) this.log(`${p.name} voltea la carta ${pos} de su Vida boca arriba: ¡${c.name}!`);
+      else this.log(`${p.name} voltea la carta ${pos} de su Vida boca abajo.`);
+    }
+  }
 
   // Elige el índice de la carta de Vida a usar. Cuando el efecto permite
   // "de arriba o de abajo", el dueño decide (a ciegas: no ve las cartas).
@@ -1119,6 +1153,7 @@ export class Game {
           for (let i = 0; i < op.n && opp.life.length; i++) {
             const c = opp.life.shift();
             c.zone = 'trash';
+            c.faceUp = false;
             opp.trash.push(c);
             this.log(`☠ ${opp.name} pierde 1 vida al descarte (${c.name}). Le quedan ${opp.life.length}.`);
           }
@@ -1249,6 +1284,7 @@ export class Game {
             const idx = await this.pickLifeIndex(p, op.pick);
             const c = p.life.splice(idx, 1)[0];
             c.zone = 'hand';
+            c.faceUp = false;
             p.hand.push(c);
             this.log(`${p.name} añade ${c.name} de su Vida a la mano. Le quedan ${p.life.length}.`);
           }
@@ -1258,6 +1294,7 @@ export class Game {
           for (let i = 0; i < op.n && p.library.length; i++) {
             const c = p.library.shift();
             c.zone = 'life';
+            c.faceUp = false;
             p.life.unshift(c);
             this.log(`${p.name} pone la carta superior del mazo en su Vida (${p.life.length}).`);
           }
@@ -1279,6 +1316,7 @@ export class Game {
           if (cand && cand.zone === 'hand' && cand.owner === p) {
             p.hand.splice(p.hand.indexOf(cand), 1);
             cand.zone = 'life';
+            cand.faceUp = !!op.faceUp;
             p.life.unshift(cand);
             this.log(`${p.name} pone ${cand.name} en lo alto de su Vida (ahora ${p.life.length}).`);
           }
@@ -1288,6 +1326,7 @@ export class Game {
           for (let i = 0; i < op.n && p.library.length; i++) {
             const c = p.library.shift();
             c.zone = 'life';
+            c.faceUp = false;
             p.life.unshift(c);
           }
           this.log(`${p.name} añade ${op.n} carta(s) del mazo a lo alto de su Vida (ahora ${p.life.length}).`);
@@ -1303,6 +1342,7 @@ export class Game {
           if (c && p.life.includes(c)) {
             p.life.splice(p.life.indexOf(c), 1);
             c.zone = 'deck';
+            c.faceUp = false;
             p.library.unshift(c);
             this.log(`${p.name} pone una carta de su Vida en lo alto del mazo (Vida: ${p.life.length}).`);
           }
@@ -1326,7 +1366,7 @@ export class Game {
             const wants = p.isBot ? true : await p.controller.chooseOption(this, { prompt: `¿Jugar ${c.name} desde tu Vida?`, options: ['Sí, jugarla', 'No'] }) === 0;
             if (wants) {
               p.life.shift();
-              c.zone = 'characters'; c.rested = false; c.summonedThisTurn = true; c.enteredTurn = this.turn;
+              c.zone = 'characters'; c.faceUp = false; c.rested = false; c.summonedThisTurn = true; c.enteredTurn = this.turn;
               p.characters.push(c);
               ctx.didPlay = true;
               this.log(`${p.name} juega ${c.name} desde su Vida.`);
@@ -1338,7 +1378,7 @@ export class Game {
         case 'lookAddToLife': {
           const seen = p.library.splice(0, Math.min(op.n, p.library.length));
           const hit = seen.find((c) => this.matchesFilter(c, op.filter));
-          if (hit) { seen.splice(seen.indexOf(hit), 1); hit.zone = 'life'; p.life.unshift(hit); this.log(`${p.name} añade ${hit.name} a lo alto de su Vida (${p.life.length}).`); }
+          if (hit) { seen.splice(seen.indexOf(hit), 1); hit.zone = 'life'; hit.faceUp = !!op.faceUp; p.life.unshift(hit); this.log(`${p.name} añade ${hit.name} a lo alto de su Vida (${p.life.length}).`); }
           this.shuffle(seen); p.library.push(...seen);
           break;
         }
@@ -1347,6 +1387,7 @@ export class Game {
           for (let i = 0; i < op.n && p.life.length; i++) {
             const c = p.life.shift();
             c.zone = 'trash';
+            c.faceUp = false;
             p.trash.push(c);
             this.log(`${p.name} trashea la carta superior de su Vida (${c.name}). Vidas: ${p.life.length}.`);
           }
@@ -1413,7 +1454,7 @@ export class Game {
             if (!c || !cands.includes(c)) break;
             const zone = c.zone === 'trash' ? p.trash : p.hand;
             zone.splice(zone.indexOf(c), 1);
-            c.zone = 'life'; p.life.unshift(c);
+            c.zone = 'life'; c.faceUp = !!op.faceUp; p.life.unshift(c);
             this.log(`${p.name} pone ${c.name} en lo alto de su Vida (${p.life.length}).`);
           }
           break;
@@ -1429,12 +1470,20 @@ export class Game {
             src.donActive += c.givenDon; c.givenDon = 0;
             src.characters.splice(src.characters.indexOf(c), 1);
             c.rested = false; c.tempPower = 0; c.mods = [];
-            c.zone = 'life'; src.life.unshift(c);
+            c.zone = 'life'; c.faceUp = !!op.faceUp; src.life.unshift(c);
             this.log(`${c.name} pasa a lo alto de la Vida de ${src.name} (${src.life.length}).`);
           }
           break;
         }
-        case 'trashFaceUpLife': { /* No modelamos Vida boca arriba: sin efecto. */ break; }
+        case 'trashFaceUpLife': {
+          const ups = p.life.filter((c) => c.faceUp);
+          for (const c of ups) {
+            p.life.splice(p.life.indexOf(c), 1);
+            c.zone = 'trash'; c.faceUp = false; p.trash.push(c);
+          }
+          this.log(`${p.name} trashea sus ${ups.length} carta(s) de Vida boca arriba.`);
+          break;
+        }
         case 'tuckSelf': {
           const c = ctx.source; const q = c.owner;
           if (c.zone === 'characters') {
@@ -1596,7 +1645,7 @@ export class Game {
           if (c.isCharacter && p.characters.length < 5 && c.zone !== 'characters') {
             if (c.zone === 'hand') p.hand.splice(p.hand.indexOf(c), 1);
             else if (c.zone === 'trash') p.trash.splice(p.trash.indexOf(c), 1);
-            else if (c.zone === 'life') p.life.splice(p.life.indexOf(c), 1);
+            else if (c.zone === 'life') { p.life.splice(p.life.indexOf(c), 1); c.faceUp = false; }
             c.zone = 'characters';
             c.rested = !!op.rested;
             c.summonedThisTurn = true;
@@ -1950,13 +1999,15 @@ export class Game {
       return;
     }
     const lifeCard = defender.life.shift();
+    const wasUp = lifeCard.faceUp;
+    lifeCard.faceUp = false;
     if (source?.hasBanish) {
       lifeCard.zone = 'trash';
       defender.trash.push(lifeCard);
       this.log(`☠ ${defender.name} pierde 1 vida (desterrada: ${lifeCard.name}). Le quedan ${defender.life.length}.`);
       return;
     }
-    this.log(`💔 ${defender.name} pierde 1 vida (${lifeCard.name}). Le quedan ${defender.life.length}.`);
+    this.log(`💔 ${defender.name} pierde 1 vida (${lifeCard.name}${wasUp ? ', estaba boca arriba' : ''}). Le quedan ${defender.life.length}.`);
     // [Trigger]: el defensor decide si lo activa en lugar de llevársela a la mano.
     const trigAb = abilitiesOf(lifeCard, 'trigger')[0];
     // Solo se ofrece si su coste (si lo tiene) es pagable ahora mismo.
@@ -2090,6 +2141,8 @@ export class Game {
         name: p.name, hand: p.hand.map(mine), leader: mine(p.leader),
         characters: p.characters.map(mine), stage: mine(p.stage),
         life: p.life.length, lifeIds: p.life.map((c) => c.id), deck: p.library.length,
+        // Vida boca arriba = información pública (posición a posición).
+        lifeFaces: p.life.map((c) => (c.faceUp ? pub(c) : null)),
         trash: p.trash.map(pub),
         don: { deck: p.donDeck, active: p.donActive, rested: p.donRested, given: p.donGiven },
       },
@@ -2097,6 +2150,7 @@ export class Game {
         name: opp.name, handCount: opp.hand.length, leader: pub(opp.leader),
         characters: opp.characters.map(pub), stage: pub(opp.stage),
         life: opp.life.length, deck: opp.library.length, trash: opp.trash.map(pub),
+        lifeFaces: opp.life.map((c) => (c.faceUp ? pub(c) : null)),
         don: { deck: opp.donDeck, active: opp.donActive, rested: opp.donRested, given: opp.donGiven },
       },
     };

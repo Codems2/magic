@@ -11,6 +11,7 @@ export class CardInstance {
     this.owner = owner;          // Player
     this.zone = 'deck';          // deck | hand | characters | leader | stage | life | trash | don
     this.rested = false;         // girada
+    this.faceUp = false;         // solo relevante en la zona de Vida (pública si true)
     this.givenDon = 0;           // DON!! dados (cada uno +1000 en tu turno)
     this.tempPower = 0;          // bonos de batalla (counter) y de "este turno"
     this.tempCost = 0;           // reducción de coste temporal (negativa)

@@ -384,6 +384,8 @@ async function startGame(myDeck, botDeck, sandboxOpts = null) {
     onNarrate: (ev) => ui.banner(ev),
   });
   ui.bind(game, human);
+  // Ayuda de depuración (consola y tests de navegador).
+  window._game = game; window._ui = ui;
 
   if (sandbox) {
     // Tablero rival poblado (objetivos girados y sin girar) y herramientas.

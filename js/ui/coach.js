@@ -27,6 +27,17 @@ const PRIORITY = {
 const SEARCHERS = new Set(['OP10-111', 'OP13-116', 'ST36-004']);
 const isSupernova = (c) => (c?.data?.subTypes ?? []).some((s) => /Supernovas/.test(s));
 const pow = (c, game) => (typeof c?.power === 'function' ? c.power(game) : 0) ?? 0;
+const strip = (s) => String(s).replace(/<[^>]+>/g, '');
+
+// Estado boca arriba/abajo de la Vida, tanto offline (CardInstance.faceUp)
+// como online (ClientPlayer.life.faces[i] = carta pública o null).
+const lifeUpCard = (p, i) => (Array.isArray(p.life)
+  ? (p.life[i]?.faceUp ? p.life[i] : null)
+  : (p.life.faces?.[i] ?? null));
+const lifeFaceUpAt = (p, i) => !!lifeUpCard(p, i);
+// ¿Hay carta boca abajo / boca arriba en un extremo (superior o inferior)?
+const endHasFaceDown = (p) => p.life.length > 0 && (!lifeFaceUpAt(p, 0) || !lifeFaceUpAt(p, p.life.length - 1));
+const endFaceUp = (p) => (p.life.length ? (lifeUpCard(p, 0) ?? lifeUpCard(p, p.life.length - 1)) : null);
 
 export class Coach {
   constructor(human) {
@@ -53,9 +64,12 @@ export class Coach {
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('opCoachMin') : null;
     const min = saved === '1' || (saved === null && window.innerWidth < 1100);
     if (min) el.classList.add('min');
+    // El tablero se aparta para que el panel nunca tape la pila de Vidas.
+    document.body.classList.toggle('coach-open', !min);
     el.innerHTML = `<header><span>🧭 Coach ST-36</span><button type="button">${min ? '▸' : '▾'}</button></header><div class="coachBody"></div>`;
     el.querySelector('header').onclick = () => {
       const isMin = el.classList.toggle('min');
+      document.body.classList.toggle('coach-open', !isMin);
       try { localStorage.setItem('opCoachMin', isMin ? '1' : '0'); } catch { /* privado */ }
       el.querySelector('header button').textContent = isMin ? '▸' : '▾';
     };
@@ -75,14 +89,34 @@ export class Coach {
     const p = this.sync(game);
     if (!p?.leader) return;
     const opp = game.opponentOf(p);
+    const plan = this.plan(game, p, opp);
     const secs = [
+      { title: '🗺 Game plan', lines: this.gamePlan(game, p, opp) },
       { title: '📊 Situación', lines: this.situation(game, p, opp) },
-      { title: '🎯 Plan del turno', lines: this.plan(game, p, opp) },
+      { title: '🎯 Plan del turno', lines: plan },
     ];
     const w = this.warnings(game, p, opp);
     if (w.length) secs.push({ title: '⚠ Vigila', lines: w });
     this.lastPlan = secs;
     this.renderPanel();
+    // Consejo turno a turno: una línea en el historial al empezar cada turno tuyo.
+    if (game.activePlayer === p && game.turn !== this._turnLogged) {
+      this._turnLogged = game.turn;
+      const heads = plan.filter((l) => /^[🃏⚔🔄🔶🧲]/u.test(l)).slice(0, 2).map(strip);
+      const msg = heads.length ? heads.join(' · ') : strip(plan[0] ?? '');
+      this.human.ui?.logLine?.(`🧭 Coach — T${game.turn}: ${msg}`);
+    }
+  }
+
+  // La estrategia global del mazo, con la fase actual marcada.
+  gamePlan(game, p, opp) {
+    const phase = game.turn <= 3 ? 0 : game.turn <= 6 ? 1 : 2;
+    const P = [
+      'T1–3 · <b>Despliegue</b>: busca mano (Luffy/evento), baja curva (Killer &gt; resto) y TANQUEA — cada golpe que recibes es una carta y quizá un [Trigger].',
+      'T4–6 · <b>La máquina</b>: cada turno bajada + combo del líder. El líder deja una Vida boca arriba… que paga el redirect de Kid, que la vuelve a bajar: es un motor, mantenlo girando.',
+      'T7+ · <b>Cierre</b>: Bonney quita su mejor muro; pega con todo si el intercambio te deja delante. Si vas justo de vidas: blockers, counters y confiar en los [Trigger].',
+    ];
+    return P.map((t, i) => (i === phase ? `▶ ${t}` : `<span class="off">${t}</span>`));
   }
 
   situation(game, p, opp) {
@@ -120,8 +154,8 @@ export class Coach {
       if (t) lines.push(`🔄 Gira a <b>X.Drake</b> para girar a <b>${t.name}</b>: luego pégale y llévatelo por KO sin que pueda defenderse enderezado.`);
     }
     const kidChar = (p.characters ?? []).find((c) => c.data?.id === 'ST36-005');
-    if (kidChar && p.donRested > 0 && p.life.length > 0) {
-      lines.push('🔶 Activa a <b>Kid</b> (personaje): voltea 1 Vida boca arriba → 1 DON!! girado pasa a tu líder (+1000 de pegada este turno).');
+    if (kidChar && p.donRested > 0 && endHasFaceDown(p)) {
+      lines.push('🔶 Activa a <b>Kid</b> (personaje): voltea 1 Vida boca arriba → 1 DON!! girado pasa a tu líder (+1000 de pegada este turno). Y esa Vida boca arriba pagará su redirect.');
     }
 
     // 3) Ataques (con la cuenta exacta y la regla del empate).
@@ -147,11 +181,17 @@ export class Coach {
       lines.push('Orden: pega <b>primero con los personajes</b> y deja el líder para el final — así ves cuántos counters gasta el rival antes de comprometer tu líder.');
     }
 
-    // 4) El combo del líder, SIEMPRE antes de pasar.
+    // 4) El combo del líder, SIEMPRE antes de pasar. Su coste voltea la Vida
+    // SUPERIOR boca arriba: necesita que esté boca abajo.
     const targets = (p.characters ?? []).filter((c) => isSupernova(c) && c.cost >= 3 && c.cost <= 8);
     if (p.leader?.data?.id === 'OP10-099' && targets.length && p.life.length > 0) {
-      const best = targets.slice().sort((a, b) => (Number(b.rested) - Number(a.rested)) || (pow(b, game) - pow(a, game)))[0];
-      lines.push(`🧲 <b>ANTES de pasar</b>: habilidad del líder — voltea 1 Vida boca arriba y endereza a <b>${best.name}</b>${best.rested ? ' (recuperas su ataque de este turno)' : ''}: gana [Blocker] hasta tu próximo turno. Hazla casi todos los turnos: es un muro gratis.`);
+      if (!lifeFaceUpAt(p, 0)) {
+        const best = targets.slice().sort((a, b) => (Number(b.rested) - Number(a.rested)) || (pow(b, game) - pow(a, game)))[0];
+        lines.push(`🧲 <b>ANTES de pasar</b>: habilidad del líder — voltea tu Vida superior boca arriba y endereza a <b>${best.name}</b>${best.rested ? ' (recuperas su ataque de este turno)' : ''}: gana [Blocker] hasta tu próximo turno. Hazla casi todos los turnos: es un muro gratis.`);
+      } else {
+        const upTop = lifeUpCard(p, 0);
+        lines.push(`⛔ El combo del líder está <b>atascado</b>: tu Vida superior ya está boca arriba (${upTop?.name ?? '?'}). Se recarga cuando el redirect de Kid la voltee boca abajo… o cuando pierdas esa Vida.`);
+      }
     }
     return lines;
   }
@@ -206,7 +246,13 @@ export class Coach {
     if ((p.hand.length ?? 0) <= 2) lines.push('Mano corta: cada carta también es un counter. No la quemes en bajadas mediocres.');
     if (p.life.length <= 2) lines.push(`☠ A ${p.life.length} vida(s): desde ya, bloquea o countera los golpes grandes; un [Double Attack] puede rematarte.`);
     const kidChar = (p.characters ?? []).find((c) => c.data?.id === 'ST36-005');
-    if (kidChar) lines.push('Recuerda el redirect de <b>Kid</b> (1/turno) al defender: la Vida que volteas boca abajo recarga el combo del líder.');
+    if (kidChar) {
+      const fuel = endFaceUp(p);
+      if (fuel) lines.push(`Redirect de <b>Kid</b> cargado (1/turno): tu Vida boca arriba (${fuel.name}) paga desviar un ataque hacia él. Al usarlo, esa Vida vuelve boca abajo y recarga al líder.`);
+      else lines.push('El redirect de <b>Kid</b> está <b>descargado</b>: necesita una Vida boca arriba en un extremo. El combo del líder al final del turno lo carga.');
+    }
+    const ups = (p.life.length ? Array.from({ length: p.life.length }, (_, i) => lifeUpCard(p, i)) : []).filter(Boolean);
+    if (ups.length) lines.push(`👁 Vida(s) boca arriba (públicas): ${ups.map((c) => c.name).join(', ')} — el rival las ve, pero su [Trigger] sigue activo si las pierdes.`);
     return lines;
   }
 
@@ -307,7 +353,7 @@ export class Coach {
         const targets = (p.characters ?? []).filter((x) => isSupernova(x) && x.cost >= 3 && x.cost <= 8);
         if (!targets.length) return '🧭 <b>Coach:</b> no: no tienes ningún Supernovas de coste 3–8 al que enderezar — no pagues por nada.';
         const best = targets.slice().sort((a, b) => (Number(b.rested) - Number(a.rested)) || (pow(b, game) - pow(a, game)))[0];
-        return `🧭 <b>Coach:</b> sí, casi siempre: endereza a <b>${best.name}</b> y dale [Blocker] — tu mejor defensa. Voltear la Vida boca arriba apenas te cuesta nada.`;
+        return `🧭 <b>Coach:</b> sí, casi siempre: endereza a <b>${best.name}</b> y dale [Blocker] — tu mejor defensa. La Vida volteada se revela (queda pública), pero a cambio deja cargado el redirect de Kid.`;
       }
       case 'ST36-005:onOppAttack':
         return '🧭 <b>Coach:</b> redirige si el golpe iba a tu líder o a una pieza clave: Kid (7000) lo tanquea. Bonus: la Vida boca abajo recarga el combo del líder. No lo hagas si Kid muere por nada.';

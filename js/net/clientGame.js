@@ -82,7 +82,11 @@ class ClientPlayer {
     this.leader = this._cg.registerDesc(v.leader);
     this.characters = (v.characters ?? []).map((d) => this._cg.registerDesc(d));
     this.stage = v.stage ? this._cg.registerDesc(v.stage) : null;
-    this.life = { length: v.life ?? 0 };
+    // faces[i] = carta pública si la posición i está boca arriba, o null.
+    this.life = {
+      length: v.life ?? 0,
+      faces: (v.lifeFaces ?? []).map((d) => (d ? this._cg.registerDesc(d) : null)),
+    };
     this.library = { length: v.deck ?? 0 };
     this.trash = (v.trash ?? []).map((d) => this._cg.registerDesc(d));
     this.donDeck = v.don.deck; this.donActive = v.don.active;

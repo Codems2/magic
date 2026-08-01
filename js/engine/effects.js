@@ -355,8 +355,8 @@ function parseOps(text, unknown) {
     text = text.replace(mm[0], '');
   }
   // "Look at N cards from the top of your deck and add up to 1 <filtro> to the top of your life".
-  if ((mm = text.match(/look at (\d+) cards? from the top of your deck and add up to 1 (.+?) to the top of your life cards?(?: face-up)?/i))) {
-    ops.push({ op: 'lookAddToLife', n: n(mm[1]), filter: parseFilter(mm[2]) });
+  if ((mm = text.match(/look at (\d+) cards? from the top of your deck and add up to 1 (.+?) to the top of your life cards?( face-up)?/i))) {
+    ops.push({ op: 'lookAddToLife', n: n(mm[1]), filter: parseFilter(mm[2]), faceUp: !!mm[3] });
     text = text.replace(mm[0], '');
   }
   // Vida: mira/ordena, escruta la de ambos, añade de la mano, etc.
@@ -381,14 +381,14 @@ function parseOps(text, unknown) {
     ops.push({ op: 'handToLife', filter: {} });
     text = text.replace(mm[0], '');
   }
-  if ((mm = text.match(/add up to (\d+) (.+?) from your (?:hand or trash|hand|trash) to the top of your life cards?(?: face-up)?/i))) {
-    ops.push({ op: 'cardsToLifeFromZone', n: n(mm[1]), filter: parseFilter(mm[2]), from: /hand or trash/i.test(mm[0]) ? 'handTrash' : /trash/i.test(mm[0]) ? 'trash' : 'hand' });
+  if ((mm = text.match(/add up to (\d+) (.+?) from your (?:hand or trash|hand|trash) to the top of your life cards?( face-up)?/i))) {
+    ops.push({ op: 'cardsToLifeFromZone', n: n(mm[1]), filter: parseFilter(mm[2]), from: /hand or trash/i.test(mm[0]) ? 'handTrash' : /trash/i.test(mm[0]) ? 'trash' : 'hand', faceUp: !!mm[3] });
     text = text.replace(mm[0], '');
   }
   // Añadir un personaje del tablero a la Vida (propio o del rival), con posible
   // condición embebida ("... if you have 2 or less life cards, add ...").
-  if ((mm = text.match(/(?:if ([^,]+),\s*)?add up to (\d+) of your (opponent'?s )?characters?(?: with [^.]*?)? to the top(?: or bottom)? of the owner'?s life cards?(?: face-up)?/i))) {
-    let op = { op: 'charToLifeEffect', side: mm[3] ? 'opp' : 'own', targets: n(mm[2]), filter: parseTargetFilter(mm[0].replace(/.*characters?/i, '')) };
+  if ((mm = text.match(/(?:if ([^,]+),\s*)?add up to (\d+) of your (opponent'?s )?characters?(?: with [^.]*?)? to the top(?: or bottom)? of the owner'?s life cards?( face-up)?/i))) {
+    let op = { op: 'charToLifeEffect', side: mm[3] ? 'opp' : 'own', targets: n(mm[2]), filter: parseTargetFilter(mm[0].replace(/.*characters?/i, '')), faceUp: !!mm[4] };
     const c = mm[1] ? parseCondition('if ' + mm[1]) : null;
     if (c) op = { op: 'ifCond', cond: c, ops: [op] };
     ops.push(op);
@@ -434,8 +434,8 @@ function parseOps(text, unknown) {
     return [{ op: 'trashOppLife', n: n(mm[1]) }];
   }
   // Revelar y poner una carta de la mano en lo alto de tu Vida (Ivankov).
-  if ((mm = text.match(/(?:reveal up to 1 |add up to 1 )?(.+?) from your hand and add it to the top of your life cards?(?: face-down| face-up)?/i))) {
-    ops.push({ op: 'handToLife', filter: parseFilter(mm[1]) });
+  if ((mm = text.match(/(?:reveal up to 1 |add up to 1 )?(.+?) from your hand and add it to the top of your life cards?( face-down| face-up)?/i))) {
+    ops.push({ op: 'handToLife', filter: parseFilter(mm[1]), faceUp: /face-up/i.test(mm[2] ?? '') });
     text = text.replace(mm[0], '');
   }
   // Añadir carta(s) de lo alto del mazo a lo alto de tu Vida (Newgate).
@@ -858,7 +858,7 @@ function parseCost(text) {
     donRest: 0, donReturn: 0, donReturnVar: false, trashHand: 0, trashHandFilter: null,
     trashHandAny: false, restSelf: false, trashSelf: false, trashLife: 0, lifeToHand: 0,
     restOwn: null, bounceOwn: null, trashToBottom: 0, charToLife: null, turnLifeDown: 0,
-    returnGivenDon: 0, revealHand: null, optional: true,
+    turnLifeUp: 0, turnLifeEnds: null, returnGivenDon: 0, revealHand: null, optional: true,
   };
   const l = text.toLowerCase();
   let m;
@@ -886,12 +886,14 @@ function parseCost(text) {
   if ((m = text.match(/return (\d+) of your (.+?) to the owner'?s hand/i))) cost.bounceOwn = { n: n(m[1]), filter: parseTargetFilter(m[2]) };
   if ((m = l.match(/place (\d+) cards? from your trash at the bottom of your deck/))) cost.trashToBottom = n(m[1]);
   if ((m = text.match(/add (\d+) of your (.+?) to the top of your life cards?/i))) cost.charToLife = { n: n(m[1]), filter: parseTargetFilter(m[2]) };
-  if ((m = l.match(/turn (\d+) of your face-up life cards? face-down/))) cost.turnLifeDown = n(m[1]);
+  if ((m = l.match(/turn (\d+) of your face-up life cards? face-down/))) { cost.turnLifeDown = n(m[1]); cost.turnLifeEnds = 'any'; }
   // "turn N card(s) from the top (or bottom) of your Life cards face-up/-down"
-  // (ST-36: el estado boca arriba/abajo no se modela, pero exige tener Vida).
-  else if ((m = l.match(/turn (\d+) cards? from the top(?: or bottom)? of your life cards? face-(up|down)/))) {
-    if (m[2] === 'up') cost.turnLifeUp = n(m[1]);
+  // (ST-36). El estado boca arriba/abajo SÍ se modela: voltear boca arriba
+  // exige una carta boca abajo en esa posición, y al revés.
+  else if ((m = l.match(/turn (\d+) cards? from the top( or bottom)? of your life cards? face-(up|down)/))) {
+    if (m[3] === 'up') cost.turnLifeUp = n(m[1]);
     else cost.turnLifeDown = n(m[1]);
+    cost.turnLifeEnds = m[2] ? 'both' : 'top';
   }
   if ((m = text.match(/reveal (\d+) (.+?) from your hand/i))) cost.revealHand = { n: n(m[1]), filter: parseTargetFilter(m[2]) };
   if (/rest this (?:card|stage|character)/.test(l)) cost.restSelf = true;
