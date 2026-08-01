@@ -173,6 +173,10 @@ export class HardBot extends BotController {
     const p = this.player;
     const attacker = game.byId(attackerId);
     const atkPower = attacker.power(game);
+    // Un ataque que no llega al poder del objetivo fracasa por sí solo:
+    // bloquear regalaría el descanso del bloqueador (y hasta su KO).
+    const curTarget = targetId === 'leader' ? p.leader : game.byId(targetId);
+    if (curTarget && atkPower < curTarget.power(game)) return null;
     const candidates = blockerIds.map((id) => game.byId(id));
     const survivor = candidates.filter((b) => b.power(game) > atkPower).sort((a, b) => a.cost - b.cost)[0];
     const cheapest = candidates.slice().sort((a, b) => a.cost - b.cost)[0];

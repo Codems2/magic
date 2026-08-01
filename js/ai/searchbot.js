@@ -79,10 +79,15 @@ export class SearchBot extends HardBot {
     for (const atk of attackers) {
       if (p.donActive >= 1) add({ type: 'giveDon', cardId: atk.id, n: 1 });
       if (p.donActive >= 2) add({ type: 'giveDon', cardId: atk.id, n: 2 });
-      add({ type: 'attack', attackerId: atk.id, targetId: 'leader' });
+      // Un ataque cuyo poder no llega al del objetivo no entra: solo merece
+      // simularse si el atacante tiene un [When Attacking] utilizable (puede
+      // subir poder o generar valor al declarar).
+      const pump = abilitiesOf(atk, 'whenAttacking').some((ab) => (ab.donX ?? 0) <= atk.givenDon);
+      const worthIt = (tPower) => atk.power(game) >= tPower || pump;
+      if (worthIt(opp.leader.power(game))) add({ type: 'attack', attackerId: atk.id, targetId: 'leader' });
       const canHitActive = atk.script?.abilities?.some((ab) => ab.ops.some((o) => o.op === 'canAttackActive'));
       for (const t of opp.characters.filter((c) => c.rested || canHitActive)) {
-        add({ type: 'attack', attackerId: atk.id, targetId: t.id });
+        if (worthIt(t.power(game))) add({ type: 'attack', attackerId: atk.id, targetId: t.id });
       }
     }
     return out.slice(0, this.maxCandidates + 8);
@@ -205,6 +210,8 @@ export class SearchBot extends HardBot {
     // Defensa lista y objetivos girados del rival para el próximo turno.
     s += me.characters.filter((c) => !c.rested && c.hasBlocker).length * 0.4;
     s += opp.characters.filter((c) => c.rested).length * 0.2;
+    // Girar un personaje propio sin sacar nada es regalar un objetivo.
+    s -= me.characters.filter((c) => c.rested).length * 0.15;
     return s;
   }
 }

@@ -458,9 +458,9 @@ function parseOps(text, unknown) {
   }
   // Añadir un personaje del tablero a la Vida (propio o del rival), con posible
   // condición embebida ("... if you have 2 or less life cards, add ...").
-  if ((mm = text.match(/(?:if ([^,]+),\s*)?(?:add|place) up to (\d+) (?:of your (opponent'?s )?)?characters?(?: with [^.]*?)? to the top(?: or bottom)? of (?:the owner'?s|your opponent'?s) life cards?( face-up)?/i))) {
+  if ((mm = text.match(/(?:if ([^,]+),\s*)?(?:add|place) up to (\d+) (?:of your (opponent'?s )?)?characters?(?: with [^.]*?)? to the top(?: or bottom)? of (?:the owner'?s|your opponent'?s) life cards?( face-up| face-down)?/i))) {
     const hasPoss = / of your /i.test(mm[0].slice(0, mm[0].search(/characters?/i)));
-    let op = { op: 'charToLifeEffect', side: mm[3] ? 'opp' : hasPoss ? 'own' : 'any', targets: n(mm[2]), filter: parseTargetFilter(mm[0].replace(/.*characters?/i, '')), faceUp: !!mm[4] };
+    let op = { op: 'charToLifeEffect', side: mm[3] ? 'opp' : hasPoss ? 'own' : 'any', targets: n(mm[2]), filter: parseTargetFilter(mm[0].replace(/.*characters?/i, '')), faceUp: /face-up/i.test(mm[4] ?? '') };
     const c = mm[1] ? parseCondition('if ' + mm[1]) : null;
     if (c) op = { op: 'ifCond', cond: c, ops: [op] };
     ops.push(op);
@@ -490,8 +490,8 @@ function parseOps(text, unknown) {
     ops.push({ op: 'revealPlay', filter: parseFilter(mm[1] + ' card'), maxCost: parseInt(mm[2], 10), rested: !!mm[3] });
     text = text.replace(mm[0], '');
     text = text.replace(/^,?\s*and place the rest at the top or bottom of your deck\.?/i, '');
-  } else if ((mm = text.match(/reveal (?:up to )?1 cards? from the top of your deck[.,;]?\s*(?:if (?:it|that card) is (?:an? )?(.+?)(?: with (?:a )?cost of (\d+)(?: or less)?)?,?\s*)?(?:you may )?play (?:up to 1 |it|that card)/i))) {
-    ops.push({ op: 'revealPlay', filter: mm[1] ? parseFilter(mm[1]) : {}, maxCost: mm[2] ? parseInt(mm[2], 10) : null });
+  } else if ((mm = text.match(/reveal (?:up to )?1 cards? from the top of your deck[.,;]?\s*(?:if (?:it|that card) is (?:an? )?(.+?)(?: with (?:a )?cost of (\d+)(?: or less)?)?,?\s*)?(?:you may )?play (?:up to 1 |it|that card)( rested)?/i))) {
+    ops.push({ op: 'revealPlay', filter: mm[1] ? parseFilter(mm[1]) : {}, maxCost: mm[2] ? parseInt(mm[2], 10) : null, rested: !!mm[3] });
     text = text.replace(mm[0], '');
   }
   // El rival elige una de dos opciones (modal del oponente) — ANTES que los
@@ -1379,6 +1379,8 @@ export function buildScript(card) {
     .replace(/[’‘]/g, "'")                                      // apóstrofes tipográficos
     .replace(/\[([^\]]+)\]/g, (mm) => mm.replace(/\.\s+/g, '.\u00A0')) // "[Dr. Hogback]" no parte la frase
     .replace(/from your, don!! deck/gi, 'from your DON!! deck')  // typo de la fuente
+    .replace(/\[DON!!\s*[×x]\s*(\d+)\]/gi, '[DON!! x$1]')        // "[DON!!×1]" → "[DON!! x1]"
+    .replace(/\bdraw a card\b/gi, 'draw 1 card')                 // "Draw a card" → forma numérica
     .replace(/this satage/gi, 'this Stage')                      // typo de la fuente
     .replace(/[–—−]/g, '-')                                     // guiones tipográficos → '-'
     .replace(/([a-z])[-](\d)/gi, '$1 -$2')                       // "Characters-1000" → "Characters -1000"
@@ -1497,6 +1499,10 @@ export function buildScript(card) {
   }
   // Limpia habilidades vacías (p. ej. solo palabras clave).
   script.abilities = script.abilities.filter((a) => a.ops.length || a.cost);
+  // Restos sin contenido semántico (conectores sueltos que quedan al consumir
+  // el resto de la frase) no cuentan como "efecto sin implementar".
+  script.unknown = [...new Set(script.unknown)]
+    .filter((u) => !/^[\s.,;:]*(?:and|then|or|in any order)?[\s.,;:]*$/i.test(u));
   return script;
 }
 

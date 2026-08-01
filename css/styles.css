@@ -508,7 +508,7 @@ body.show-log #log { display: block; }
 }
 @keyframes usepulse { 0%,100% { box-shadow: 0 0 6px rgba(78,205,138,.6); } 50% { box-shadow: 0 0 14px rgba(78,205,138,1); } }
 .card.has-use { border-color: var(--ok); }
-.card .warnB { position: absolute; bottom: 2px; left: 2px; background: rgba(200,120,40,.95); color: #fff; font-size: .58rem; font-weight: 800; border-radius: 3px; padding: 0 3px; }
+.card .warnB { position: absolute; top: 2px; left: 50%; transform: translateX(-50%); background: rgba(200,120,40,.95); color: #fff; font-size: .58rem; font-weight: 800; border-radius: 3px; padding: 0 3px; pointer-events: none; }
 #preview .hint, #previewModal .hint { color: var(--gold); }
 
 /* efectos de combate */
