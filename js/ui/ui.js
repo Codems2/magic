@@ -397,50 +397,110 @@ export class UI {
     const cont = $('hand');
     cont.innerHTML = '';
     for (const c of me.hand) cont.appendChild(this.cardEl(c, { hand: true }));
-    // Móvil/táctil: lupa para ver TODA la mano en grande.
-    if ((IS_TOUCH || window.innerWidth < 900) && me.hand.length) {
-      const zoom = document.createElement('button');
-      zoom.id = 'handZoom';
-      zoom.type = 'button';
-      zoom.textContent = '🔍';
-      zoom.title = 'Ver tu mano en grande';
-      zoom.onclick = (e) => { e.stopPropagation(); this.showHandModal(me); };
-      cont.appendChild(zoom);
+    // Táctil/estrecho: tocar el fondo de la mano despliega el visor en grande
+    // (tocar una CARTA conserva su función de siempre).
+    if (IS_TOUCH || window.innerWidth < 900) {
+      cont.onclick = (e) => {
+        if (e.target === cont && me.hand.length) this.openHandViewer(me);
+      };
+    } else {
+      cont.onclick = null;
     }
   }
 
-  // Visor de la mano completa (móvil): cartas grandes, toca una para ampliarla.
-  showHandModal(me) {
-    document.getElementById('handModal')?.remove();
+  // Visor de la mano: las cartas VUELAN desde tu mano, se ordenan por coste
+  // en pantalla y, al cerrar, vuelven volando a su sitio.
+  openHandViewer(me) {
+    if (document.getElementById('handModal')) return;
+    const hand = me.hand.slice().sort((a, b) => (a.cost ?? 0) - (b.cost ?? 0) || (a.data.power ?? 0) - (b.data.power ?? 0));
+
     const modal = document.createElement('div');
     modal.id = 'handModal';
-    const head = document.createElement('div');
-    head.className = 'hmHead';
-    head.innerHTML = `<b>✋ Tu mano (${me.hand.length})</b><span>toca una carta para ampliarla</span>`;
-    modal.appendChild(head);
+    modal.innerHTML = `<div class="hmHead"><b>✋ Tu mano (${hand.length})</b><span>toca una carta para ampliarla · toca fuera para volver</span></div>`;
     const grid = document.createElement('div');
     grid.className = 'hmGrid';
-    for (const c of me.hand) {
+    const cells = new Map();   // carta → celda destino
+    for (const c of hand) {
       const el = document.createElement('div');
-      el.className = 'hmCard';
+      el.className = 'hmCard hmHidden';
       const img = c.data.image;
       if (img && !failedImages.has(img)) {
-        el.innerHTML = `<img src="${img}" alt="${c.name}" loading="lazy">`;
+        el.innerHTML = `<img src="${img}" alt="${c.name}" loading="eager">`;
         el.querySelector('img').onerror = () => { failedImages.add(img); el.innerHTML = this.previewText(c); };
       } else {
         el.innerHTML = this.previewText(c);
       }
       el.onclick = (e) => { e.stopPropagation(); this.showPreviewModal(c); };
       grid.appendChild(el);
+      cells.set(c, el);
     }
     modal.appendChild(grid);
-    const close = document.createElement('button');
-    close.className = 'hmClose';
-    close.textContent = 'Cerrar';
-    close.onclick = () => modal.remove();
-    modal.appendChild(close);
-    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+    modal.onclick = (e) => { if (e.target === modal || e.target.classList?.contains('hmHead')) this.closeHandViewer(me); };
     document.body.appendChild(modal);
+    requestAnimationFrame(() => modal.classList.add('open'));
+
+    // Vuelo de ida: clones desde la posición real de cada carta en la mano.
+    const flights = [];
+    hand.forEach((c, i) => {
+      const src = document.querySelector(`#hand [data-cid="${c.id}"]`)?.getBoundingClientRect();
+      const dst = cells.get(c).getBoundingClientRect();
+      if (!src || !dst.width) return;
+      const fly = this.makeFlyCard(c, src);
+      fly.style.transitionDelay = `${i * 45}ms`;
+      document.body.appendChild(fly);
+      flights.push(fly);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        Object.assign(fly.style, { left: `${dst.left}px`, top: `${dst.top}px`, width: `${dst.width}px`, height: `${dst.height}px` });
+      }));
+    });
+    setTimeout(() => {
+      grid.querySelectorAll('.hmCard').forEach((el) => el.classList.remove('hmHidden'));
+      flights.forEach((f) => f.remove());
+    }, 420 + hand.length * 45);
+  }
+
+  closeHandViewer(me) {
+    const modal = document.getElementById('handModal');
+    if (!modal || modal.dataset.closing) return;
+    modal.dataset.closing = '1';
+    // Vuelo de vuelta: de la rejilla a la posición actual en la mano.
+    const flights = [];
+    for (const el of modal.querySelectorAll('.hmCard')) {
+      const src = el.getBoundingClientRect();
+      el.classList.add('hmHidden');
+      flights.push([el, src]);
+    }
+    // Empareja cada celda con su carta por orden de creación.
+    const sorted = me.hand.slice().sort((a, b) => (a.cost ?? 0) - (b.cost ?? 0) || (a.data.power ?? 0) - (b.data.power ?? 0));
+    flights.forEach(([el, src], k) => {
+      const c = sorted[k];
+      const dstEl = c ? document.querySelector(`#hand [data-cid="${c.id}"]`) : null;
+      const dst = dstEl?.getBoundingClientRect();
+      if (!c || !dst) return;
+      const fly = this.makeFlyCard(c, src);
+      fly.style.transitionDelay = `${k * 35}ms`;
+      document.body.appendChild(fly);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        Object.assign(fly.style, { left: `${dst.left}px`, top: `${dst.top}px`, width: `${dst.width}px`, height: `${dst.height}px`, opacity: '0.15' });
+      }));
+      setTimeout(() => fly.remove(), 480 + k * 35);
+    });
+    modal.classList.remove('open');
+    setTimeout(() => modal.remove(), 460 + flights.length * 35);
+  }
+
+  // Clon volador de una carta (para las transiciones del visor).
+  makeFlyCard(c, rect) {
+    const fly = document.createElement('div');
+    fly.className = 'flyCard';
+    const img = c.data.image;
+    if (img && !failedImages.has(img)) fly.innerHTML = `<img src="${img}" alt="">`;
+    else fly.innerHTML = `<span>${c.name}</span>`;
+    Object.assign(fly.style, {
+      left: `${rect.left}px`, top: `${rect.top}px`,
+      width: `${rect.width}px`, height: `${rect.height}px`,
+    });
+    return fly;
   }
 
   // Flecha de ataque con pausa, para poder seguir el combate.
