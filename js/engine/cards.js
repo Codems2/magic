@@ -49,6 +49,8 @@ export class CardInstance {
   // Palabra clave activa = impresa, otorgada "este turno" o por un modificador
   // temporizado (p. ej. "gana [Rush] hasta tu próximo turno").
   hasKeyword(kw) {
+    // "Negate the effect of ...": sin keywords (ni impresas) este turno.
+    if (this._negatedUntil !== undefined && this._negatedUntil === this.game?.turn) return false;
     if (this.text.includes(`[${kw}]`)) return true;
     if (this._tempKw?.has(kw)) return true;
     if (this.mods.some((m) => m.stat === 'kw' && m.kw === kw)) return true;

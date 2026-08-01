@@ -32,7 +32,8 @@ function parseFilter(text) {
     text = text.replace(m[0], ' ');
   }
   // Nombres entre corchetes: [Sabo], [Ace], or [Luffy].
-  const names = [...text.matchAll(/\[([^\]]+)\]/g)].map((x) => x[1]).filter((x) => !/^(don!!|blocker|rush)/i.test(x));
+  if (/\[trigger\]/i.test(text) || /\b(?:with|and) a trigger\b/i.test(text)) f.hasTrigger = true;
+  const names = [...text.matchAll(/\[([^\]]+)\]/g)].map((x) => x[1]).filter((x) => !/^(don!!|blocker|rush|trigger|banish|double attack)/i.test(x));
   if (names.length) f.names = names;
   // Fuera los [nombres] antes de mirar subtipos (comillas internas de nombres).
   text = text.replace(/\[[^\]]+\]/g, ' ');
@@ -60,6 +61,7 @@ function parseTargetFilter(text) {
     f.notName = m[1];
     text = text.replace(m[0], ' ');
   }
+  if (/\[trigger\]/i.test(text) || /\b(?:with|and) a trigger\b/i.test(text)) f.hasTrigger = true;
   const names = [...text.matchAll(/\[([^\]]+)\]/g)].map((x) => x[1]).filter((x) => !/^(don!!|blocker|rush|double attack|banish|trigger)/i.test(x));
   if (names.length) f.names = names;
   // Quita los nombres [X] antes de buscar subtipos: las comillas DENTRO de un
@@ -124,6 +126,17 @@ function parseGrant(text) {
 function parseBuff(sentence) {
   const l = sentence.toLowerCase();
   let m;
+  // Rival: "give all of your opponent's <scope> -N power/cost [dur]".
+  if ((m = l.match(/^give all of your opponent'?s (.+?) ([+-]?\d+ (?:power|cost)(?: and [+-]?\d+ (?:power|cost))*) ?(.*)$/))) {
+    const grant = parseGrant(m[2]);
+    for (const ch of grant.changes) if (ch.delta > 0) ch.delta = -ch.delta;
+    return {
+      op: 'buff', side: 'opp', all: true, targets: 99,
+      scope: scopeOf(m[1]), filter: parseTargetFilter(m[1]),
+      changes: grant.changes, kws: grant.kws, per: grant.per,
+      dur: durOf((m[3] || sentence).toLowerCase()),
+    };
+  }
   // Rival: "give (up to) N of your opponent's <scope> -N power/cost [dur]".
   if ((m = l.match(/^give (?:up to )?(\d+) of your opponent'?s (.+?) ([+-]?\d+ (?:power|cost)(?: and [+-]?\d+ (?:power|cost))*) ?(.*)$/))) {
     const grant = parseGrant(m[3]);
@@ -235,7 +248,12 @@ function parseConditionSingle(raw) {
   if ((m = l.match(/^you have (\d+) or (less|more) cards? in your hand/))) return { t: 'youHand', dir: m[2], v: +m[1] };
   if ((m = l.match(/^your opponent has (\d+) or more cards? in (?:their|your opponent'?s) hand/))) return { t: 'oppHand', dir: 'more', v: +m[1] };
   if ((m = l.match(/^your opponent has a character with (\d+)(?: or more)? (base )?power/))) return { t: 'oppHasChar', filter: { [m[2] ? 'basePower' : 'power']: { v: +m[1], dir: 'more' } } };
-  if ((m = l.match(/^your opponent has (\d+) or more rested characters/))) return { t: 'oppRested', v: +m[1] };
+  if ((m = l.match(/^your opponent has (\d+) or more rested (characters?|cards?)/))) return { t: 'oppRested', v: +m[1], anyCard: m[2].startsWith('card') };
+  if ((m = l.match(/^you have (\d+) or more cards? in your trash/))) return { t: 'trashCount', v: +m[1] };
+  if ((m = l.match(/^your opponent has (\d+) or more don!! cards? on their field/))) return { t: 'oppDon', v: +m[1] };
+  if ((m = raw.match(/^your leader has the (?:\{([^}]+)\}|["“]([^"”]+)["”]) or (?:\{([^}]+)\}|["“]([^"”]+)["”]) type/i))) {
+    return { t: 'or', a: { t: 'leaderType', type: m[1] ?? m[2] }, b: { t: 'leaderType', type: m[3] ?? m[4] } };
+  }
   if ((m = raw.match(/^your leader is \[([^\]]+)\]/i))) return { t: 'leaderName', name: m[1] };
   if ((m = raw.match(/^your leader has the (?:\{([^}]+)\}|["“]([^"”]+)["”]|\[([^\]]+)\]) type/i)) || (m = raw.match(/^your leader'?s type includes ["“]([^"”]+)["”]/i))) return { t: 'leaderType', type: m[1] ?? m[2] ?? m[3] ?? m[4] };
   if ((m = l.match(/^you have (\d+) or (less|more) characters?$/))) return { t: 'youHaveMatch', count: +m[1], dir: m[2], filter: {} };
@@ -252,6 +270,7 @@ function parseConditionSingle(raw) {
   if (/^this character was played on this turn/.test(l)) return { t: 'playedThisTurn' };
   if (/^your opponent has more don!! cards? on their field than you/.test(l)) return { t: 'oppMoreDon' };
   if (/^a character is rested by your effect/.test(l)) return { t: 'restedByEffect' };
+  if ((m = raw.match(/^you (?:do not|don'?t) have (?:a |an )?\[([^\]]+)\]/i))) return { t: 'not', a: { t: 'youHaveMatch', count: 1, filter: { names: [m[1]] } } };
   // "you do not have N characters with ..." (condición negada).
   if ((m = l.match(/^you do not have (\d+) characters? (with .+)$/))) return { t: 'not', a: { t: 'youHaveMatch', count: +m[1], filter: parseTargetFilter(m[2]) } };
   // "you have a/N ... character(s) ..." con filtro (nombre/coste/poder).
@@ -293,6 +312,33 @@ function parseOps(text, unknown) {
   // Restos de "You may ..." sin coste reconocido (el opcional lo gestiona el
   // paso de coste); también "You may to your hand:" (texto mutilado de la API).
   text = text.replace(/^\s*you may to your hand:\s*/i, '').replace(/^\s*you may\s*:\s*/i, '').trim();
+  // "[Trigger] Activate this card's [On Play]/[Main] effect": alias de otra habilidad.
+  if ((mm = text.match(/^\s*activate (?:this card'?s (on play|on ko|main|when attacking|counter|activate: main) effects?|the (main|on play|counter) effect of this card)\.?\s*$/i))) {
+    const MAPW = { 'on play': 'onPlay', 'on ko': 'onKO', main: 'main', 'when attacking': 'whenAttacking', counter: 'counter', 'activate: main': 'activateMain' };
+    return [{ op: 'aliasAbility', when: MAPW[(mm[1] ?? mm[2]).toLowerCase()] }];
+  }
+  // "Select up to N of your opponent's Characters <filtro>. The selected ... cannot attack ..."
+  if ((mm = text.match(/select up to (\d+) of your opponent'?s characters?([^.]*)\.\s*(?:the|that) selected characters? cannot attack until the (?:end|start) of your (?:opponent'?s )?next turn/i))) {
+    ops.push({ op: 'cannotAttack', targets: n(mm[1]), filter: parseTargetFilter(mm[2]) });
+    text = text.replace(mm[0], '');
+  }
+  // "Select your opponent's rested Leader and up to N Character(s). The selected
+  // cards will not become active in your opponent's next Refresh Phase."
+  if ((mm = text.match(/select your opponent'?s rested leader and up to (\d+) (?:rested )?character cards?([^.]*)\.\s*the selected cards? will not become active in your opponent'?s next refresh phase/i))) {
+    ops.push({ op: 'freeze', targets: n(mm[1]), includeLeader: true, filter: parseTargetFilter(mm[2]) });
+    text = text.replace(mm[0], '');
+  }
+  // "Select up to 1 of your opponent's Characters. This Character's base power
+  // becomes the same as the selected character's power during this turn."
+  if ((mm = text.match(/select up to (\d+) of your opponent'?s characters?([^.]*)\.\s*this character'?s base power becomes the same as the selected character'?s power(?: during this turn)?/i))) {
+    ops.push({ op: 'copyPowerFromOpp', filter: parseTargetFilter(mm[2]) });
+    text = text.replace(mm[0], '');
+  }
+  // "Select N of your Characters. Change the attack target to the selected character."
+  if ((mm = text.match(/select (?:up to )?(\d+) of your ([^.]*?)characters?([^.]*)\.\s*change the attack target to the selected character/i))) {
+    ops.push({ op: 'redirectAttack', filter: parseTargetFilter(mm[2] + ' ' + mm[3]) });
+    text = text.replace(mm[0], '');
+  }
   // Katakuri (púrpura): "Choose a cost and reveal 1 card from the top of your
   // opponent's deck. If the revealed card has the chosen cost, <efecto>."
   if ((mm = text.match(/choose a cost and reveal 1 card from the top of your opponent'?s deck\.?\s*if the revealed card has the chosen cost,?\s*([\s\S]+?)(?:\.\s|\.$|$)/i))) {
@@ -334,7 +380,7 @@ function parseOps(text, unknown) {
     ops.push({ op: 'lifeToHand', n: 1, pick: true });
     text = text.replace(mm[0], '');
   }
-  if ((mm = text.match(/add up to (\d+) cards? from the top of your life[^.]*?to (?:your|its owner'?s?) hand/i))) {
+  if ((mm = text.match(/add (?:up to )?(\d+) cards? from the top of your life[^.]*?to (?:your|its owner'?s?) hand/i))) {
     ops.push({ op: 'lifeToHand', n: n(mm[1]) });
     text = text.replace(mm[0], '');
   }
@@ -387,8 +433,9 @@ function parseOps(text, unknown) {
   }
   // Añadir un personaje del tablero a la Vida (propio o del rival), con posible
   // condición embebida ("... if you have 2 or less life cards, add ...").
-  if ((mm = text.match(/(?:if ([^,]+),\s*)?add up to (\d+) of your (opponent'?s )?characters?(?: with [^.]*?)? to the top(?: or bottom)? of the owner'?s life cards?( face-up)?/i))) {
-    let op = { op: 'charToLifeEffect', side: mm[3] ? 'opp' : 'own', targets: n(mm[2]), filter: parseTargetFilter(mm[0].replace(/.*characters?/i, '')), faceUp: !!mm[4] };
+  if ((mm = text.match(/(?:if ([^,]+),\s*)?add up to (\d+) (?:of your (opponent'?s )?)?characters?(?: with [^.]*?)? to the top(?: or bottom)? of the owner'?s life cards?( face-up)?/i))) {
+    const hasPoss = / of your /i.test(mm[0].slice(0, mm[0].search(/characters?/i)));
+    let op = { op: 'charToLifeEffect', side: mm[3] ? 'opp' : hasPoss ? 'own' : 'any', targets: n(mm[2]), filter: parseTargetFilter(mm[0].replace(/.*characters?/i, '')), faceUp: !!mm[4] };
     const c = mm[1] ? parseCondition('if ' + mm[1]) : null;
     if (c) op = { op: 'ifCond', cond: c, ops: [op] };
     ops.push(op);
@@ -468,7 +515,7 @@ function parseOps(text, unknown) {
   // Frases separadas por ". " / "; " / ", then " / ". Then,".
   const sentences = text.split(/(?<=\.)\s+|;\s*|,\s*then\s+/i).map((s) => s.trim()).filter(Boolean);
   for (let s of sentences) {
-    s = s.replace(/\.$/, '').replace(/^then,?\s*/i, '').replace(/^if you do(?! not)(?! do)\b,?\s*/i, '').replace(/^if you do not\b/i, 'if you do not').trim();
+    s = s.replace(/\.$/, '').replace(/^then,?\s*/i, '').replace(/^if you do(?!(?: not| do|n'?t))\b,?\s*/i, '').replace(/^if you do not\b/i, 'if you do not').trim();
     if (!s) continue;
 
     // — condicional "if <cond>, <efecto>" —
@@ -537,8 +584,8 @@ function parseOps(text, unknown) {
         continue;
       }
     }
-    if ((m = l.match(/^your opponent cannot activate(?: a)? \[blocker\](?: character that has (\d+) or more power)? during this battle/))) {
-      ops.push({ op: 'noBlocker', minPower: m[1] ? parseInt(m[1], 10) : 0 });
+    if ((m = l.match(/^your opponent cannot activate(?: a| the)? \[blocker\](?: of any characters? with a cost of (\d+) or less)?(?: character that has (\d+) or more power)? during this (?:battle|turn)/))) {
+      ops.push({ op: 'noBlocker', minPower: m[2] ? parseInt(m[2], 10) : 0, maxCost: m[1] ? parseInt(m[1], 10) : null });
       continue;
     }
     if ((m = l.match(/^select up to 1 of your .*?leader or character cards/)) && /cannot activate \[blocker\]/.test(l)) {
@@ -566,6 +613,11 @@ function parseOps(text, unknown) {
       ops.push({ op: 'bounce', targets: n(m[1]), maxCost: m[2] ? parseInt(m[2], 10) : 99 });
       continue;
     }
+    // "return up to N of your opponent's characters <filtro> to the owner's hand".
+    if ((m = s.match(/^return (?:up to )?(\d+) (of your opponent'?s )?characters?\b(.*?) to (?:the|its|their) owner'?s hand$/i))) {
+      ops.push({ op: 'bounce', targets: n(m[1]), maxCost: 99, side: m[2] ? 'opp' : 'any', filter: parseTargetFilter(m[3]) });
+      continue;
+    }
     // "return all of your [X] and [Y] characters to the owner's hand".
     if ((m = s.match(/^return all of your (.+?) characters? to the owner'?s hand/i))) {
       ops.push({ op: 'bounceOwn', all: true, filter: parseTargetFilter(m[1]) });
@@ -580,10 +632,11 @@ function parseOps(text, unknown) {
       continue;
     }
     // Girar objetivos del rival (personajes o líder), con filtros/[Blocker].
-    if ((m = s.match(/^rest up to (\d+) of your opponent'?s (leader or character cards?|\[blocker\] characters?|characters?)\b(.*)$/i))) {
+    if ((m = s.match(/^rest up to (\d+) of your opponent'?s (leader or character cards?|\[blocker\] characters?|characters?|cards?)\b(.*)$/i))) {
       ops.push({
         op: 'restTarget', targets: n(m[1]),
-        includeLeader: /leader/i.test(m[2]), blockerOnly: /\[blocker\]/i.test(m[2]),
+        includeLeader: /leader/i.test(m[2]) || /^cards?$/i.test(m[2]),
+        includeStage: /^cards?$/i.test(m[2]), blockerOnly: /\[blocker\]/i.test(m[2]),
         filter: parseTargetFilter(m[3]),
       });
       continue;
@@ -633,8 +686,11 @@ function parseOps(text, unknown) {
       continue;
     }
     // No pueden atacar hasta el próximo turno del rival.
-    if ((m = s.match(/^up to (\d+) of your opponent'?s characters?\b(.*?) cannot attack until the end of your opponent'?s next (?:turn|end phase)/i))) {
-      ops.push({ op: 'cannotAttack', targets: n(m[1]), filter: parseTargetFilter(m[2]) });
+    if ((m = s.match(/^up to (\d+) of your opponent'?s (?:leader or )?((?:active |rested )?)characters?\b(.*?) cannot attack (until the (?:end|start) of your (?:opponent'?s )?next (?:turn|end phase)|during this turn)/i))) {
+      const f = parseTargetFilter(m[3]);
+      if (/active/i.test(m[2])) f.activeOnly = true;
+      if (/rested/i.test(m[2])) f.restedOnly = true;
+      ops.push({ op: 'cannotAttack', targets: n(m[1]), filter: f, dur: /during this turn/i.test(m[4]) ? 'turn' : 'next' });
       continue;
     }
     // "up to N of your opponent's ... cannot activate [Blocker] during this turn".
@@ -683,7 +739,7 @@ function parseOps(text, unknown) {
       continue;
     }
     // Molino propio: "trash N card(s) from the top of your deck".
-    if ((m = l.match(/^trash (\d+) cards? from the top of your deck$/))) {
+    if ((m = l.match(/^(?:you may )?trash (\d+) cards? from the top of your deck$/))) {
       ops.push({ op: 'millSelf', n: n(m[1]) });
       continue;
     }
@@ -694,7 +750,133 @@ function parseOps(text, unknown) {
     }
     if (s === '/') continue;   // separador suelto de la fuente
 
+    // "Play this card and KO ...": el [Trigger] se juega a sí mismo y remata.
+    if ((m = s.match(/^play this card(?: and (.+))?$/i))) {
+      ops.push({ op: 'playSelf' });
+      if (m[1]) ops.push(...parseOps(m[1], unknown));
+      continue;
+    }
+    // Bounce propio con filtro: "return up to N of your [X] type characters ...".
+    if ((m = s.match(/^return (?:up to )?(\d+) of your ((?!opponent).+?) characters?(?: with a cost of (\d+))? to the owner'?s hand$/i))) {
+      ops.push({ op: 'bounceOwn', n: n(m[1]), filter: parseTargetFilter(m[2] + (m[3] ? ` with a cost of ${m[3]}` : '')) });
+      continue;
+    }
+    // "set up to N <filtro> as active" (sin "of your").
+    if ((m = s.match(/^set up to (\d+) ((?!of your).+?) as active$/i))) {
+      ops.push({ op: 'unrestChar', all: false, targets: n(m[1]), filter: parseTargetFilter(m[2]) });
+      continue;
+    }
+    // Mirar y reordenar la cima del propio mazo (frase suelta tras ';').
+    if ((m = l.match(/^look at (\d+) cards? from the top of your deck$/))) {
+      ops.push({ op: 'peekReorder', n: n(m[1]) });
+      continue;
+    }
+    if (/^place them at the (?:top or )?bottom of (?:your|the) deck( in any order)?$/.test(l)) continue;
+    if (/^reveal \d+ cards? from the top of your deck$/.test(l)) continue;
+    // Sacrificar tu escenario.
+    if (/^trash this stage$/.test(l)) { ops.push({ op: 'trashOwnStage' }); continue; }
+    // "none of your <filtro> characters can be KO'd by effects until ...".
+    if ((m = s.match(/^none of your (.+?) characters can be ko'?d(?: by effects)? until the end of your opponent'?s next turn$/i))) {
+      ops.push({ op: 'cannotKOGroup', filter: parseTargetFilter(m[1]) });
+      continue;
+    }
+    // DON!! rival congelado en su próximo refresh.
+    if ((m = l.match(/^up to (\d+) of your opponent'?s rested don!! cards? will not become active in your opponent'?s next refresh phase$/))) {
+      ops.push({ op: 'freezeOppDon', n: n(m[1]) });
+      continue;
+    }
+    // Restricción propia: no puedes jugar personajes caros este turno.
+    if ((m = l.match(/^you cannot play character cards? with a base cost of (\d+) or more during this turn$/))) {
+      ops.push({ op: 'restrictPlay', minCost: parseInt(m[1], 10) });
+      continue;
+    }
+    // Estática: no puede ser girado por efectos del rival.
+    if (/^this character cannot be rested by your opponent'?s effects?$/.test(l)) {
+      ops.push({ op: 'cannotRestOpp' });
+      continue;
+    }
+    // "give up to a total of N of your opponent's leader or character cards -N power".
+    if ((m = l.match(/^give up to a total of (\d+) of your opponent'?s (.+?) ([+-]?\d+) power(.*)$/))) {
+      ops.push({ op: 'buff', side: 'opp', all: false, targets: n(m[1]), scope: scopeOf(m[2]), filter: parseTargetFilter(m[2]), changes: [{ stat: 'power', delta: -Math.abs(parseInt(m[3], 10)) }], kws: [], dur: durOf(m[4] || l) });
+      continue;
+    }
+    // El rival se lleva N Vidas suyas a la mano (variantes).
+    if ((m = l.match(/^your opponent adds (\d+) cards? from (?:the top of )?their life (?:area|cards?) to their hand$/))) {
+      ops.push({ op: 'oppLifeToHand', n: n(m[1]) });
+      continue;
+    }
+    if ((m = l.match(/^they place (\d+) cards? from their hand at the bottom of their deck(?: in any order)?$/))) {
+      ops.push({ op: 'oppHandToDeck', n: n(m[1]) });
+      continue;
+    }
+    // "all of your [X] cards' base power becomes N during this turn".
+    if ((m = s.match(/^all of your (.+?) (?:cards'?|characters'?) base power becomes (\d+)(?: during this turn)?$/i))) {
+      ops.push({ op: 'setBasePowerGroup', filter: parseTargetFilter(m[1]), value: parseInt(m[2], 10) });
+      continue;
+    }
+    // Copiar el poder base del líder.
+    if (/^this character'?s base power becomes the same as your leader'?s base power(?: during this turn)?$/.test(l)) {
+      ops.push({ op: 'copyLeaderBasePower' });
+      continue;
+    }
+    // El rival gira DON!! al inicio de su próxima main phase.
+    if ((m = l.match(/^your opponent rests (\d+) of their active don!! cards? at the start of their next main phase$/))) {
+      ops.push({ op: 'restOppDonNext', n: n(m[1]) });
+      continue;
+    }
+    // Endosar DON!! girados del rival a sus personajes (denegación de tempo).
+    if ((m = l.match(/^give (?:up to )?(\d+) (?:of your opponent'?s rested don!! cards?|don!! cards? from your opponent'?s cost area) to (\d+) of your opponent'?s characters?$/))) {
+      ops.push({ op: 'giveOppDonToChar', n: n(m[1]) });
+      continue;
+    }
+    // "activate up to N <filtro> event from your hand" (jugar evento gratis).
+    if ((m = s.match(/^activate up to (\d+) (.+?) events? from your hand$/i))) {
+      ops.push({ op: 'playFromZone', targets: n(m[1]), filter: { ...parseTargetFilter(m[2]), cardType: 'Event' }, maxCost: 99, zone: 'hand', asEvent: true });
+      continue;
+    }
+    // Trashear tu Vida hasta quedarte con N.
+    if ((m = l.match(/^trash cards? from the top of your life cards? until you have (\d+) life cards?$/))) {
+      ops.push({ op: 'trashLifeTo', n: n(m[1]) });
+      continue;
+    }
+    // tuck "top or bottom" (elige fondo).
+    if ((m = l.match(/^place up to (\d+) of your opponent'?s characters?(?: with a cost of (\d+) or less)? at the top or bottom of the owner'?s deck/))) {
+      ops.push({ op: 'tuckBottom', targets: n(m[1]), maxCost: m[2] ? parseInt(m[2], 10) : 99 });
+      continue;
+    }
+    if (/^place the revealed cards? at the bottom of your deck$/.test(l)) { ops.push({ op: 'revealedToDeckBottom' }); continue; }
+    // Dar DON!! girados a ESTA carta.
+    if ((m = l.match(/^give this character up to (\d+) rested don!! cards?$/))) {
+      ops.push({ op: 'giveRestedDon', n: n(m[1]), toSelf: true });
+      continue;
+    }
+    // "set the power of up to N of your opponent's characters to N".
+    if ((m = l.match(/^set the power of up to (\d+) of your opponent'?s characters? to (\d+)(?: during this turn)?$/))) {
+      ops.push({ op: 'setBasePowerOpp', targets: n(m[1]), value: parseInt(m[2], 10), dur: 'turn' });
+      continue;
+    }
+    // "up to N of your <filtro> leader or character cards can also attack active characters".
+    if ((m = s.match(/^up to (\d+) of your (.+?) (?:leader or )?character cards? can also attack (?:your opponent'?s )?active characters(?: during this turn)?$/i))) {
+      ops.push({ op: 'canAttackActiveGroup', targets: n(m[1]), filter: parseTargetFilter(m[2]), includeLeader: /leader or/i.test(s) });
+      continue;
+    }
+    // Copiar el poder base del líder RIVAL.
+    if (/^this character'?s base power becomes the same as your opponent'?s leader(?:'?s base power)?(?: during this turn)?$/.test(l)) {
+      ops.push({ op: 'copyOppLeaderBasePower' });
+      continue;
+    }
+    // "play up to N [A], up to N [B], and up to N [C], with a cost of N or less from your trash".
+    if ((m = s.match(/^play ((?:up to \d+ \[[^\]]+\],?\s*(?:and )?)+) with a cost of (\d+) or less from your (trash|hand)$/i))) {
+      for (const seg of m[1].matchAll(/up to (\d+) \[([^\]]+)\]/g)) {
+        ops.push({ op: 'playFromZone', targets: n(seg[1]), filter: { names: [seg[2]] }, maxCost: parseInt(m[2], 10), zone: m[3].toLowerCase() });
+      }
+      continue;
+    }
     // — cartas —
+    if ((m = l.match(/^draw up to (\d+) cards?$/))) {
+      ops.push({ op: 'draw', n: n(m[1]), upTo: true });
+      continue;
+    }
     if ((m = l.match(/^draw (\d+) cards?(?: and trash (\d+) cards? from your hand)?(?: if you have (\d+) or less cards in your hand)?/))) {
       ops.push({ op: 'draw', n: n(m[1]), trash: m[2] ? n(m[2]) : 0, ifHandMax: m[3] ? parseInt(m[3], 10) : null });
       // "Draw 1 card and/,(...) <otro efecto>": no tragarse el resto de la frase.
@@ -708,6 +890,76 @@ function parseOps(text, unknown) {
       continue;
     }
     if (/^trash (\d+) cards? from your hand$/.test(l)) { ops.push({ op: 'selfDiscard', n: n(l.match(/\d+/)[0]) }); continue; }
+    if ((m = l.match(/^trash up to (\d+) cards? from your hand$/))) { ops.push({ op: 'selfDiscard', n: n(m[1]), upTo: true }); continue; }
+    // KO/retirada de escenarios del rival.
+    if ((m = l.match(/^(?:ko|trash) (?:up to (\d+) of )?your opponent'?s stages?(?: with a cost of (\d+)(?: or less)?)?$/))) {
+      ops.push({ op: 'koStage', maxCost: m[2] ? parseInt(m[2], 10) : 99 });
+      continue;
+    }
+    // El rival devuelve DON!! de su campo a su mazo de DON!!.
+    if ((m = l.match(/^your opponent returns (\d+) don!! cards? from their field to their don!! deck$/))) {
+      ops.push({ op: 'oppDonReturn', n: n(m[1]) });
+      continue;
+    }
+    // El rival coloca cartas de su mano al fondo de su mazo (él elige cuáles).
+    if ((m = l.match(/^your opponent places (\d+) cards? from their hand at the bottom of their deck(?: in any order)?$/))) {
+      ops.push({ op: 'oppHandToDeck', n: n(m[1]) });
+      continue;
+    }
+    // Anular los efectos de personajes rivales este turno.
+    if ((m = s.match(/^negate the effects? of up to (\d+) of your opponent'?s characters?\b(.*?)(?: during this turn)?$/i))) {
+      ops.push({ op: 'negate', targets: n(m[1]), filter: parseTargetFilter(m[2]) });
+      continue;
+    }
+    // Restricción: este turno no puedes llevarte Vidas a la mano con tus efectos.
+    if (/^you cannot add life cards to your hand using your own effects during this turn$/.test(l)) {
+      ops.push({ op: 'restrictLifeToHand' });
+      continue;
+    }
+    // Voltear cartas de Vida (efecto, no coste).
+    if ((m = l.match(/^turn (all|(?:up to )?\d+)(?: cards?)? of your (?:face-(?:up|down) )?life cards? face-(up|down)$/))) {
+      const num = m[1] === 'all' ? 99 : parseInt(m[1].replace(/\D/g, ''), 10);
+      ops.push({ op: 'flipLife', n: num, all: m[1] === 'all', up: m[2] === 'up' });
+      continue;
+    }
+    // "puede atacar personajes el turno que entra" = [Rush: Character].
+    if (/^this character can attack characters on the turn in which it is played$/.test(l)) {
+      ops.push({ op: 'selfGrant', static: true, changes: [], kws: ['Rush: Character'], dur: 'turn' });
+      continue;
+    }
+    if ((m = s.match(/^(?:all of )?your (.+?) characters can attack characters on the turn in which they are played$/i))) {
+      ops.push({ op: 'buff', side: 'own', all: true, targets: 99, scope: 'char', filter: parseTargetFilter(m[1]), changes: [], kws: ['Rush: Character'], dur: 'turn' });
+      continue;
+    }
+    // Este líder/personaje no puede atacar (restricción propia).
+    if ((m = l.match(/^this (?:leader|character) cannot attack(?: during this turn)?$/))) {
+      ops.push({ op: 'selfNoAttack' });
+      continue;
+    }
+    // Nadie endereza los baratos en el próximo refresh (ambos jugadores).
+    if ((m = l.match(/^all characters with a cost of (\d+) or less do not become active in your and your opponent'?s next refresh phases?$/))) {
+      ops.push({ op: 'freezeAllLowCost', maxCost: parseInt(m[1], 10) });
+      continue;
+    }
+    // Robar Vidas del rival a SU mano (removal de vidas sin daño).
+    if ((m = l.match(/^add up to (\d+) cards? from the top of your opponent'?s life cards? to the owner'?s hand$/))) {
+      ops.push({ op: 'oppLifeToHand', n: n(m[1]) });
+      continue;
+    }
+    // Protección contra retirada por efectos rivales (con posible "+N power").
+    if ((m = s.match(/^this character cannot be removed from the field by your opponent'?s effects?( and gains .+)?$/i))) {
+      ops.push({ op: 'cannotRemove' });
+      if (m[1]) {
+        const grant = parseGrant(m[1].replace(/^ and gains /i, ''));
+        if (grant.changes.length === 1 && grant.changes[0].stat === 'power' && !grant.kws.length && !/during|until/i.test(m[1])) ops.push({ op: 'powerSelf', n: grant.changes[0].delta });
+        else if (grant.changes.length || grant.kws.length) ops.push({ op: 'selfGrant', changes: grant.changes, kws: grant.kws, dur: durOf(l) });
+      }
+      continue;
+    }
+    if ((m = s.match(/^(?:all of )?your (.+?) characters cannot be removed from the field by your opponent'?s effects?$/i))) {
+      ops.push({ op: 'cannotRemoveGroup', filter: parseTargetFilter(m[1]) });
+      continue;
+    }
     // Efecto (no coste): trashea N cartas de lo alto de TU Vida.
     if ((m = l.match(/^trash (\d+) cards? from the top of your life cards?$/))) {
       ops.push({ op: 'trashOwnLife', n: n(m[1]) });
@@ -724,7 +976,7 @@ function parseOps(text, unknown) {
       continue;
     }
     // "place N card(s) from your hand at the top/bottom of your deck".
-    if ((m = l.match(/^place (\d+) cards? from your hand at the (top|bottom) of your deck$/))) {
+    if ((m = l.match(/^place (\d+) cards? from your hand at the (top or bottom|top|bottom) of your deck(?: in any order)?$/))) {
       ops.push({ op: 'handToDeck', n: n(m[1]), top: m[2] === 'top' });
       continue;
     }
@@ -732,7 +984,7 @@ function parseOps(text, unknown) {
       ops.push({ op: 'tutorTop', n: n(m[1]), type: m[2] ?? m[3] });
       continue;
     }
-    if ((m = l.match(/^place the rest at the bottom of your deck/))) continue; // parte del tutorTop
+    if ((m = l.match(/^place the rest at the (?:top or )?bottom of (?:your|the) deck/))) continue; // parte del tutorTop
     if ((m = l.match(/^look at (\d+) cards? from the top of your deck and (?:return them|place them) (?:to|at) the top or bottom/))) {
       ops.push({ op: 'peekReorder', n: n(m[1]) });
       continue;
@@ -777,6 +1029,7 @@ function parseOps(text, unknown) {
       if (/rest this character/.test(alt)) rep.action = 'rest';
       else if (/trash this character and draw (\d+)/.test(alt)) { rep.action = 'trashDraw'; rep.draw = parseInt(alt.match(/draw (\d+)/)[1], 10); }
       else if ((m = alt.match(/trash (\d+) cards? from your hand/))) { rep.action = 'pay'; rep.trashHand = parseInt(m[1], 10); }
+      else if ((m = alt.match(/place (\d+) of your characters?( other than \[[^\]]+\])? at the bottom of the owner'?s deck/))) { rep.action = 'tuckOwn'; rep.n = parseInt(m[1], 10); rep.notName = m[2] ? m[2].match(/\[([^\]]+)\]/)[1] : null; }
       else if (/trash \d+ cards? from (?:the top or bottom of )?your life/.test(alt)) { rep.action = 'pay'; rep.trashLife = 1; rep.trashLifePick = /top or bottom/.test(alt); }
       else if (/turn 1 card from the top of your life cards face-up/.test(alt)) { rep.action = 'pay'; rep.trashLife = 0; }
       else rep.action = 'pay';
@@ -851,7 +1104,7 @@ function parseOps(text, unknown) {
 // ---- costes internos ("(2)", "DON!! -1", "trash 1 card...", "rest this") --
 
 // Marcadores que identifican un COSTE (antes del ':' de "coste: efecto").
-const COST_MARKER = /\(\d+\)|don!!\s*[-]?\d+|trash (?:\d+|any number of|this)|rest this|rest \d+ of your|rest your (?:\S+ )?attribute leader|return (?:\d+|any number of|\d+ or more|\d+ total)|add \d+ cards? from (?:the top|the top or bottom) of your life cards? to your hand|place \d+ cards? from your trash|add \d+ of your characters?[^:]*to the top[^:]*your life|turn \d+ (?:of your face-up life|cards? from the top)|reveal \d+ /i;
+const COST_MARKER = /\(\d+\)|don!!\s*[-]?\d+|trash (?:\d+|any number of|this)|rest this|rest \d+ of your|rest your (?:\S+ )?attribute leader|return (?:\d+|any number of|\d+ or more|\d+ total)|add \d+ cards? from (?:the top|the top or bottom) of your life cards? to your hand|place \d+ [^:]*?from your trash|place this (?:character|card) at the bottom|add \d+ of your characters?[^:]*to the top[^:]*your life|turn \d+ (?:of your face-up life|cards? from the top)|reveal \d+ /i;
 
 function parseCost(text) {
   const cost = {
@@ -884,7 +1137,9 @@ function parseCost(text) {
   if ((m = l.match(/add (\d+) cards? from (the top or bottom|the top) of your life cards? to your hand/))) { cost.lifeToHand = n(m[1]); cost.lifeToHandPick = m[2] === 'the top or bottom'; }
   if ((m = text.match(/rest (\d+) of your (.+?) cards?(?::|$)/i)) && /rest \d+ of your/i.test(text) && !/don!!/i.test(m[2])) cost.restOwn = { n: n(m[1]), filter: parseTargetFilter(m[2]) };
   if ((m = text.match(/return (\d+) of your (.+?) to the owner'?s hand/i))) cost.bounceOwn = { n: n(m[1]), filter: parseTargetFilter(m[2]) };
+  if (/place this (?:character|card) at the bottom of the owner'?s deck/.test(l)) cost.tuckSelf = true;
   if ((m = l.match(/place (\d+) cards? from your trash at the bottom of your deck/))) cost.trashToBottom = n(m[1]);
+  else if ((m = text.match(/place (\d+) (.+?) from your trash at the bottom of your deck/i))) { cost.trashToBottom = n(m[1]); cost.trashToBottomFilter = parseFilter(m[2]); }
   if ((m = text.match(/add (\d+) of your (.+?) to the top of your life cards?/i))) cost.charToLife = { n: n(m[1]), filter: parseTargetFilter(m[2]) };
   if ((m = l.match(/turn (\d+) of your face-up life cards? face-down/))) { cost.turnLifeDown = n(m[1]); cost.turnLifeEnds = 'any'; }
   // "turn N card(s) from the top (or bottom) of your Life cards face-up/-down"
@@ -916,17 +1171,32 @@ export function buildScript(card) {
   // 2. Quita recordatorios "(texto...)" pero conserva costes numéricos "(2)".
   text = text.replace(/\((?=[^)]*[a-z])[^)]*\)/gi, ' ').replace(/\s+/g, ' ').trim();
   if (!text || text === 'NULL') return script;
+  // Alias de nombre: "Also treat this card's name as [X] ..." — afecta a los
+  // filtros por nombre, no es una habilidad.
+  {
+    const am = text.match(/also treat this card'?s name as \[([^\]]+)\](?: according to the rules(?: of the game)?)?\.?/i);
+    if (am) { script.aliases = [am[1]]; text = text.replace(am[0], ' '); }
+  }
+  // Regla de construcción (no se juega): "any number of this card in your deck".
+  text = text.replace(/under the rules of this game,? you may have any number of this card in your deck\.?/i, ' ');
   text = text
     .replace(/K\.O\./g, 'KO')                                   // que el punto no rompa frases
     // Punto sin espacio entre frases ("effects.If your...") → añade el espacio.
     // La lista de arranques evita romper nombres como "Monkey.D.Luffy".
     .replace(/\.(?=(?:If|When|Then|You|Your|This|These|At|All|Set|Give|Draw|Add|KO|Rest|Play|Trash|Look|Reveal|Select|Place|Up)\b)/g, '. ')
+    .replace(/[’‘]/g, "'")                                      // apóstrofes tipográficos
+    .replace(/from your, don!! deck/gi, 'from your DON!! deck')  // typo de la fuente
+    .replace(/this satage/gi, 'this Stage')                      // typo de la fuente
     .replace(/[–—−]/g, '-')                                     // guiones tipográficos → '-'
     .replace(/([a-z])[-](\d)/gi, '$1 -$2')                       // "Characters-1000" → "Characters -1000"
+    .replace(/-(gains?)\b/gi, ' $1')                             // "character-gains" (typo)
     .replace(/\[Activate:Main\]/gi, '[Activate: Main]')          // etiqueta sin espacio
-    .replace(/with an? \[(Trigger|Blocker|Rush|Double Attack|Banish)\]/gi, 'with a $1') // "carta con [Trigger]" no es un timing
+    .replace(/\b(with|and) an? \[(Trigger|Blocker|Rush|Double Attack|Banish)\]/gi, '$1 a $2') // "carta con [Trigger]" no es un timing
     .replace(/\s+\/\s+/g, ' ').replace(/(^|\s)\/(\s|$)/g, ' ')   // barras sueltas de la API
-    .replace(/this card's \[(Main|Counter)\] effect/g, "this card's $1 effect")
+    .replace(/-(\d+) poser/gi, '-$1 power')                     // typo de la fuente
+    .replace(/this card's \[(Main|Counter|On Play|On KO|When Attacking|Activate: Main)\] effect/gi, "this card's $1 effect")
+    // "Activate the [Main] effect of this card" (variante con el timing delante).
+    .replace(/the \[(Main|Counter|On Play)\] effect of this card/gi, 'the $1 effect of this card')
     .trim();
 
   // Trocea por etiquetas conservando texto intermedio.
@@ -1033,6 +1303,17 @@ export function opsValue(ops) {
       case 'draw': v += op.n * 1.2 - (op.trash ?? 0) * 0.4; break;
       case 'ko': v += 2.5; break;
       case 'bounce': case 'tuckBottom': v += 1.8; break;
+      case 'aliasAbility': v += 1.5; break;
+      case 'koStage': case 'oppDonReturn': case 'oppHandToDeck': case 'oppLifeToHand': v += 1.5; break;
+      case 'negate': v += 1.6; break;
+      case 'flipLife': v += 0.3; break;
+      case 'freezeAllLowCost': case 'freezeOppDon': case 'restOppDonNext': case 'giveOppDonToChar': v += 1.2; break;
+      case 'cannotKOGroup': case 'cannotRemove': case 'cannotRemoveGroup': case 'cannotRestOpp': v += 1.0; break;
+      case 'setBasePowerGroup': case 'copyLeaderBasePower': case 'copyOppLeaderBasePower': case 'copyPowerFromOpp': v += 1.2; break;
+      case 'canAttackActiveGroup': v += 1.0; break;
+      case 'trashLifeTo': v -= 1.0; break;
+      case 'trashOwnStage': v += 0.2; break;
+      case 'selfNoAttack': case 'restrictPlay': case 'restrictLifeToHand': v -= 0.3; break;
       case 'powerUp': v += op.n / 1500; break;
       case 'buff': {
         const pw = op.changes?.filter((c) => c.stat === 'power').reduce((s, c) => s + c.delta, 0) ?? 0;
