@@ -16,13 +16,23 @@ export class BotController {
     return v;
   }
 
-  async chooseTarget(game, { purpose, candidateIds, optional, battle = null }) {
+  async chooseTarget(game, { purpose, candidateIds, optional, battle = null, incomingId = null }) {
     const p = this.player;
     const cands = candidateIds.map((id) => game.byId(id)).filter(Boolean);
     if (!cands.length) return null;
     const own = cands.filter((c) => c.owner === p);
     const enemy = cands.filter((c) => c.owner !== p);
     switch (purpose) {
+      case 'makeRoom': {
+        // Área llena (regla 3-7-6-1): descarta el propio menos valioso, y solo
+        // si el personaje entrante mejora lo que se va.
+        const val = (c) => (c.data.power ?? 0) / 1000 +
+          (c.script?.abilities ?? []).reduce((n, a) => n + opsValue(a.ops), 0);
+        const worst = own.slice().sort((a, b) => val(a) - val(b))[0];
+        const inc = incomingId ? game.byId(incomingId) : null;
+        if (!worst || (inc && val(inc) <= val(worst))) return null;
+        return worst.id;
+      }
       case 'ko': case 'bounce': case 'tuckBottom': case 'rest':
       case 'powerDown': case 'costDown':
         // Al enemigo más peligroso (mayor poder + habilidades).

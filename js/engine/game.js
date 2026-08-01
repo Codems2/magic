@@ -1487,7 +1487,7 @@ export class Game {
             (op.maxCost === null || c.cost <= op.maxCost) &&
             (!op.filter?.types || op.filter.types.some((t) => (c.data.subTypes ?? []).some((s) => s.toLowerCase().includes(t.toLowerCase()))));
           this.log(`${p.name} revela ${c.name}.`);
-          if (okType && c.isCharacter && p.characters.length < 5) {
+          if (okType && c.isCharacter && await this.makeRoom(p, c)) {
             p.library.shift();
             c.zone = 'characters'; c.rested = false; c.summonedThisTurn = true;
             p.characters.push(c);
@@ -1584,10 +1584,10 @@ export class Game {
           if (!p.life.length) break;
           const c = p.life[0];
           this.log(`${p.name} revela de su Vida: ${c.name}.`);
-          const ok = this.matchesFilter(c, op.filter) && c.cost <= (op.maxCost ?? 99) && c.isCharacter && p.characters.length < 5;
+          const ok = this.matchesFilter(c, op.filter) && c.cost <= (op.maxCost ?? 99) && c.isCharacter;
           if (ok) {
             const wants = p.isBot ? true : await p.controller.chooseOption(this, { prompt: `¿Jugar ${c.name} desde tu Vida?`, options: ['Sí, jugarla', 'No'] }) === 0;
-            if (wants) {
+            if (wants && await this.makeRoom(p, c)) {
               p.life.shift();
               c.zone = 'characters'; c.faceUp = false; c.rested = false; c.summonedThisTurn = true; c.enteredTurn = this.turn;
               p.characters.push(c);
@@ -1802,13 +1802,14 @@ export class Game {
           if (!seen.length) break;
           const ok = seen.filter((c) => c.isCharacter && c.cost <= (op.maxCost ?? 99) && this.matchesFilter(c, op.filter));
           this.log(`${p.name} mira ${seen.length} carta(s) de su mazo.`);
-          for (let i = 0; i < (op.targets ?? 1) && ok.length && p.characters.length < 5; i++) {
+          for (let i = 0; i < (op.targets ?? 1) && ok.length; i++) {
             const ids = await p.controller.chooseRevealed(this, {
               revealedIds: seen.map((c) => c.id), pickableIds: ok.map((c) => c.id),
               min: 0, max: 1, prompt: 'Elige una para ponerla en juego; el resto va al fondo.',
             });
             const hit = this.byId((ids ?? [])[0]);
             if (!hit || !ok.includes(hit)) break;
+            if (!(await this.makeRoom(p, hit))) break;
             seen.splice(seen.indexOf(hit), 1); ok.splice(ok.indexOf(hit), 1);
             hit.zone = 'characters'; hit.rested = false; hit.summonedThisTurn = true; hit.enteredTurn = this.turn;
             p.characters.push(hit);
@@ -2175,7 +2176,6 @@ export class Game {
           // "each of [A],[B],[C]": juega uno por cada nombre; si no, hasta N.
           const rounds = op.each && op.filter?.names ? op.filter.names.map((nm) => ({ names: [nm] })) : Array(op.targets ?? 1).fill(op.filter);
           for (const rf of rounds) {
-            if (p.characters.length >= 5) break;
             const dynMax = op.maxCostOppDon ? (opp.donActive + opp.donRested + opp.donGiven) : (op.maxCost ?? 99);
             const cands = zones.flat().filter((c) => c.isCharacter && c.cost <= dynMax && (op.minCost == null || c.cost >= op.minCost) && this.matchesFilter(c, rf) && this.matchesFilter(c, op.filter) && matchesAlt(c));
             if (!cands.length) continue;
@@ -2184,6 +2184,7 @@ export class Game {
             });
             const hit = this.byId(id);
             if (!hit || !cands.includes(hit)) break;
+            if (!(await this.makeRoom(p, hit))) break;
             const srcZone = zones.find((z) => z.includes(hit));
             srcZone.splice(srcZone.indexOf(hit), 1);
             hit.zone = 'characters';
@@ -2199,7 +2200,7 @@ export class Game {
         }
         case 'playSelf': {
           const c = ctx.source;
-          if (c.isCharacter && p.characters.length < 5 && c.zone !== 'characters') {
+          if (c.isCharacter && c.zone !== 'characters' && await this.makeRoom(p, c)) {
             if (c.zone === 'hand') p.hand.splice(p.hand.indexOf(c), 1);
             else if (c.zone === 'trash') p.trash.splice(p.trash.indexOf(c), 1);
             else if (c.zone === 'life') { p.life.splice(p.life.indexOf(c), 1); c.faceUp = false; }
@@ -2327,8 +2328,8 @@ export class Game {
       if (!victim || victim.zone !== 'characters' || victim.owner !== p) {
         throw new Error('área de personajes llena (elige uno para el descarte)');
       }
-      this.trashCard(victim);
-      this.log(`${p.name} manda ${victim.name} al descarte para hacer sitio.`);
+      this.ruleTrashCharacter(victim);
+      this.log(`${p.name} manda ${victim.name} al descarte para hacer sitio (regla 3-7-6-1).`);
     }
     this.payDon(p, card.cost);
     p.hand.splice(p.hand.indexOf(card), 1);
@@ -2664,6 +2665,37 @@ export class Game {
     c.rested = false;
     c.tempPower = 0;
     p.trash.push(c);
+  }
+
+  // Regla 3-7-6-1-1: descartar por el límite de 5 personajes es un proceso de
+  // regla, no un KO ni un efecto — no dispara [On K.O.] ni cuenta como KO.
+  ruleTrashCharacter(c) {
+    const p = c.owner;
+    p.donActive += c.givenDon;
+    c.givenDon = 0;
+    const i = p.characters.indexOf(c);
+    if (i !== -1) p.characters.splice(i, 1);
+    c.zone = 'trash';
+    c.rested = false;
+    c.tempPower = 0;
+    p.trash.push(c);
+  }
+
+  // Regla 3-7-6-1: con el área de personajes llena, jugar uno nuevo (también
+  // cuando lo pone en juego un efecto) exige descartar antes 1 personaje
+  // propio. Devuelve false si el jugador renuncia (no se juega la carta).
+  async makeRoom(p, incoming) {
+    if (p.characters.length < 5) return true;
+    const id = await p.controller.chooseTarget(this, {
+      purpose: 'makeRoom', candidateIds: p.characters.map((c) => c.id),
+      optional: true, incomingId: incoming?.id ?? null,
+      prompt: `Área de personajes llena: descarta 1 para jugar ${incoming?.name ?? 'el nuevo personaje'} (regla 3-7-6-1)`,
+    });
+    const victim = this.byId(id);
+    if (!victim || victim.owner !== p || victim.zone !== 'characters') return false;
+    this.ruleTrashCharacter(victim);
+    this.log(`${p.name} manda ${victim.name} al descarte para hacer sitio (regla 3-7-6-1).`);
+    return true;
   }
 
   trashCard(c) {

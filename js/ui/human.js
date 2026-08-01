@@ -160,6 +160,7 @@ export class HumanController {
       toLife: 'poner en tu Vida (boca abajo)', lifeToDeck: 'poner en lo alto del mazo',
       playFree: 'poner en juego gratis', trashLifeTarget: 'descartar de tu Vida',
       redirect: 'recibir el ataque en su lugar',
+      makeRoom: 'descartar para hacer sitio (área de personajes llena)',
     };
     const label = LABELS[purpose] ?? purpose;
     // Cartas en zonas ocultas (descarte, mazo, Vida) no están pintadas en el

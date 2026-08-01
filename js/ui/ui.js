@@ -396,37 +396,19 @@ export class UI {
   renderHand(me) {
     const cont = $('hand');
     cont.innerHTML = '';
+    document.getElementById('handHandle')?.remove();   // restos de la mecánica anterior
+    cont.ontouchstart = cont.ontouchmove = cont.ontouchend = null;
     for (const c of me.hand) cont.appendChild(this.cardEl(c, { hand: true }));
-    const mobile = IS_TOUCH || window.innerWidth < 900;
-    // Asa tipo cajón sobre la mano (solo táctil/estrecho).
-    let handle = document.getElementById('handHandle');
-    if (mobile && me.hand.length) {
-      if (!handle) {
-        handle = document.createElement('div');
-        handle.id = 'handHandle';
-        handle.innerHTML = '<span></span>';
-        cont.parentElement.insertBefore(handle, cont);
-      }
-      handle.onclick = () => this.openHandViewer(me);
-    } else if (handle) {
-      handle.remove();
+    // Botón "Ver mano" a la derecha de la zona de la mano: abre el visor
+    // grande (jugable). Sticky para que no se pierda con el scroll.
+    if (me.hand.length) {
+      const btn = document.createElement('button');
+      btn.id = 'verMano';
+      btn.type = 'button';
+      btn.textContent = 'Ver mano';
+      btn.onclick = () => this.openHandViewer(me);
+      cont.appendChild(btn);
     }
-    // Gesto: DESLIZA HACIA ARRIBA sobre la mano para desplegarla en grande.
-    // No choca con los taps (jugar carta) ni con el scroll horizontal.
-    cont.ontouchstart = (e) => {
-      this._handSwipe = { y: e.touches[0].clientY, x: e.touches[0].clientX };
-    };
-    cont.ontouchmove = (e) => {
-      if (!this._handSwipe) return;
-      const dy = this._handSwipe.y - e.touches[0].clientY;
-      const dx = Math.abs(this._handSwipe.x - e.touches[0].clientX);
-      if (dy > 32 && dy > dx * 1.2 && me.hand.length) {
-        this._handSwipe = null;
-        e.preventDefault();
-        this.openHandViewer(me);
-      }
-    };
-    cont.ontouchend = () => { this._handSwipe = null; };
   }
 
   // Visor de la mano: las cartas VUELAN desde tu mano, se ordenan por coste

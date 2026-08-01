@@ -526,17 +526,17 @@ body.show-log #log { display: block; }
   border-top: 2px solid var(--gold-d);
 }
 
-/* Asa tipo cajón sobre la mano (táctil): tócala o desliza hacia arriba. */
-#handHandle {
-  display: flex; align-items: center; justify-content: center;
-  padding: 3px 0 1px; cursor: pointer; user-select: none;
-  background: linear-gradient(180deg, transparent, rgba(15,49,79,.55));
+/* Botón "Ver mano" a la derecha de la zona de la mano: abre el visor grande. */
+#verMano {
+  position: sticky; right: 6px; margin-left: auto; align-self: center;
+  flex: 0 0 auto; z-index: 5; padding: 8px 12px;
+  background: linear-gradient(180deg, rgba(20,58,92,.95), rgba(10,32,54,.95));
+  border: 1px solid var(--gold-d); border-radius: 8px;
+  color: var(--gold); font-weight: 700; font-size: .8rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,.5); cursor: pointer; white-space: nowrap;
 }
-#handHandle span {
-  width: 52px; height: 5px; border-radius: 3px;
-  background: var(--gold-d); opacity: .8; box-shadow: 0 0 6px rgba(245,197,66,.4);
-}
-/* Visor de la mano (táctil): desliza hacia arriba o toca el asa. */
+#verMano:hover { border-color: var(--gold); box-shadow: 0 0 10px rgba(245,197,66,.35); }
+/* Visor de la mano: se abre con el botón "Ver mano". */
 #handModal {
   position: fixed; inset: 0; background: rgba(4,10,18,0); z-index: 380;
   display: flex; flex-direction: column; align-items: center; padding: 12px;
