@@ -298,12 +298,21 @@ body.show-log #log { display: block; }
 /* Líder + escenario centrados; la identidad del jugador va anclada a la
    derecha (posición absoluta) para no descentrar el grupo. */
 .leaderRow { display: flex; align-items: center; gap: 8px; justify-content: center; position: relative; }
-.nameBar {
-  display: flex; align-items: center; gap: 8px; font-size: .9rem; color: var(--dim);
-  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-  font-family: 'Cinzel', serif;
+/* Mano del rival: abanico de dorsos (el número, por hover). */
+.oppHand {
+  display: flex; justify-content: center; align-items: center;
+  min-height: 40px; padding: 3px 0 0; cursor: help;
 }
-.nameBar b { color: var(--ink); font-size: 1rem; }
+.handBack {
+  width: 30px; height: 42px; border-radius: 4px; flex: 0 0 auto;
+  border: 1px solid #23486e;
+  background:
+    radial-gradient(10px 10px at 50% 45%, rgba(245,197,66,.5), transparent 60%),
+    linear-gradient(160deg, #14335a, #0b2036);
+  box-shadow: 0 2px 6px rgba(0,0,0,.5);
+}
+.handBack + .handBack { margin-left: -13px; }
+.oppHandEmpty { color: var(--dim); font-size: .72rem; font-style: italic; }
 .lifeBadge { color: var(--red); font-weight: 800; font-size: 1.1rem; text-shadow: 0 1px 2px #000; }
 .handChip { font-size: .82rem; font-family: system-ui; }
 
@@ -644,8 +653,6 @@ body.show-log #log { display: block; }
   .mat { gap: 6px; }
   /* En móvil la fila casi llena el ancho: identidad en flujo normal. */
   .leaderRow { justify-content: flex-start; }
-  .nameBar { position: static; transform: none; margin-left: auto; font-size: .76rem; gap: 5px; }
-  .nameBar b { font-size: .85rem; }
   .charZone { justify-content: flex-start; }
   .costZone { justify-content: flex-start; }
   .charZone, .leaderZone, .stageZone { min-height: 84px; }

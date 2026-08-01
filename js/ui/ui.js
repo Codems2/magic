@@ -234,6 +234,25 @@ export class UI {
   // jugadores quedan enfrentadas en la línea de batalla central.
   renderSide(root, p, isOpp) {
     root.innerHTML = '';
+    // El rival "sujeta" su mano boca abajo sobre su tapete, como en la mesa.
+    if (isOpp) {
+      const n = Array.isArray(p.hand) ? p.hand.length : (p.hand?.length ?? 0);
+      const handRow = document.createElement('div');
+      handRow.className = 'oppHand';
+      handRow.title = `${p.name} — ${n} carta(s) en mano · ${p.library.length} en el mazo`;
+      for (let i = 0; i < n; i++) {
+        const b = document.createElement('div');
+        b.className = 'handBack';
+        handRow.appendChild(b);
+      }
+      if (!n) {
+        const empty = document.createElement('span');
+        empty.className = 'oppHandEmpty';
+        empty.textContent = 'sin cartas en mano';
+        handRow.appendChild(empty);
+      }
+      root.appendChild(handRow);
+    }
     const mat = document.createElement('div');
     mat.className = 'mat' + (isOpp ? ' opp' : '');
 
@@ -263,12 +282,7 @@ export class UI {
     stageZone.dataset.label = 'Escenario';
     if (p.stage) stageZone.appendChild(this.cardEl(p.stage, {}));
     else stageZone.appendChild(this.slotEl());
-    // Barra de identidad, junto al líder.
-    const nameBar = document.createElement('div');
-    nameBar.className = 'nameBar';
-    nameBar.innerHTML = `<b>${p.name}</b><span class="lifeBadge">❤ ${p.life.length}</span>
-      <span class="handChip">✋ ${p.hand.length} · 📚 ${p.library.length}</span>`;
-    leaderRow.append(leaderZone, stageZone, nameBar);
+    leaderRow.append(leaderZone, stageZone);
 
     // Área de coste: cartas DON!! en juego (activas / giradas).
     const cost = document.createElement('div');
@@ -317,6 +331,7 @@ export class UI {
   lifeStack(p) {
     const wrap = document.createElement('div');
     wrap.className = 'lifeStack';
+    wrap.title = `Vidas de ${p.name}: ${p.life.length}`;
     const n = p.life.length;
     // Offline: p.life[i] es la carta (con .faceUp). Online: p.life.faces[i]
     // es la carta pública si esa posición está boca arriba, o null.
