@@ -489,6 +489,39 @@ function sandboxSearchModal(catalog, game, human, ui) {
   input.focus();
 }
 
+// Piedra, papel o tijera contra el bot; el ganador elige el orden.
+// Devuelve 'first' si el humano empieza, 'second' si empieza el bot.
+async function rpsChooseOrder(ui) {
+  const OPTS = ['✊ Piedra', '✋ Papel', '✌ Tijera'];
+  while (true) {
+    const me = await ui.dialog({
+      title: '✊✋✌ Piedra, papel o tijera',
+      body: 'Como en el juego real: el ganador elige quién va primero.',
+      buttons: OPTS.map((label, i) => ({ label, value: i })),
+    });
+    const bot = (Math.random() * 3) | 0;
+    if (bot === me) {
+      await ui.dialog({ title: `Empate: ${OPTS[me]} contra ${OPTS[bot]}`, body: 'Otra vez…', buttons: [{ label: 'Repetir', value: true, primary: true }] });
+      continue;
+    }
+    const win = (me === 0 && bot === 2) || (me === 1 && bot === 0) || (me === 2 && bot === 1);
+    if (win) {
+      const first = await ui.dialog({
+        title: `🏆 ¡Ganaste! ${OPTS[me]} contra ${OPTS[bot]}`,
+        body: 'Tú eliges. Recuerda: el PRIMERO no roba, coloca 1 DON!! y no puede atacar en su primer turno; el SEGUNDO roba, coloca 2 DON!! y sí puede atacar.',
+        buttons: [{ label: '🥇 Empiezo yo', value: true, primary: true }, { label: '🥈 Empieza el bot', value: false }],
+      });
+      return first ? 'first' : 'second';
+    }
+    await ui.dialog({
+      title: `☠ Perdiste: ${OPTS[me]} contra ${OPTS[bot]}`,
+      body: 'El bot elige empezar PRIMERO.',
+      buttons: [{ label: 'Vale', value: true, primary: true }],
+    });
+    return 'second';
+  }
+}
+
 async function startGame(myDeck, botDeck, sandboxOpts = null, level = 'search') {
   $('setup').classList.add('hidden');
   $('game').classList.remove('hidden');
@@ -507,8 +540,8 @@ async function startGame(myDeck, botDeck, sandboxOpts = null, level = 'search') 
       isBot: true,
     },
   ];
-  // Quién empieza: al azar en partida normal; en sandbox siempre tú.
-  if (!sandbox && Math.random() < 0.5) configs.reverse();
+  // Quién empieza: piedra-papel-tijera (el ganador elige); en sandbox, tú.
+  if (!sandbox && (await rpsChooseOrder(ui)) === 'second') configs.reverse();
 
   const game = new Game(configs, {
     seed: (Math.random() * 2 ** 31) | 0,

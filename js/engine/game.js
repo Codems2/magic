@@ -489,6 +489,7 @@ export class Game {
 
   async run() {
     await this.start();
+    this.log('📜 Regla: quien empieza no roba, coloca 1 DON!! y NO puede atacar en su primer turno; el 2º jugador roba, coloca 2 DON!! y SÍ puede atacar en el suyo.');
     while (!this.over) await this.playTurn();
     return this.winner;
   }
