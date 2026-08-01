@@ -289,14 +289,19 @@ export class UI {
     cost.className = 'zone costZone';
     cost.dataset.label = `Coste · DON!! ${p.donActive} activos / ${p.donRested} girados`;
     const totalDon = p.donActive + p.donRested;
+    // Tus DON!! usan el arte que elijas en 🎨; los del rival, el clásico.
+    const donSrc = (!isOpp && localStorage.getItem('opDonImg')) || DON_IMG;
     for (let i = 0; i < totalDon; i++) {
       const tok = document.createElement('div');
       tok.className = 'donTok' + (i >= p.donActive ? ' rested' : '');
       tok.textContent = 'DON';
       if (!donImgFailed) {
         const im = document.createElement('img');
-        im.src = DON_IMG; im.alt = 'DON!!'; im.loading = 'lazy';
-        im.onerror = () => { donImgFailed = true; im.remove(); };
+        im.src = donSrc; im.alt = 'DON!!'; im.loading = 'lazy';
+        im.onerror = () => {
+          if (donSrc !== DON_IMG) im.src = DON_IMG;   // arte custom caído → clásico
+          else { donImgFailed = true; im.remove(); }
+        };
         tok.appendChild(im);
       }
       cost.appendChild(tok);
@@ -312,7 +317,7 @@ export class UI {
     const rightCol = document.createElement('div');
     rightCol.className = 'matCol';
     rightCol.appendChild(this.pileEl('Mazo', p.library.length, 'deck'));
-    rightCol.appendChild(this.pileEl('DON!!', p.donDeck, 'don'));
+    rightCol.appendChild(this.pileEl('DON!!', p.donDeck, 'don', null, null, isOpp));
     rightCol.appendChild(this.pileEl('Descarte', p.trash.length, 'trash', null, p.trash[p.trash.length - 1]));
 
     mat.append(leftCol, center, rightCol);
@@ -375,7 +380,7 @@ export class UI {
     return wrap;
   }
 
-  pileEl(label, count, kind, area = null, topCard = null) {
+  pileEl(label, count, kind, area = null, topCard = null, isOpp = false) {
     const d = document.createElement('div');
     d.className = `pile pile-${kind}`;
     if (area) d.style.gridArea = area;
@@ -383,7 +388,8 @@ export class UI {
       d.innerHTML = `<img src="${topCard.data.image}" alt="descarte">`;
     }
     if (kind === 'don' && !donImgFailed) {
-      d.innerHTML = `<img src="${DON_IMG}" alt="DON!!" loading="lazy" onerror="this.remove()">`;
+      const src = (!isOpp && localStorage.getItem('opDonImg')) || DON_IMG;
+      d.innerHTML = `<img src="${src}" alt="DON!!" loading="lazy" onerror="this.onerror=null;this.src='${DON_IMG}'">`;
     }
     d.innerHTML += `<span class="pileCount">${count}</span><span class="pileLabel">${label}</span>`;
     if (kind === 'trash' && topCard) {

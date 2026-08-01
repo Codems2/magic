@@ -1,0 +1,562 @@
+[
+ {
+  "id": 482236,
+  "name": "Gold",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/482236_400w.jpg"
+ },
+ {
+  "id": 482237,
+  "name": "Red",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/482237_400w.jpg"
+ },
+ {
+  "id": 482238,
+  "name": "Yellow",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/482238_400w.jpg"
+ },
+ {
+  "id": 482239,
+  "name": "Blue",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/482239_400w.jpg"
+ },
+ {
+  "id": 482240,
+  "name": "Purple",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/482240_400w.jpg"
+ },
+ {
+  "id": 482241,
+  "name": "Silver",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/482241_400w.jpg"
+ },
+ {
+  "id": 483145,
+  "name": "Tournament Pack Vol. 2",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/483145_400w.jpg"
+ },
+ {
+  "id": 483167,
+  "name": "Green",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/483167_400w.jpg"
+ },
+ {
+  "id": 483168,
+  "name": "Orange",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/483168_400w.jpg"
+ },
+ {
+  "id": 483169,
+  "name": "Pink",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/483169_400w.jpg"
+ },
+ {
+  "id": 483170,
+  "name": "Teal",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/483170_400w.jpg"
+ },
+ {
+  "id": 483171,
+  "name": "Bronze",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/483171_400w.jpg"
+ },
+ {
+  "id": 517477,
+  "name": "Color",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/517477_400w.jpg"
+ },
+ {
+  "id": 517478,
+  "name": "Black & White",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/517478_400w.jpg"
+ },
+ {
+  "id": 520776,
+  "name": "Monkey.D.Luffy",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/520776_400w.jpg"
+ },
+ {
+  "id": 525340,
+  "name": "CS 2023 Celebration Pack",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/525340_400w.jpg"
+ },
+ {
+  "id": 525667,
+  "name": "Luffy vs. Crocodile",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/525667_400w.jpg"
+ },
+ {
+  "id": 525668,
+  "name": "Young Luffy",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/525668_400w.jpg"
+ },
+ {
+  "id": 530120,
+  "name": "Manga",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/530120_400w.jpg"
+ },
+ {
+  "id": 539205,
+  "name": "Gear 5",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/539205_400w.jpg"
+ },
+ {
+  "id": 542683,
+  "name": "Mihawk & Zoro",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/542683_400w.jpg"
+ },
+ {
+  "id": 542684,
+  "name": "Ivankov & Sanji",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/542684_400w.jpg"
+ },
+ {
+  "id": 544805,
+  "name": "3D Text",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/544805_400w.jpg"
+ },
+ {
+  "id": 557080,
+  "name": "Trafalgar Law, Eustass Kid and Monkey.D.Luffy",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/557080_400w.jpg"
+ },
+ {
+  "id": 576484,
+  "name": "Shattered",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/576484_400w.jpg"
+ },
+ {
+  "id": 576485,
+  "name": "Silhouette",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/576485_400w.jpg"
+ },
+ {
+  "id": 586188,
+  "name": "Sakazuki",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/586188_400w.jpg"
+ },
+ {
+  "id": 586191,
+  "name": "Ivankov",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/586191_400w.jpg"
+ },
+ {
+  "id": 586202,
+  "name": "Oden",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/586202_400w.jpg"
+ },
+ {
+  "id": 586482,
+  "name": "Magellan",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/586482_400w.jpg"
+ },
+ {
+  "id": 586550,
+  "name": "Rebecca",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/586550_400w.jpg"
+ },
+ {
+  "id": 586552,
+  "name": "Kaido",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/586552_400w.jpg"
+ },
+ {
+  "id": 586554,
+  "name": "Vivi",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/586554_400w.jpg"
+ },
+ {
+  "id": 586556,
+  "name": "King",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/586556_400w.jpg"
+ },
+ {
+  "id": 586557,
+  "name": "Eustass \"Captain\" Kid",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/586557_400w.jpg"
+ },
+ {
+  "id": 586723,
+  "name": "Trafalgar Law",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/586723_400w.jpg"
+ },
+ {
+  "id": 586884,
+  "name": "Sabo",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/586884_400w.jpg"
+ },
+ {
+  "id": 586885,
+  "name": "Gecko Moria",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/586885_400w.jpg"
+ },
+ {
+  "id": 586886,
+  "name": "Perona",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/586886_400w.jpg"
+ },
+ {
+  "id": 586887,
+  "name": "Iceberg",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/586887_400w.jpg"
+ },
+ {
+  "id": 586888,
+  "name": "Hody Jones",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/586888_400w.jpg"
+ },
+ {
+  "id": 587191,
+  "name": "Rosinante",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/587191_400w.jpg"
+ },
+ {
+  "id": 587192,
+  "name": "Zoro",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/587192_400w.jpg"
+ },
+ {
+  "id": 587399,
+  "name": "Queen",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/587399_400w.jpg"
+ },
+ {
+  "id": 587573,
+  "name": "Reiju",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/587573_400w.jpg"
+ },
+ {
+  "id": 587705,
+  "name": "Enel",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/587705_400w.jpg"
+ },
+ {
+  "id": 587954,
+  "name": "Big Mom",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/587954_400w.jpg"
+ },
+ {
+  "id": 587955,
+  "name": "Whitebeard",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/587955_400w.jpg"
+ },
+ {
+  "id": 587957,
+  "name": "Ace",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/587957_400w.jpg"
+ },
+ {
+  "id": 593448,
+  "name": "Portgas.D.Ace",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/593448_400w.jpg"
+ },
+ {
+  "id": 600706,
+  "name": "2nd Anniversary Tournament",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/600706_400w.jpg"
+ },
+ {
+  "id": 605126,
+  "name": "Blackbeard",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/605126_400w.jpg"
+ },
+ {
+  "id": 619595,
+  "name": "Championship 2024 World Final",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/619595_400w.jpg"
+ },
+ {
+  "id": 620097,
+  "name": "One Piece Day Dallas 2025",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/620097_400w.jpg"
+ },
+ {
+  "id": 623626,
+  "name": "Black and Gold",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/623626_400w.jpg"
+ },
+ {
+  "id": 624673,
+  "name": "Tin Pack Set Vol. 1 -Gol.D.Roger-",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/624673_400w.jpg"
+ },
+ {
+  "id": 624674,
+  "name": "Tin Pack Set Vol. 1 -Monkey.D.Luffy-",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/624674_400w.jpg"
+ },
+ {
+  "id": 635475,
+  "name": "English Version 2nd Anniversary Set",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/635475_400w.jpg"
+ },
+ {
+  "id": 636745,
+  "name": "Katakuri",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/636745_400w.jpg"
+ },
+ {
+  "id": 649750,
+  "name": "Donquixote Rosinante",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/649750_400w.jpg"
+ },
+ {
+  "id": 649751,
+  "name": "Op-Op Fruit",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/649751_400w.jpg"
+ },
+ {
+  "id": 651174,
+  "name": "2Y",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/651174_400w.jpg"
+ },
+ {
+  "id": 651175,
+  "name": "3D",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/651175_400w.jpg"
+ },
+ {
+  "id": 655110,
+  "name": "Marco",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655110_400w.jpg"
+ },
+ {
+  "id": 655112,
+  "name": "Bonney",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655112_400w.jpg"
+ },
+ {
+  "id": 655114,
+  "name": "Dragon",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655114_400w.jpg"
+ },
+ {
+  "id": 655118,
+  "name": "GEAR5 Luffy",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655118_400w.jpg"
+ },
+ {
+  "id": 655120,
+  "name": "Rob Lucci",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655120_400w.jpg"
+ },
+ {
+  "id": 655122,
+  "name": "Shanks",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655122_400w.jpg"
+ },
+ {
+  "id": 655123,
+  "name": "Hannyabal",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655123_400w.jpg"
+ },
+ {
+  "id": 655126,
+  "name": "Teach",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655126_400w.jpg"
+ },
+ {
+  "id": 655127,
+  "name": "Koby",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655127_400w.jpg"
+ },
+ {
+  "id": 655130,
+  "name": "Buggy",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655130_400w.jpg"
+ },
+ {
+  "id": 655132,
+  "name": "Smoker",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655132_400w.jpg"
+ },
+ {
+  "id": 655134,
+  "name": "Jinbe",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655134_400w.jpg"
+ },
+ {
+  "id": 655136,
+  "name": "Yamato",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655136_400w.jpg"
+ },
+ {
+  "id": 655138,
+  "name": "Carrot",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655138_400w.jpg"
+ },
+ {
+  "id": 655140,
+  "name": "Pudding",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655140_400w.jpg"
+ },
+ {
+  "id": 655480,
+  "name": "Vegapunk",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655480_400w.jpg"
+ },
+ {
+  "id": 655482,
+  "name": "Lim",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655482_400w.jpg"
+ },
+ {
+  "id": 655485,
+  "name": "Caesar Clown",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655485_400w.jpg"
+ },
+ {
+  "id": 655487,
+  "name": "Foxy",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655487_400w.jpg"
+ },
+ {
+  "id": 655513,
+  "name": "Shirahoshi",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655513_400w.jpg"
+ },
+ {
+  "id": 655515,
+  "name": "Sugar",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655515_400w.jpg"
+ },
+ {
+  "id": 655740,
+  "name": "Kalgara",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655740_400w.jpg"
+ },
+ {
+  "id": 655742,
+  "name": "Kyros",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655742_400w.jpg"
+ },
+ {
+  "id": 655895,
+  "name": "Gear 4 Luffy",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655895_400w.jpg"
+ },
+ {
+  "id": 655911,
+  "name": "Usopp",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655911_400w.jpg"
+ },
+ {
+  "id": 655913,
+  "name": "Chopper",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655913_400w.jpg"
+ },
+ {
+  "id": 655915,
+  "name": "Sanji",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655915_400w.jpg"
+ },
+ {
+  "id": 655917,
+  "name": "Robin",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/655917_400w.jpg"
+ },
+ {
+  "id": 660710,
+  "name": "Gol.D.Roger",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/660710_400w.jpg"
+ },
+ {
+  "id": 672185,
+  "name": "Dracule Mihawk",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/672185_400w.jpg"
+ },
+ {
+  "id": 672188,
+  "name": "Egghead",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/672188_400w.jpg"
+ },
+ {
+  "id": 672736,
+  "name": "Donquixote Doflamingo",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/672736_400w.jpg"
+ },
+ {
+  "id": 672738,
+  "name": "Crocodile",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/672738_400w.jpg"
+ },
+ {
+  "id": 677559,
+  "name": "Nami",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/677559_400w.jpg"
+ },
+ {
+  "id": 677566,
+  "name": "Uta",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/677566_400w.jpg"
+ },
+ {
+  "id": 677568,
+  "name": "Nico Robin",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/677568_400w.jpg"
+ },
+ {
+  "id": 677570,
+  "name": "Boa Hancock",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/677570_400w.jpg"
+ },
+ {
+  "id": 680489,
+  "name": "Japanese Version 3rd Anniversary Set",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/680489_400w.jpg"
+ },
+ {
+  "id": 681870,
+  "name": "Red Bull Double Don!!",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/681870_400w.jpg"
+ },
+ {
+  "id": 681871,
+  "name": "Red Bull Don!!",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/681871_400w.jpg"
+ },
+ {
+  "id": 683969,
+  "name": "Netflix Tony Tony.Chopper",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/683969_400w.jpg"
+ },
+ {
+  "id": 686650,
+  "name": "Luffy",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/686650_400w.jpg"
+ },
+ {
+  "id": 689810,
+  "name": "Enel Lightning",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/689810_400w.jpg"
+ },
+ {
+  "id": 689811,
+  "name": "Sky Island Map",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/689811_400w.jpg"
+ },
+ {
+  "id": 693163,
+  "name": "Judge Promo",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/693163_400w.jpg"
+ },
+ {
+  "id": 696699,
+  "name": "LA Dodgers 2026 Promo",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/696699_400w.jpg"
+ },
+ {
+  "id": 698313,
+  "name": "Alternate Art",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/698313_400w.jpg"
+ },
+ {
+  "id": 698315,
+  "name": "Double Pack Set Vol. 11",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/698315_400w.jpg"
+ },
+ {
+  "id": 702306,
+  "name": "Elbaph Luffy",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/702306_400w.jpg"
+ }
+]

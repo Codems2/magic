@@ -26,6 +26,8 @@ const MATS = [
   { id: 'custom', name: '🖼 Tu imagen' },
 ];
 
+let DONS = null;   // artes de DON!! oficiales (data/cards/dons.json), carga perezosa
+
 function applyMat() {
   const mat = localStorage.getItem('opMat') ?? 'altamar';
   // La imagen subida manda; la URL pegada es la alternativa.
@@ -133,6 +135,42 @@ function openMatPicker() {
   customBox.appendChild(input);
   dlg.appendChild(customBox);
   refreshCustomSwatch();
+  // ---- tu carta DON!!: arte clásico o cualquiera de los oficiales ----
+  const donHead = document.createElement('p');
+  donHead.style.margin = '12px 0 6px';
+  donHead.innerHTML = '🎴 <b>Tu carta DON!!</b> — cambia solo las tuyas; el rival usa la clásica:';
+  const donGrid = document.createElement('div');
+  donGrid.className = 'donGrid';
+  dlg.append(donHead, donGrid);
+  const renderDons = (list) => {
+    const cur = localStorage.getItem('opDonImg') ?? '';
+    const mk = (name, img) => {
+      const sw = document.createElement('div');
+      sw.className = 'donSwatch' + ((img ?? '') === cur ? ' on' : '');
+      sw.title = name;
+      const im = document.createElement('img');
+      im.src = img || 'assets/don.jpg';
+      im.alt = name;
+      im.loading = 'lazy';
+      im.onerror = () => { im.remove(); sw.classList.add('noimg'); sw.textContent = name; };
+      sw.appendChild(im);
+      sw.onclick = () => {
+        if (img) { localStorage.setItem('opDonImg', img); localStorage.setItem('opDonName', name); }
+        else { localStorage.removeItem('opDonImg'); localStorage.removeItem('opDonName'); }
+        donGrid.querySelectorAll('.donSwatch').forEach((x) => x.classList.toggle('on', x === sw));
+        window._ui?.render?.();   // si hay partida en curso, se ve al momento
+      };
+      donGrid.appendChild(sw);
+    };
+    mk('Clásico', null);
+    for (const d of list) mk(d.name, d.image);
+  };
+  if (DONS) renderDons(DONS);
+  else {
+    fetch('data/cards/dons.json', noCache).then((r) => r.json())
+      .then((list) => { DONS = list; renderDons(list); })
+      .catch(() => { donHead.remove(); donGrid.remove(); });
+  }
   const close = document.createElement('button');
   close.textContent = 'Listo';
   close.onclick = () => modal.remove();

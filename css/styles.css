@@ -108,6 +108,19 @@ body[data-mat="custom"] #selfArea .mat {
   background: rgba(0,0,0,.35); color: inherit; font: inherit; font-size: .85rem;
 }
 .matUpRow { display: flex; gap: 8px; justify-content: center; margin: 8px 0 2px; }
+/* Selector de arte del DON!! */
+.donGrid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+  gap: 6px; max-height: 200px; overflow-y: auto; padding: 2px;
+}
+.donSwatch {
+  aspect-ratio: 5 / 7; border: 2px solid #2b567a; border-radius: 8px;
+  overflow: hidden; cursor: pointer; background: rgba(0,0,0,.3);
+}
+.donSwatch img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.donSwatch:hover { border-color: var(--gold-d); }
+.donSwatch.on { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold); }
+.donSwatch.noimg { display: flex; align-items: center; justify-content: center; font-size: .55rem; text-align: center; padding: 2px; color: var(--ink); }
 /* miniaturas de cada tema */
 .matSwatch[data-mat="altamar"] { background: radial-gradient(90px 46px at 50% -6%, #12395c, transparent 65%), linear-gradient(180deg, #061626, #071a2e 60%, #05121f); }
 .matSwatch[data-mat="madera"] { background: repeating-linear-gradient(90deg, #5a3b1e 0 22px, #4c3016 22px 24px, #63431f 24px 46px, #3f2a12 46px 48px); }
