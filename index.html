@@ -14,17 +14,30 @@
   <div id="setup" class="screen">
     <h1>🏴‍☠️ Simulador de One Piece Card Game</h1>
     <p class="subtitle">Starter Decks oficiales · 1v1 contra un bot · cartas de OPTCG API</p>
-    <h2>Tu mazo</h2>
-    <div id="myDecks" class="deck-grid"></div>
-    <h2>Mazo del bot</h2>
-    <div id="botDecks" class="deck-grid"></div>
+    <div id="deckSlots">
+      <div class="deckSlot">
+        <span class="slotLabel">Tu mazo</span>
+        <div class="slotCard" id="slotMy" title="Elegir tu mazo"><span class="slotEmpty">➕<br>Elegir<br>mazo</span></div>
+      </div>
+      <div class="vsBadge">⚔<br>VS</div>
+      <div class="deckSlot">
+        <span class="slotLabel">Mazo del bot</span>
+        <div class="slotCard" id="slotBot" title="Elegir el mazo del bot"><span class="slotEmpty">➕<br>Elegir<br>mazo</span></div>
+        <div class="slotQuick">
+          <button id="botRandom" title="Mazo aleatorio para el bot">🎲 Azar</button>
+          <button id="botMirror" title="El mismo mazo que el tuyo">🪞 Espejo</button>
+        </div>
+      </div>
+    </div>
     <div id="botLevelWrap">Nivel del bot:
       <label><input type="radio" name="botLevel" value="normal"> 🐣 Normal</label>
       <label><input type="radio" name="botLevel" value="hard" checked> 🏆 Competitivo</label>
     </div>
-    <button id="startBtn" class="primary" disabled>¡Zarpar!</button>
-    <button id="sandboxBtn" title="Modo pruebas: rival pasivo, DON!! de sobra y cualquier carta del catálogo en tu mano">🧪 Sandbox</button>
-    <button id="matBtnSetup" title="Elegir tapete">🎨 Tapete</button>
+    <div id="startRow">
+      <button id="startBtn" class="primary" disabled>¡Zarpar!</button>
+      <button id="sandboxBtn" title="Modo pruebas: rival pasivo, DON!! de sobra y cualquier carta del catálogo en tu mano">🧪 Sandbox</button>
+      <button id="matBtnSetup" title="Elegir tapete">🎨 Tapete</button>
+    </div>
 
     <h2>🌐 Jugar online (1v1 con un amigo)</h2>
     <p class="subtitle">Elige arriba TU mazo, pon tu nombre y crea una sala — o únete con el código de tu amigo.</p>

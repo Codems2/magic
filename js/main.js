@@ -101,29 +101,109 @@ async function main() {
     decks[d.slug] = await (await fetch(`data/decks/${d.slug}.json`, noCache)).json();
   }));
 
+  // --- selección de mazos: dos "huecos" compactos que abren un buscador ---
   let mySlug = null;
   let botSlug = null;
-  const renderGrid = (rootId, onPick) => {
-    const root = $(rootId);
-    root.innerHTML = '';
-    for (const d of index) {
-      const div = document.createElement('div');
-      div.className = 'deck-card';
-      div.innerHTML = `
+  const valid = (s) => index.some((d) => d.slug === s);
+
+  const updateSlot = (which) => {
+    const slug = which === 'my' ? mySlug : botSlug;
+    const el = $(which === 'my' ? 'slotMy' : 'slotBot');
+    const d = index.find((x) => x.slug === slug);
+    if (!d) {
+      el.innerHTML = '<span class="slotEmpty">➕<br>Elegir<br>mazo</span>';
+    } else {
+      el.innerHTML = `
         <img src="${d.image}" alt="${d.name}" loading="lazy" onerror="this.style.display='none'">
-        <div class="dname">${d.leader}</div>
-        <div class="dcolor">${d.id} · ${d.color}</div>`;
-      div.onclick = () => {
-        root.querySelectorAll('.deck-card').forEach((e) => e.classList.remove('selected'));
-        div.classList.add('selected');
-        onPick(d.slug);
-        if (mySlug && botSlug) $('startBtn').disabled = false;
-      };
-      root.appendChild(div);
+        <div class="slotName">${d.leader}</div>
+        <div class="slotMeta">${d.id} · ${d.color}</div>`;
     }
+    $('startBtn').disabled = !(mySlug && botSlug);
   };
-  renderGrid('myDecks', (s) => { mySlug = s; });
-  renderGrid('botDecks', (s) => { botSlug = s; });
+
+  const pickDeck = (which, slug) => {
+    if (which === 'my') { mySlug = slug; localStorage.setItem('opDeckMine', slug); }
+    else { botSlug = slug; localStorage.setItem('opDeckBot', slug); }
+    updateSlot(which);
+  };
+
+  // Modal buscador: escribe para filtrar y toca un color para acotar.
+  const COLOR_ES = { Red: '🔴 Rojo', Green: '🟢 Verde', Blue: '🔵 Azul', Purple: '🟣 Morado', Black: '⚫ Negro', Yellow: '🟡 Amarillo' };
+  const openDeckPicker = (which) => {
+    document.getElementById('deckModal')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'deckModal';
+    const dlg = document.createElement('div');
+    dlg.className = 'dialog deckDialog';
+    dlg.innerHTML = `<h2>${which === 'my' ? '⚓ Tu mazo' : '🤖 Mazo del bot'}</h2>`;
+    const search = document.createElement('input');
+    search.type = 'search';
+    search.className = 'sbSearch';
+    search.placeholder = 'Busca por líder, ID o set (p. ej. "Kid", "ST-36")…';
+    dlg.appendChild(search);
+    const chips = document.createElement('div');
+    chips.className = 'colorChips';
+    let colorSel = null;
+    for (const [en, label] of [['*', '✳ Todos'], ...Object.entries(COLOR_ES)]) {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.className = en === '*' ? 'on' : '';
+      b.onclick = () => {
+        colorSel = en === '*' ? null : en;
+        chips.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+        refresh();
+      };
+      chips.appendChild(b);
+    }
+    dlg.appendChild(chips);
+    const grid = document.createElement('div');
+    grid.className = 'deck-grid compact';
+    dlg.appendChild(grid);
+    const close = document.createElement('button');
+    close.textContent = 'Cerrar';
+    close.onclick = () => modal.remove();
+    dlg.appendChild(close);
+
+    const current = which === 'my' ? mySlug : botSlug;
+    const refresh = () => {
+      const q = search.value.trim().toLowerCase();
+      grid.innerHTML = '';
+      const hits = index.filter((d) =>
+        (!colorSel || (d.color ?? '').includes(colorSel)) &&
+        (!q || d.leader.toLowerCase().includes(q) || d.name.toLowerCase().includes(q) ||
+          d.id.toLowerCase().includes(q) || d.slug.includes(q)));
+      for (const d of hits) {
+        const div = document.createElement('div');
+        div.className = 'deck-card' + (d.slug === current ? ' selected' : '');
+        div.innerHTML = `
+          <img src="${d.image}" alt="${d.name}" loading="lazy" onerror="this.style.display='none'">
+          <div class="dname">${d.leader}</div>
+          <div class="dcolor">${d.id} · ${d.color}</div>`;
+        div.onclick = () => { pickDeck(which, d.slug); modal.remove(); };
+        grid.appendChild(div);
+      }
+      if (!hits.length) grid.innerHTML = '<p class="noHits">Sin resultados: prueba otro nombre o quita el filtro de color.</p>';
+    };
+    search.oninput = refresh;
+    refresh();
+    modal.appendChild(dlg);
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+    document.body.appendChild(modal);
+    search.focus();
+  };
+
+  $('slotMy').onclick = () => openDeckPicker('my');
+  $('slotBot').onclick = () => openDeckPicker('bot');
+  $('botRandom').onclick = () => pickDeck('bot', index[(Math.random() * index.length) | 0].slug);
+  $('botMirror').onclick = () => { if (mySlug) pickDeck('bot', mySlug); };
+
+  // Recuerda los últimos mazos usados: en la segunda visita, un clic y a jugar.
+  const savedMine = localStorage.getItem('opDeckMine');
+  const savedBot = localStorage.getItem('opDeckBot');
+  if (valid(savedMine)) mySlug = savedMine;
+  if (valid(savedBot)) botSlug = savedBot;
+  updateSlot('my');
+  updateSlot('bot');
 
   // Nivel del bot (persistente): 🏆 Competitivo por defecto.
   const savedLevel = localStorage.getItem('opBotLevel') ?? 'hard';
