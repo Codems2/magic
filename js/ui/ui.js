@@ -397,6 +397,50 @@ export class UI {
     const cont = $('hand');
     cont.innerHTML = '';
     for (const c of me.hand) cont.appendChild(this.cardEl(c, { hand: true }));
+    // Móvil/táctil: lupa para ver TODA la mano en grande.
+    if ((IS_TOUCH || window.innerWidth < 900) && me.hand.length) {
+      const zoom = document.createElement('button');
+      zoom.id = 'handZoom';
+      zoom.type = 'button';
+      zoom.textContent = '🔍';
+      zoom.title = 'Ver tu mano en grande';
+      zoom.onclick = (e) => { e.stopPropagation(); this.showHandModal(me); };
+      cont.appendChild(zoom);
+    }
+  }
+
+  // Visor de la mano completa (móvil): cartas grandes, toca una para ampliarla.
+  showHandModal(me) {
+    document.getElementById('handModal')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'handModal';
+    const head = document.createElement('div');
+    head.className = 'hmHead';
+    head.innerHTML = `<b>✋ Tu mano (${me.hand.length})</b><span>toca una carta para ampliarla</span>`;
+    modal.appendChild(head);
+    const grid = document.createElement('div');
+    grid.className = 'hmGrid';
+    for (const c of me.hand) {
+      const el = document.createElement('div');
+      el.className = 'hmCard';
+      const img = c.data.image;
+      if (img && !failedImages.has(img)) {
+        el.innerHTML = `<img src="${img}" alt="${c.name}" loading="lazy">`;
+        el.querySelector('img').onerror = () => { failedImages.add(img); el.innerHTML = this.previewText(c); };
+      } else {
+        el.innerHTML = this.previewText(c);
+      }
+      el.onclick = (e) => { e.stopPropagation(); this.showPreviewModal(c); };
+      grid.appendChild(el);
+    }
+    modal.appendChild(grid);
+    const close = document.createElement('button');
+    close.className = 'hmClose';
+    close.textContent = 'Cerrar';
+    close.onclick = () => modal.remove();
+    modal.appendChild(close);
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+    document.body.appendChild(modal);
   }
 
   // Flecha de ataque con pausa, para poder seguir el combate.
