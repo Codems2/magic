@@ -1284,7 +1284,7 @@ function parseOps(text, unknown) {
 // ---- costes internos ("(2)", "DON!! -1", "trash 1 card...", "rest this") --
 
 // Marcadores que identifican un COSTE (antes del ':' de "coste: efecto").
-const COST_MARKER = /\(\d+\)|don!!\s*[-]?\d+|trash (?:\d+|any number of|this)|rest this|rest \d+ of your|rest your (?:\S+ )?attribute leader|return (?:\d+|any number of|\d+ or more|\d+ total)|add \d+ cards? from (?:the top|the top or bottom) of your life cards? to your hand|place \d+ [^:]*?from your trash|place this (?:character|card) at the bottom|give your (?:\d+ )?active leader|place this card and \d+|place \d+ cards? from your hand at the bottom|place \d+ of your characters? at the bottom|give \d+ active don!!|add \d+ cards? from your life area|rest your leader|give \d+ of your opponent'?s rested don!!|place this character and \d+|add \d+ of your characters?[^:]*to the top[^:]*your life|turn \d+ (?:of your face-up life|cards? from the top)|reveal \d+ /i;
+const COST_MARKER = /\(\d+\)|don!!\s*[-]?\d+|trash (?:\d+|any number of|this)|rest this|rest \d+ of your|rest your (?:\S+ )?attribute leader|return (?:\d+|any number of|\d+ or more|\d+ total)|add \d+ cards? from (?:the top|the top or bottom) of your life cards? to your hand|place \d+ [^:]*?from your trash|place this (?:character|card) at the bottom|give your (?:\d+ )?active leader|place this card and \d+|place \d+ cards? from your hand at the bottom|place \d+ of your characters? at the bottom|place \d+ characters? (?:with a cost of \d+[^:]*?)?at the bottom|give \d+ active don!!|add \d+ cards? from your life area|rest your leader|give \d+ of your opponent'?s rested don!!|place this character and \d+|add \d+ of your characters?[^:]*to the top[^:]*your life|turn \d+ (?:of your face-up life|cards? from the top)|reveal \d+ /i;
 
 function parseCost(text) {
   const cost = {
@@ -1322,6 +1322,9 @@ function parseCost(text) {
   if ((m = l.match(/place this card and (\d+) cards? from your hand at the bottom of your deck/))) { cost.selfToDeckBottom = true; cost.handToBottom = n(m[1]); }
   else if ((m = l.match(/place (\d+) cards? from your hand at the bottom of your deck/))) cost.handToBottom = n(m[1]);
   if ((m = l.match(/place (\d+) of your characters? at the bottom of the owner'?s deck/))) cost.tuckOwnN = n(m[1]);
+  else if ((m = l.match(/place (\d+) characters?(?: with a cost of (\d+)(?: or less)?)? at the bottom of the owner'?s deck/))) {
+    cost.tuckAny = { n: n(m[1]), maxCost: m[2] ? parseInt(m[2], 10) : 99 };
+  }
   if ((m = text.match(/give (\d+) active don!! cards? to (?:1 of )?your (.+?)(?::|$)/i))) cost.giveActiveDon = { n: n(m[1]), filter: parseTargetFilter(m[2]) };
   if ((m = l.match(/add (\d+) cards? from your life area to your hand/))) cost.lifeToHand = Math.max(cost.lifeToHand, n(m[1]));
   if (/rest your leader\b/.test(l) && !/attribute leader/.test(l)) cost.restLeader = true;

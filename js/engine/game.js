@@ -616,6 +616,12 @@ export class Game {
     if (cost.selfToDeckBottom && !['characters', 'stage'].includes(source.zone)) return false;
     if (cost.handToBottom > p.hand.length) return false;
     if (cost.tuckOwnN && p.characters.length < cost.tuckOwnN) return false;
+    if (cost.tuckAny) {
+      const oppT = this.opponentOf(p);
+      const pool = [...p.characters, ...oppT.characters]
+        .filter((c) => c.cost <= cost.tuckAny.maxCost && (c.owner === p || !this.isProtectedFromRemoval(c)));
+      if (pool.length < cost.tuckAny.n) return false;
+    }
     if (cost.restLeader && p.leader.rested) return false;
     if (cost.giveOppDon && (this.opponentOf(p).donRested < cost.giveOppDon || !this.opponentOf(p).characters.length)) return false;
     if (cost.giveActiveDon && (p.donActive < cost.giveActiveDon.n ||
@@ -721,6 +727,22 @@ export class Game {
       }
       for (const c of chosen) { p.hand.splice(p.hand.indexOf(c), 1); c.zone = 'deck'; p.library.push(c); }
       this.log(`${p.name} pone ${chosen.length} carta(s) de su mano al fondo del mazo como coste.`);
+    }
+    if (cost.tuckAny) {
+      const oppT = this.opponentOf(p);
+      for (let i = 0; i < cost.tuckAny.n; i++) {
+        const pool = [...p.characters, ...oppT.characters]
+          .filter((c) => c.cost <= cost.tuckAny.maxCost && (c.owner === p || !this.isProtectedFromRemoval(c)));
+        if (!pool.length) break;
+        const id = await p.controller.chooseTarget(this, { purpose: 'tuckBottom', candidateIds: pool.map((c) => c.id), optional: false });
+        const t = this.byId(id) ?? pool[0];
+        const q = t.owner;
+        q.donActive += t.givenDon; t.givenDon = 0;
+        q.characters.splice(q.characters.indexOf(t), 1);
+        t.zone = 'deck'; t.rested = false; t.tempPower = 0; t.mods = [];
+        q.library.push(t);
+        this.log(`⤵ ${t.name} va al fondo del mazo de ${q.name} como coste.`);
+      }
     }
     if (cost.tuckOwnN) {
       for (let i = 0; i < cost.tuckOwnN && p.characters.length; i++) {

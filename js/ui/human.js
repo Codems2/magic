@@ -259,6 +259,7 @@ export class HumanController {
     if (c.turnLifeUp) parts.push(`voltear ${c.turnLifeUp} carta(s) de Vida boca arriba (se revela y queda pública)`);
     if (c.turnLifeDown) parts.push(`voltear ${c.turnLifeDown} carta(s) de Vida boca abajo (debe estar boca arriba)`);
     if (c.restLeaderOrDon) parts.push('girar tu líder o 1 DON!!');
+    if (c.tuckAny) parts.push(`poner ${c.tuckAny.n} personaje(s) de coste ${c.tuckAny.maxCost} o menos (de cualquier jugador) al fondo de su mazo`);
     const tip = this.coach ? this.coach.advisePayCost(game, { cardId, when }) : '';
     return this.ui.dialog({
       title: `Habilidad de ${card.name}`,
