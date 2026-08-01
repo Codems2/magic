@@ -1,0 +1,278 @@
+{
+ "slug": "st-33",
+ "id": "ST-33",
+ "name": "Starter Deck 33: BLUE Kuzan",
+ "leader": {
+  "id": "OP12-040",
+  "name": "Kuzan",
+  "type": "Leader",
+  "color": "Blue",
+  "cost": null,
+  "power": 5000,
+  "counter": null,
+  "life": 5,
+  "attribute": "Special",
+  "subTypes": [
+   "Navy"
+  ],
+  "rarity": "L",
+  "text": "When a card is trashed from your hand by your {Navy} type card's effect, draw cards equal to the number of cards trashed.",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/706329_400w.jpg",
+  "count": 1
+ },
+ "altLeaders": [],
+ "cards": [
+  {
+   "id": "ST33-001",
+   "name": "Koby",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 2,
+   "power": 1000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Navy"
+   ],
+   "rarity": "C",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\n\r\n[On Play] You may trash 1 card from your hand: Draw 1 card.",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/706332_400w.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST33-002",
+   "name": "Sakazuki",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 4,
+   "power": 5000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Navy"
+   ],
+   "rarity": "C",
+   "text": "[When Attacking] You may trash 1 card from your hand: If your opponent has 6 or more cards in their hand, your opponent trashes 1 card from their hand.\n\r\n[On K.O.] Play up to 1 {Navy} type Character card with a cost of 4 or less from your hand.",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/706333_400w.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST33-003",
+   "name": "Smoker",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 2,
+   "power": 3000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Navy"
+   ],
+   "rarity": "C",
+   "text": "[On Play] You may trash 1 card from your hand: Place up to 2 of your opponent's Characters with a cost of 2 or less at the bottom of the owner's deck.",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/706334_400w.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST33-004",
+   "name": "Borsalino",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 6,
+   "power": 6000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Navy"
+   ],
+   "rarity": "SR",
+   "text": "During the turn in which a card in your hand is trashed by an effect, give this card in your hand 3 cost.\n\r\n[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/706335_400w.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST33-005",
+   "name": "Monkey.D.Garp",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 6,
+   "power": 6000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Navy"
+   ],
+   "rarity": "SR",
+   "text": "[On Play] If your Leader has the {Navy} type, play up to 1 blue {Navy} type Character card with 8000 power or less other than [Monkey.D.Garp] from your hand.",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/706336_400w.jpg",
+   "count": 2
+  },
+  {
+   "id": "EB04-026",
+   "name": "Bluegrass",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 4,
+   "power": 6000,
+   "counter": 0,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Navy Egghead"
+   ],
+   "rarity": "C",
+   "text": "[On Play] Place up to 1 of your opponent's Characters with a cost of 1 or less at the bottom of the owner's deck.\n[When Attacking] Draw 1 card and trash 1 card from your hand.",
+   "image": "https://optcgapi.com/media/static/Card_Images/EB04-026_CE6s1y3.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP12-043",
+   "name": "Kuzan",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 6,
+   "power": 8000,
+   "counter": null,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Navy"
+   ],
+   "rarity": "R",
+   "text": "If you have 5 or more cards in your hand, this Character gains +1 cost.\n\r\n[On Play] You may trash 1 card from your hand: Up to 1 of your opponent's Characters cannot attack until the end of your opponent's next End Phase.\n\r\nDisclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil.",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/706330_400w.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP12-045",
+   "name": "Jango",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 6,
+   "power": 8000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Navy"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP12-045_d7p2Fvs.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP12-046",
+   "name": "Zephyr(Navy)",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 5,
+   "power": 5000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "FILM Navy"
+   ],
+   "rarity": "C",
+   "text": "[On Play] Trash 2 cards from your hand.\n[Activate: Main] You may trash this Character: Return up to 1 Character with a cost of 5 or less to the owner's hand.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP12-046_HVRUPMF.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP12-047",
+   "name": "Sengoku",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 3,
+   "power": 3000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Wisdom",
+   "subTypes": [
+    "Navy"
+   ],
+   "rarity": "R",
+   "text": "[On Play] You may trash 1 card from your hand: Look at 5 cards from the top of your deck; reveal up to 2 {Navy} type cards other than [Sengoku] and add them to your hand. Then, place the rest at the bottom of your deck in any order.\n\r\nDisclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil.",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/706331_400w.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP12-050",
+   "name": "Jaguar.D.Saul",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 6,
+   "power": 7000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Giant Navy Ohara"
+   ],
+   "rarity": "UC",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP12-050_3wAafnU.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP12-052",
+   "name": "Fullbody",
+   "type": "Character",
+   "color": "Blue",
+   "cost": 4,
+   "power": 6000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Navy"
+   ],
+   "rarity": "C",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP12-052_6iV382y.jpg",
+   "count": 4
+  },
+  {
+   "id": "EB04-028",
+   "name": "Ice Time",
+   "type": "Event",
+   "color": "Blue",
+   "cost": 5,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Navy"
+   ],
+   "rarity": "R",
+   "text": "[Main] You may trash 1 card from your hand: If your Leader has the {Navy} type, up to 2 of your opponent's Characters with 10000 power or less cannot attack until the end of your opponent's next End Phase.\n\r\n[Trigger] Return up to 1 Character with a cost of 5 or less to the owner's hand.\n\r\nDisclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil.",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/706328_400w.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP12-057",
+   "name": "Ice Block Pheasant Peck",
+   "type": "Event",
+   "color": "Blue",
+   "cost": 1,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Navy"
+   ],
+   "rarity": "C",
+   "text": "[Counter] Up to 1 of your Leader or Character cards gains +4000 power during this battle. Then, trash 1 card from your hand.\n[Trigger] You may trash 1 card from your hand: Draw 1 card.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP12-057_T9tmHBg.jpg",
+   "count": 4
+  }
+ ]
+}

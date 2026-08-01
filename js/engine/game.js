@@ -120,8 +120,19 @@ export class Game {
       case 'returned': return Math.floor((ctx.returnedNow ?? 0) / per.n);
       case 'trashed': return Math.floor((ctx.trashedNow ?? 0) / per.n);
       case 'restedDon': return Math.floor(p.donRested / per.n);
+      case 'fieldType': {
+        const pool = [p.leader, ...p.characters, p.stage].filter(Boolean);
+        return pool.filter((c) => (c.data.subTypes ?? []).some((s) => s.toLowerCase().includes(per.type.toLowerCase()))).length;
+      }
       default: return 1;
     }
+  }
+
+  // Gira una carta disparando "cuando este personaje se gira" (Mihawk ST32-003).
+  async restCard(c) {
+    if (c.rested) return;
+    c.rested = true;
+    await this.runTaggedAbilities(c, 'onSelfRested');
   }
 
   // Recorre las habilidades estáticas de `holder` que aplican ahora mismo y
@@ -186,6 +197,18 @@ export class Game {
 
   // Delta de COSTE por estáticas ("gain +1 cost", propias o de grupo).
   staticCostFor(card) {
+    // Descuentos "de mano" (Borsalino ST33-004): estáticas de la propia carta
+    // que aplican mientras está en tu mano.
+    if (card.zone === 'hand') {
+      let d = 0;
+      for (const ab of card.script?.abilities ?? []) {
+        if (ab.when !== 'static') continue;
+        for (const op of ab.ops) {
+          if (op.op === 'handCostAfterTrash' && card.owner?._handTrashedTurn === this.turn) d += op.delta;
+        }
+      }
+      return d;
+    }
     if (!['characters', 'leader', 'stage'].includes(card.zone)) return 0;
     if (this._inStaticCost) return 0;   // corta ciclos coste→condición→coste
     this._inStaticCost = true;
@@ -257,6 +280,10 @@ export class Game {
       case 'didPlay': return !!ctx.didPlay;
       case 'not': return !this.evalCond(cond.a, ctx);
       case 'totalLife': return p.life.length + opp.life.length <= cond.v;
+      case 'givenDon': return p.donGiven >= cond.v;
+      case 'donLEOpp': return (p.donActive + p.donRested + p.donGiven) <= (opp.donActive + opp.donRested + opp.donGiven);
+      case 'leaderAttrSelf': return !!src?.data?.attribute && p.leader.data.attribute === src.data.attribute;
+      case 'handTrashedThisTurn': return p._handTrashedTurn === this.turn;
       case 'oppMoreDon': return (opp.donActive + opp.donRested) > (p.donActive + p.donRested);
       case 'restedByEffect': return !!p._restedByEffectTurn && p._restedByEffectTurn === this.turn;
       default: return false;
@@ -502,6 +529,7 @@ export class Game {
     if (cost.turnLifeDown && p.life.length < cost.turnLifeDown) return false;
     if (cost.turnLifeUp && p.life.length < cost.turnLifeUp) return false;
     if (cost.restSelf && source.rested) return false;
+    if (cost.restLeaderOrDon && p.donActive < 1 && p.leader.rested) return false;
     if (cost.trashHandFilter && p.hand.filter((c) => this.matchesFilter(c, cost.trashHandFilter)).length < cost.trashHand) return false;
     // "rest N of your [X] cards" puede referirse a personajes, escenario o líder.
     if (cost.restOwn && [...p.characters, p.stage, p.leader].filter(Boolean)
@@ -628,7 +656,17 @@ export class Game {
     }
     if (cost.turnLifeDown) this.log(`${p.name} gira ${cost.turnLifeDown} carta(s) de su Vida boca abajo.`);
     if (cost.turnLifeUp) this.log(`${p.name} gira ${cost.turnLifeUp} carta(s) de su Vida boca arriba.`);
-    if (cost.restSelf) source.rested = true;
+    if (cost.restLeaderOrDon) {
+      // Coste alternativo: girar 1 DON!! (preferido) o girar tu líder.
+      if (p.donActive >= 1) {
+        p.donActive -= 1; p.donRested += 1;
+        this.log(`${p.name} gira 1 DON!! como coste.`);
+      } else {
+        await this.restCard(p.leader);
+        this.log(`${p.name} gira a su líder como coste.`);
+      }
+    }
+    if (cost.restSelf) await this.restCard(source);
     if (cost.trashSelf) this.trashCard(source);
   }
 
@@ -720,6 +758,7 @@ export class Game {
   async resolveOps(ops, ctx) {
     const p = ctx.p;
     const opp = this.opponentOf(p);
+    this._resolveDepth = (this._resolveDepth ?? 0) + 1;
     try {
     for (const op of ops) {
       if (this.over) return;
@@ -908,13 +947,13 @@ export class Game {
           for (let i = 0; i < op.targets; i++) {
             let cands = [...opp.characters];
             if (op.includeLeader && opp.leader) cands.push(opp.leader);
-            cands = cands.filter((c) => !c.rested && (!op.blockerOnly || c.hasBlocker) && this.matchesFilter(c, op.filter));
+            cands = cands.filter((c) => !c.rested && (!op.blockerOnly || c.hasBlocker) && this.matchesFilter(c, op.filter) && !(c._noRestUntil >= this.turn));
             if (!cands.length) break;
             const targetId = await p.controller.chooseTarget(this, {
               purpose: 'rest', candidateIds: cands.map((c) => c.id), optional: true,
             });
             const t = this.byId(targetId);
-            if (t && cands.includes(t)) { t.rested = true; p._restedByEffectTurn = this.turn; this.log(`${t.name} queda girado.`); }
+            if (t && cands.includes(t)) { await this.restCard(t); p._restedByEffectTurn = this.turn; this.log(`${t.name} queda girado.`); }
           }
           break;
         }
@@ -1012,11 +1051,11 @@ export class Game {
         case 'canAttackActive': { ctx.source._canAttackActive = true; break; }
         case 'freeze': {
           for (let i = 0; i < op.targets; i++) {
-            const cands = opp.characters.filter((c) => this.matchesFilter(c, op.filter) && !c._frozenUntil);
+            const cands = opp.characters.filter((c) => this.matchesFilter(c, op.filter) && !c._frozenUntil && !(c._noRestUntil >= this.turn));
             if (!cands.length) break;
             const id = await p.controller.chooseTarget(this, { purpose: 'rest', candidateIds: cands.map((c) => c.id), optional: true });
             const t = this.byId(id);
-            if (t && cands.includes(t)) { t.rested = true; t._frozenUntil = this.turn + 1; this.log(`${t.name} no se enderezará en el próximo refresco del rival.`); }
+            if (t && cands.includes(t)) { await this.restCard(t); t._frozenUntil = this.turn + 1; this.log(`${t.name} no se enderezará en el próximo refresco del rival.`); }
           }
           break;
         }
@@ -1419,6 +1458,76 @@ export class Game {
         }
         case 'battleAttrBuff': break; // estática de combate: se aplica en attack().
         case 'koReplace': break; // se consulta en tryKOReplace al ir a eliminar.
+        case 'chooseCostReveal': {
+          // Katakuri púrpura: eliges un coste, revelas la carta superior del
+          // mazo RIVAL y, si coincide, se resuelve el efecto interior.
+          const options = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+          const idx = await p.controller.chooseOption(this, { prompt: 'Elige un coste (revelarás la carta superior del mazo rival):', options });
+          const chosen = Math.max(0, Math.min(idx ?? 0, options.length - 1));
+          const top = opp.library[0];
+          if (!top) break;
+          const topCost = top.data.cost ?? null;
+          this.log(`${p.name} elige coste ${chosen}; se revela ${top.name} (coste ${topCost ?? '—'}).`);
+          if (topCost === chosen) {
+            this.log('¡Coincide! Se activa el efecto.');
+            await this.resolveOps(op.ops, ctx);
+          }
+          break;
+        }
+        case 'unrestLeader': {
+          if (p.leader.rested && p.leader.name.toLowerCase().includes(op.name.toLowerCase())) {
+            p.leader.rested = false;
+            this.log(`${p.leader.name} se endereza.`);
+          }
+          break;
+        }
+        case 'peekOppTop': {
+          this.log(`${p.name} mira la carta superior del mazo rival.`);
+          break;
+        }
+        case 'millSelf': {
+          for (let i = 0; i < op.n && p.library.length; i++) {
+            const c = p.library.shift();
+            c.zone = 'trash'; p.trash.push(c);
+            this.log(`${p.name} trashea ${c.name} de lo alto de su mazo.`);
+          }
+          break;
+        }
+        case 'setBasePowerOpp': {
+          for (let i = 0; i < op.targets; i++) {
+            const cands = opp.characters;
+            if (!cands.length) break;
+            const id = await p.controller.chooseTarget(this, { purpose: 'powerDown', candidateIds: cands.map((c) => c.id), optional: true });
+            const t = this.byId(id);
+            if (t && cands.includes(t)) {
+              const expireTurn = op.dur === 'next' ? this.turn + 1 : this.turn;
+              t.addMod({ stat: 'power', delta: op.value - (t.data.power ?? 0), expireTurn, battle: op.dur === 'battle' });
+              this.log(`${t.name}: su poder base pasa a ${op.value}.`);
+            }
+          }
+          break;
+        }
+        case 'cannotBeRested': {
+          for (let i = 0; i < op.targets; i++) {
+            const cands = opp.characters.filter((c) => this.matchesFilter(c, op.filter) && !(c._noRestUntil >= this.turn));
+            if (!cands.length) break;
+            const id = await p.controller.chooseTarget(this, { purpose: 'rest', candidateIds: cands.map((c) => c.id), optional: true });
+            const t = this.byId(id);
+            if (t && cands.includes(t)) { t._noRestUntil = this.turn + 1; this.log(`${t.name} no puede ser girado hasta el final del próximo turno.`); }
+          }
+          break;
+        }
+        case 'selfNoAttackLowCost': {
+          ctx.source._noAtkCharMax = { turn: this.turn, v: op.maxBaseCost };
+          this.log(`${ctx.source.name} no puede atacar personajes de coste base ${op.maxBaseCost} o menos este turno.`);
+          break;
+        }
+        case 'drawTrashedCount': {
+          const n2 = ctx.trashedCount ?? 0;
+          if (n2 > 0) this.draw(p, n2);
+          break;
+        }
+        case 'handCostAfterTrash': break; // estática de mano: la lee staticCostFor.
         case 'oppChoose': {
           // El rival elige cuál de las opciones sufre; el efecto se resuelve
           // desde la perspectiva del controlador de la carta (p).
@@ -1453,19 +1562,24 @@ export class Game {
           break;
         }
         case 'playFromZone': {
-          const zone = op.zone === 'deck' ? p.library : op.zone === 'trash' ? p.trash : p.hand;
+          const zones = op.zone === 'deck' ? [p.library] : op.zone === 'trash' ? [p.trash]
+            : op.zone === 'hand or trash' ? [p.hand, p.trash] : [p.hand];
+          const matchesAlt = (c) => !op.orNameAttr ||
+            c.name.toLowerCase().includes(op.orNameAttr.toLowerCase()) ||
+            (!!c.data.attribute && c.data.attribute === ctx.source?.data?.attribute);
           // "each of [A],[B],[C]": juega uno por cada nombre; si no, hasta N.
           const rounds = op.each && op.filter?.names ? op.filter.names.map((nm) => ({ names: [nm] })) : Array(op.targets ?? 1).fill(op.filter);
           for (const rf of rounds) {
             if (p.characters.length >= 5) break;
-            const cands = zone.filter((c) => c.isCharacter && c.cost <= (op.maxCost ?? 99) && this.matchesFilter(c, rf) && this.matchesFilter(c, op.filter));
+            const cands = zones.flat().filter((c) => c.isCharacter && c.cost <= (op.maxCost ?? 99) && this.matchesFilter(c, rf) && this.matchesFilter(c, op.filter) && matchesAlt(c));
             if (!cands.length) continue;
             const id = await p.controller.chooseTarget(this, {
               purpose: 'playFree', candidateIds: cands.map((c) => c.id), optional: true,
             });
             const hit = this.byId(id);
             if (!hit || !cands.includes(hit)) break;
-            zone.splice(zone.indexOf(hit), 1);
+            const srcZone = zones.find((z) => z.includes(hit));
+            srcZone.splice(srcZone.indexOf(hit), 1);
             hit.zone = 'characters';
             hit.rested = !!op.rested;
             hit.summonedThisTurn = true;
@@ -1570,6 +1684,16 @@ export class Game {
       // Cierra la ventana de verificación de la última op de esta lista antes
       // de que sigan otros eventos (daño, triggers, descarte del evento...).
       if (this.opProbe) this.opProbe(null, ctx);
+      this._resolveDepth--;
+      // Al cerrar la resolución más externa, dispara "cuando trasheas de tu
+      // mano por un efecto" con el recuento acumulado (líder Kuzan).
+      if (this._resolveDepth === 0 && this._pendingHandTrash?.size) {
+        const pending = [...this._pendingHandTrash.entries()];
+        this._pendingHandTrash.clear();
+        for (const [player, count] of pending) {
+          if (!this.over) await this.fireOnBoard(player, 'onHandTrash', { trashedCount: count });
+        }
+      }
     }
   }
 
@@ -1645,7 +1769,17 @@ export class Game {
       (target && target.owner === opp && target.zone === 'characters' && (target.rested || canHitActive));
     if (!validTarget) throw new Error('objetivo inválido (líder o personaje girado)');
 
-    attacker.rested = true;
+    // [Rush: Character]: el turno que entra solo puede atacar PERSONAJES.
+    if (attacker.summonedThisTurn && target.isLeader &&
+        !attacker.text.includes('[Rush]') && attacker.hasKeyword('Rush: Character')) {
+      throw new Error('con [Rush: Character] solo puede atacar personajes este turno');
+    }
+    // Restricción del líder Zoro ST-32: no atacar personajes baratos.
+    const noAtk = attacker._noAtkCharMax;
+    if (noAtk?.turn === this.turn && !target.isLeader && (target.data.cost ?? 0) <= noAtk.v) {
+      throw new Error(`no puede atacar personajes de coste base ${noAtk.v} o menos este turno`);
+    }
+    await this.restCard(attacker);
     this.log(`⚔ ${attacker.name} (${attacker.power(this)}) ataca a ${target.name} (${target.power(this)}).`);
     await this.narrate(p, { kind: 'attack', attacker: attacker.name, targetName: target.name, targetIsLeader: target.isLeader });
     if (this.onAnimate) await this.onAnimate({ type: 'attack', attackerId: attacker.id, targetId: target.id });
@@ -1683,7 +1817,7 @@ export class Game {
       });
       const blocker = this.byId(blockId);
       if (blocker && blockers.includes(blocker)) {
-        blocker.rested = true;
+        await this.restCard(blocker);
         target = blocker;
         this.log(`🛡 ${blocker.name} bloquea (${blocker.power(this)}).`);
         // "When your opponent activates a [Blocker]": lo activó el DEFENSOR,
@@ -1709,7 +1843,7 @@ export class Game {
       const c = this.byId(id);
       if (!c || c.owner !== opp || c.zone !== 'hand' || !c.counterValue) continue;
       counterBonus += c.counterValue;
-      this.trashFromHand(c);
+      this.trashFromHand(c, false);
       this.log(`✋ ${opp.name} descarta ${c.name} como counter (+${c.counterValue}).`);
     }
     target.tempPower += counterBonus;
@@ -1785,7 +1919,7 @@ export class Game {
   }
 
   async afterCharBattle(attacker, battled = null) {
-    if (attacker.zone !== 'characters') return;
+    if (attacker.zone !== 'characters' && !attacker.isLeader) return;
     for (const ab of attacker.script?.abilities ?? []) {
       if (ab.donX && attacker.givenDon < ab.donX) continue;
       if (ab.ops.some((op) => op.op === 'unrestAfterCharBattle')) {
@@ -1883,11 +2017,17 @@ export class Game {
     c.owner.trash.push(c);
   }
 
-  trashFromHand(c) {
+  trashFromHand(c, byEffect = true) {
     const p = c.owner;
     p.hand.splice(p.hand.indexOf(c), 1);
     c.zone = 'trash';
     p.trash.push(c);
+    if (byEffect) {
+      // Marca para condicionales ("during the turn in which...") y acumula
+      // para "when a card is trashed from your hand..." (líder Kuzan).
+      p._handTrashedTurn = this.turn;
+      (this._pendingHandTrash ??= new Map()).set(p, (this._pendingHandTrash?.get(p) ?? 0) + 1);
+    }
   }
 
   checkState() { /* condiciones continuas (F3+); la victoria se evalúa en el daño */ }

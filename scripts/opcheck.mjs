@@ -5,7 +5,7 @@
 // Ops "envoltorio": no cambian estado por sí mismas (delegan en ops anidadas).
 export const WRAPPERS = new Set([
   'ifCond', 'ifOppLife', 'ifYouHaveChar', 'ifDon', 'ifLeaderType',
-  'ownChoose', 'oppChoose', 'revealTopThen', 'runAbility',
+  'ownChoose', 'oppChoose', 'revealTopThen', 'runAbility', 'chooseCostReveal',
 ]);
 
 // Ops-marcador: dejan una señal para otra fase (combate, KO...) y se
@@ -15,7 +15,9 @@ const MARKERS = new Set([
   'canAttackActive', 'battleAttrBuff', 'negate', 'koBattled', 'lifeReorder',
   'lifeScryEither', 'peekReorder', 'staticSelfPower', 'auraWhileRested',
   'unrestAfterCharBattle', 'trashFaceUpLife', 'playedThisTurn',
-  'redirectAttack', 'grantToLast',
+  'redirectAttack', 'grantToLast', 'peekOppTop', 'setBasePowerOpp',
+  'cannotBeRested', 'selfNoAttackLowCost', 'drawTrashedCount', 'handCostAfterTrash',
+  'unrestLeader', 'millSelf',
 ]);
 
 export function snap(g) {

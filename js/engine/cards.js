@@ -78,7 +78,10 @@ export class CardInstance {
     if (this.isLeader) return true;
     if (!this.isCharacter || this.zone !== 'characters') return false;
     const rush = this.hasRush || this._tempKw?.has('Rush') || game?.staticKeyword?.(this, 'Rush');
-    return !this.summonedThisTurn || rush;
+    // [Rush: Character]: puede atacar el turno que entra, pero solo a
+    // personajes (la restricción de objetivo se valida en attack()).
+    const rushChar = this.hasKeyword('Rush: Character');
+    return !this.summonedThisTurn || rush || rushChar;
   }
 
   cleanupEndOfTurn() {

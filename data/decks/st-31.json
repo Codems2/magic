@@ -1,0 +1,284 @@
+{
+ "slug": "st-31",
+ "id": "ST-31",
+ "name": "Starter Deck 31: RED Monkey.D.Luffy",
+ "leader": {
+  "id": "ST21-001",
+  "name": "Monkey.D.Luffy",
+  "type": "Leader",
+  "color": "Red",
+  "cost": null,
+  "power": 5000,
+  "counter": null,
+  "life": 5,
+  "attribute": "Strike",
+  "subTypes": [
+   "Straw Hat Crew",
+   "The Four Emperors"
+  ],
+  "rarity": "L",
+  "text": "[DON!! x1] [Activate: Main] [Once Per Turn] Give up to 2 rested DON!! cards to 1 of your Characters.",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/706313_400w.jpg",
+  "count": 1
+ },
+ "altLeaders": [],
+ "cards": [
+  {
+   "id": "ST31-001",
+   "name": "Sanji",
+   "type": "Character",
+   "color": "Red",
+   "cost": 5,
+   "power": 3000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "SR",
+   "text": "[DON!! x2] This Character gains [Rush]. (This card can attack on the turn in which it is played.)\n\r\n[On Play] Draw 1 card and play up to 1 {Straw Hat Crew} type Character card with a cost of 5 or less other than [Sanji] from your hand.",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/706314_400w.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST31-002",
+   "name": "Jinbe",
+   "type": "Character",
+   "color": "Red",
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Fish-Man",
+    "Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\n\r\n[On Play] Draw 1 card and play up to 1 {Straw Hat Crew} type card with a cost of 1 from your hand.",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/706315_400w.jpg",
+   "count": 2
+  },
+  {
+   "id": "ST31-003",
+   "name": "Brook",
+   "type": "Character",
+   "color": "Red",
+   "cost": 2,
+   "power": 3000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[Opponent's Turn] If you have a total of 3 or more given DON!! cards, this Character gains [Blocker] and +3000 power. (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/706316_400w.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST31-004",
+   "name": "Monkey.D.Luffy",
+   "type": "Character",
+   "color": "Red",
+   "cost": 7,
+   "power": 9000,
+   "counter": null,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Straw Hat Crew",
+    "The Four Emperors"
+   ],
+   "rarity": "SR",
+   "text": "If you have a total of 3 or more given DON!! cards, this Character gains [Rush]. (This card can attack on the turn in which it is played.)\n\r\n[On Play] For every {Straw Hat Crew} type card on your field, give up to 1 of your opponent's Characters 1000 power during this turn.",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/706317_400w.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST31-005",
+   "name": "Thousand Sunny",
+   "type": "Stage",
+   "color": "Red",
+   "cost": 1,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[On Play] Look at 5 cards from the top of your deck; reveal up to 1 {Straw Hat Crew} type card and add it to your hand. Then, place the rest at the bottom of your deck in any order.\n\r\n[Activate: Main] You may rest this Stage: Give up to 1 rested DON!! card to 1 of your [Monkey.D.Luffy] cards.",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/706318_400w.jpg",
+   "count": 2
+  },
+  {
+   "id": "OP01-016",
+   "name": "Nami",
+   "type": "Character",
+   "color": "Red",
+   "cost": 1,
+   "power": 2000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Special",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "R",
+   "text": "[On Play] Look at 5 cards from the top of your deck; reveal up to 1 {Straw Hat Crew} type card other than [Nami] and add it to your hand. Then, place the rest at the bottom of your deck in any order.\n\r\nDisclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil.",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/706310_400w.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP11-003",
+   "name": "Usopp",
+   "type": "Character",
+   "color": "Red",
+   "cost": 5,
+   "power": 6000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Ranged",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "UC",
+   "text": "NULL",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP11-003.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP11-009",
+   "name": "Nico Robin",
+   "type": "Character",
+   "color": "Red",
+   "cost": 3,
+   "power": 4000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[DON!! x2] [When Attacking] Give up to 1 of your opponent's Characters 2000 power until the end of your opponent's next turn.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP11-009.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP11-012",
+   "name": "Franky",
+   "type": "Character",
+   "color": "Red",
+   "cost": 4,
+   "power": 4000,
+   "counter": 2000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Navy SWORD"
+   ],
+   "rarity": "UC",
+   "text": "[Your Turn] [Once Per Turn] When your opponent activates an Event, all of your Characters gain +2000 power during this turn.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP11-012.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP14-015",
+   "name": "Roronoa Zoro",
+   "type": "Character",
+   "color": "Red",
+   "cost": 7,
+   "power": 8000,
+   "counter": null,
+   "life": null,
+   "attribute": "Slash",
+   "subTypes": [
+    "Straw Hat Crew",
+    "Supernovas"
+   ],
+   "rarity": "R",
+   "text": "[Rush] (This card can attack on the turn in which it is played.)\n\r\n[When Attacking] Give up to 1 of your opponent's Characters 1000 power during this turn.\n\r\nDisclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil.",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/706312_400w.jpg",
+   "count": 4
+  },
+  {
+   "id": "ST23-004",
+   "name": "Monkey.D.Luffy",
+   "type": "Character",
+   "color": "Red",
+   "cost": 1,
+   "power": 2000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "FILM Straw Hat Crew Supernovas"
+   ],
+   "rarity": "C",
+   "text": "[Activate:Main] You may rest 1 of your DON!! cards and this Character: Give up to 1 of your opponent's Characters-1000 power during this turn.",
+   "image": "https://optcgapi.com/media/static/Card_Images/ST23-004.jpg",
+   "count": 4
+  },
+  {
+   "id": "P-101",
+   "name": "Tony Tony.Chopper (Tournament Pack 2026 Vol. 2)",
+   "type": "Character",
+   "color": "Red",
+   "cost": 4,
+   "power": 5000,
+   "counter": 1000,
+   "life": null,
+   "attribute": "Strike",
+   "subTypes": [
+    "Animal",
+    "Straw Hat Crew"
+   ],
+   "rarity": "PR",
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\r\n\n[On Play] Give up to 1 rested DON!! card to your Leader.",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/684309_400w.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP04-016",
+   "name": "Bad Manners Kick Course",
+   "type": "Event",
+   "color": "Red",
+   "cost": 0,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Alabasta",
+    "Straw Hat Crew"
+   ],
+   "rarity": "R",
+   "text": "[Counter] You may trash 1 card from your hand: Up to 1 of your Leader or Character cards gains +3000 power during this battle.\n\r\n[Trigger] Give up to 1 of your opponent's Leader or Character cards 3000 power during this turn.\n\r\nDisclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil.",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/706311_400w.jpg",
+   "count": 4
+  },
+  {
+   "id": "OP13-021",
+   "name": "Gum-Gum Gatling Gun",
+   "type": "Event",
+   "color": "Red",
+   "cost": 1,
+   "power": null,
+   "counter": null,
+   "life": null,
+   "attribute": null,
+   "subTypes": [
+    "Straw Hat Crew"
+   ],
+   "rarity": "C",
+   "text": "[Main] Give up to 1 rested DON!! card to 1 of your [Monkey.D.Luffy] cards. Then, give up to 1 of your opponent's Characters 2000 power during this turn.\n[Trigger] Give up to 1 of your opponent's Characters 2000 power during this turn.",
+   "image": "https://optcgapi.com/media/static/Card_Images/OP13-021_coQV5ky.jpg",
+   "count": 4
+  }
+ ]
+}

@@ -234,6 +234,46 @@
   "quantitiesExact": false
  },
  {
+  "slug": "st-31",
+  "id": "ST-31",
+  "name": "Starter Deck 31: RED Monkey.D.Luffy",
+  "leader": "Monkey.D.Luffy",
+  "color": "Red",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/706313_400w.jpg"
+ },
+ {
+  "slug": "st-32",
+  "id": "ST-32",
+  "name": "Starter Deck 32: GREEN Roronoa Zoro",
+  "leader": "Roronoa Zoro",
+  "color": "Green",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/706319_400w.jpg"
+ },
+ {
+  "slug": "st-33",
+  "id": "ST-33",
+  "name": "Starter Deck 33: BLUE Kuzan",
+  "leader": "Kuzan",
+  "color": "Blue",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/706329_400w.jpg"
+ },
+ {
+  "slug": "st-34",
+  "id": "ST-34",
+  "name": "Starter Deck 34: PURPLE Charlotte Katakuri",
+  "leader": "Charlotte Katakuri",
+  "color": "Purple",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/706338_400w.jpg"
+ },
+ {
+  "slug": "st-35",
+  "id": "ST-35",
+  "name": "Starter Deck 35: RED/BLACK Sabo",
+  "leader": "Sabo",
+  "color": "Red;Black",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/706347_400w.jpg"
+ },
+ {
   "slug": "st-36",
   "id": "ST-36",
   "name": "Starter Deck 36: YELLOW Eustass\"Captain\"Kid",
