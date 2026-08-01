@@ -19,6 +19,16 @@ Abre <http://localhost:8000>, elige tu mazo y el del bot, y a jugar.
 Funciona en escritorio y **móvil** (mantén pulsada una carta para verla en
 grande; el botón 📜 muestra u oculta el registro).
 
+### 🧭 Coach del ST-36
+
+Si juegas el **ST-36 (Eustass"Captain"Kid)** se activa solo un entrenador
+(`js/ui/coach.js`): un panel lateral con la situación y el plan del turno
+(bajadas, activaciones, ataques con la cuenta exacta y el combo del líder), y
+consejos razonados dentro de cada diálogo — mulligan, bloqueos, counters,
+triggers y costes opcionales. Usa las mismas heurísticas que el bot y el
+conocimiento del mazo carta a carta. La cabecera del panel lo pliega/despliega
+(se recuerda). Se valida en headless con `node scripts/coach-check.mjs`.
+
 ## 🌐 Multijugador online (1v1 con un amigo)
 
 El online usa un **servidor autoritativo**: el motor corre solo en el

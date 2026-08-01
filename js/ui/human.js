@@ -7,11 +7,13 @@ export class HumanController {
   constructor(ui) {
     this.ui = ui;
     this.player = null;
+    this.coach = null;   // Coach del ST-36 (js/ui/coach.js), si procede
   }
 
   async mulligan(game, handIds) {
     const res = await this.ui.dialog({
       title: 'Tu mano inicial',
+      body: this.coach ? this.coach.adviseMulligan(game) : '',
       cardIds: handIds,
       buttons: [
         { label: 'Quedármela', value: false, primary: true },
@@ -25,6 +27,7 @@ export class HumanController {
     const p = this.player;
     const opp = game.opponentOf(p);
     while (true) {
+      this.coach?.updatePanel(game);
       const playableHand = p.hand.filter((c) =>
         (c.isCharacter && c.cost <= p.donActive) ||
         (c.isStage && c.cost <= p.donActive) ||
@@ -101,9 +104,10 @@ export class HumanController {
   async chooseBlocker(game, { attackerId, targetId, blockerIds }) {
     const attacker = game.byId(attackerId);
     const targetName = targetId === 'leader' ? 'tu líder' : game.byId(targetId)?.name;
+    const tip = this.coach ? await this.coach.adviseBlocker(game, { attackerId, targetId, blockerIds }) : '';
     const res = await this.ui.pick({
       cardIds: blockerIds,
-      text: `${attacker.name} (${attacker.power(game)}) ataca a ${targetName}. ¿Bloqueas?`,
+      text: `${attacker.name} (${attacker.power(game)}) ataca a ${targetName}. ¿Bloqueas?${tip ? ` 🧭 ${tip}` : ''}`,
       buttons: [{ label: 'No bloquear', value: null }],
     });
     return res.type === 'card' ? res.id : null;
@@ -118,9 +122,10 @@ export class HumanController {
 
     const targetName = targetId === 'leader' ? 'tu líder' : game.byId(targetId)?.name;
     const ids = [...new Set([...counters, ...events].map((c) => c.id))];
+    const tip = this.coach ? await this.coach.adviseCounter(game, { attackerId, targetId, attackPower, targetPower }) : '';
     const chosen = await this.ui.chooseCards({
       title: 'Paso de counter',
-      body: `${game.byId(attackerId).name} (${attackPower}) golpea a ${targetName} (${targetPower}). En empate gana el ATACANTE: tu defensa debe SUPERAR ${attackPower}.`,
+      body: `${game.byId(attackerId).name} (${attackPower}) golpea a ${targetName} (${targetPower}). En empate gana el ATACANTE: tu defensa debe SUPERAR ${attackPower}.${tip ? `<br>${tip}` : ''}`,
       cardIds: ids,
       confirmLabel: 'Resolver',
       extra: (sel) => {
@@ -163,10 +168,11 @@ export class HumanController {
     const onMat = (c) => ['characters', 'leader', 'stage'].includes(c.zone) ||
       (c.zone === 'hand' && c.owner === this.player);
     if (!cands.length) return null;
+    const tip = this.coach ? await this.coach.adviseTarget(game, { purpose, candidateIds, optional }) : '';
     if (cands.some((c) => !onMat(c))) {
       const chosen = await this.ui.chooseCards({
         title: `Elige: ${label}`,
-        body: optional ? 'Puedes confirmar sin seleccionar nada para no aplicarlo.' : '',
+        body: `${optional ? 'Puedes confirmar sin seleccionar nada para no aplicarlo.' : ''}${tip ? ` ${tip}` : ''}`,
         cardIds: candidateIds,
         max: 1, min: optional ? 0 : 1,
         confirmLabel: 'Confirmar',
@@ -175,7 +181,7 @@ export class HumanController {
     }
     const res = await this.ui.pick({
       cardIds: candidateIds,
-      text: `Elige objetivo: ${label}.`,
+      text: `Elige objetivo: ${label}.${tip ? ` ${tip}` : ''}`,
       buttons: optional ? [{ label: 'No usar', value: null }] : [],
     });
     return res.type === 'card' ? res.id : null;
@@ -184,9 +190,10 @@ export class HumanController {
   async discardFromHand(game, n, opts = {}) {
     const pool = opts.fromIds ?? this.player.hand.map((c) => c.id);
     const min = opts.min ?? Math.min(n, pool.length);
+    const tip = this.coach ? await this.coach.adviseDiscard(game, n, opts) : '';
     const chosen = await this.ui.chooseCards({
       title: min === 0 ? `Descarta hasta ${n} carta(s) (opcional)` : `Descarta ${n} carta(s)`,
-      body: min === 0 ? 'Puedes confirmar sin seleccionar ninguna.' : '',
+      body: `${min === 0 ? 'Puedes confirmar sin seleccionar ninguna.' : ''}${tip ? ` ${tip}` : ''}`,
       cardIds: pool,
       max: n, min: Math.min(min, pool.length),
     });
@@ -194,9 +201,10 @@ export class HumanController {
   }
 
   async triggerDecision(game, { cardId }) {
+    const tip = this.coach ? this.coach.adviseTrigger(game, cardId) : '';
     return this.ui.dialog({
       title: '✨ ¡Trigger!',
-      body: 'Esta carta de vida tiene [Trigger]. ¿Lo activas (la carta no irá a tu mano) o te la quedas?',
+      body: `Esta carta de vida tiene [Trigger]. ¿Lo activas (la carta no irá a tu mano) o te la quedas?${tip ? `<br>${tip}` : ''}`,
       cardIds: [cardId],
       buttons: [
         { label: 'Activar Trigger', value: true, primary: true },
@@ -208,9 +216,10 @@ export class HumanController {
   // Miras N cartas reveladas y eliges hasta `max` de entre las elegibles;
   // las no elegibles se ven pero no se pueden seleccionar (como en el juego real).
   async chooseRevealed(game, { revealedIds, pickableIds, min = 0, max = 1, prompt = '' }) {
+    const tip = this.coach ? this.coach.adviseRevealed(game, { revealedIds, pickableIds, min, max }) : '';
     return this.ui.chooseCards({
       title: 'Miras la cima de tu mazo',
-      body: prompt,
+      body: `${prompt}${tip ? `<br>${tip}` : ''}`,
       cardIds: revealedIds,
       selectableIds: pickableIds,
       min: Math.min(min, pickableIds.length),
@@ -247,9 +256,13 @@ export class HumanController {
     if (c.revealHand) parts.push(`revelar ${c.revealHand.n} carta(s) de tu mano`);
     if (c.restSelf) parts.push('girar esta carta');
     if (c.trashSelf) parts.push('descartar esta carta');
+    if (c.turnLifeUp) parts.push(`voltear ${c.turnLifeUp} carta(s) de Vida boca arriba`);
+    if (c.turnLifeDown) parts.push(`voltear ${c.turnLifeDown} carta(s) de Vida boca abajo`);
+    if (c.restLeaderOrDon) parts.push('girar tu líder o 1 DON!!');
+    const tip = this.coach ? this.coach.advisePayCost(game, { cardId, when }) : '';
     return this.ui.dialog({
       title: `Habilidad de ${card.name}`,
-      body: `¿Pagas el coste (${parts.join(' + ') || 'gratis'}) para activar su efecto?`,
+      body: `¿Pagas el coste (${parts.join(' + ') || 'gratis'}) para activar su efecto?${tip ? `<br>${tip}` : ''}`,
       cardIds: [cardId],
       buttons: [
         { label: 'Pagar y activar', value: true, primary: true },
