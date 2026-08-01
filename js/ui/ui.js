@@ -397,15 +397,36 @@ export class UI {
     const cont = $('hand');
     cont.innerHTML = '';
     for (const c of me.hand) cont.appendChild(this.cardEl(c, { hand: true }));
-    // Táctil/estrecho: tocar el fondo de la mano despliega el visor en grande
-    // (tocar una CARTA conserva su función de siempre).
-    if (IS_TOUCH || window.innerWidth < 900) {
-      cont.onclick = (e) => {
-        if (e.target === cont && me.hand.length) this.openHandViewer(me);
-      };
-    } else {
-      cont.onclick = null;
+    const mobile = IS_TOUCH || window.innerWidth < 900;
+    // Asa tipo cajón sobre la mano (solo táctil/estrecho).
+    let handle = document.getElementById('handHandle');
+    if (mobile && me.hand.length) {
+      if (!handle) {
+        handle = document.createElement('div');
+        handle.id = 'handHandle';
+        handle.innerHTML = '<span></span>';
+        cont.parentElement.insertBefore(handle, cont);
+      }
+      handle.onclick = () => this.openHandViewer(me);
+    } else if (handle) {
+      handle.remove();
     }
+    // Gesto: DESLIZA HACIA ARRIBA sobre la mano para desplegarla en grande.
+    // No choca con los taps (jugar carta) ni con el scroll horizontal.
+    cont.ontouchstart = (e) => {
+      this._handSwipe = { y: e.touches[0].clientY, x: e.touches[0].clientX };
+    };
+    cont.ontouchmove = (e) => {
+      if (!this._handSwipe) return;
+      const dy = this._handSwipe.y - e.touches[0].clientY;
+      const dx = Math.abs(this._handSwipe.x - e.touches[0].clientX);
+      if (dy > 32 && dy > dx * 1.2 && me.hand.length) {
+        this._handSwipe = null;
+        e.preventDefault();
+        this.openHandViewer(me);
+      }
+    };
+    cont.ontouchend = () => { this._handSwipe = null; };
   }
 
   // Visor de la mano: las cartas VUELAN desde tu mano, se ordenan por coste
@@ -414,9 +435,13 @@ export class UI {
     if (document.getElementById('handModal')) return;
     const hand = me.hand.slice().sort((a, b) => (a.cost ?? 0) - (b.cost ?? 0) || (a.data.power ?? 0) - (b.data.power ?? 0));
 
+    const anyPlayable = hand.some((c) => this.pickState?.cards.has(c.id));
+    const hint = anyPlayable
+      ? 'toca una carta con brillo para JUGARLA · mantén pulsada para leerla · toca fuera para volver'
+      : 'toca una carta para ampliarla · toca fuera para volver';
     const modal = document.createElement('div');
     modal.id = 'handModal';
-    modal.innerHTML = `<div class="hmHead"><b>✋ Tu mano (${hand.length})</b><span>toca una carta para ampliarla · toca fuera para volver</span></div>`;
+    modal.innerHTML = `<div class="hmHead"><b>✋ Tu mano (${hand.length})</b><span>${hint}</span></div>`;
     const grid = document.createElement('div');
     grid.className = 'hmGrid';
     const cells = new Map();   // carta → celda destino
@@ -430,7 +455,27 @@ export class UI {
       } else {
         el.innerHTML = this.previewText(c);
       }
-      el.onclick = (e) => { e.stopPropagation(); this.showPreviewModal(c); };
+      const selectable = this.pickState?.cards.has(c.id);
+      if (selectable) el.classList.add('hmPlayable');
+      // Mantener pulsado: leerla en grande. Toque corto: jugarla (si se puede)
+      // o ampliarla (si no).
+      let timer = null; let long = false;
+      el.addEventListener('touchstart', () => {
+        long = false;
+        timer = setTimeout(() => { long = true; this.showPreviewModal(c); }, 430);
+      }, { passive: true });
+      el.addEventListener('touchmove', () => clearTimeout(timer), { passive: true });
+      el.addEventListener('touchend', () => clearTimeout(timer), { passive: true });
+      el.onclick = (e) => {
+        e.stopPropagation();
+        if (long) { long = false; return; }
+        if (this.pickState?.cards.has(c.id)) {
+          this.destroyHandViewer();
+          this.resolvePick({ type: 'card', id: c.id });
+        } else {
+          this.showPreviewModal(c);
+        }
+      };
       grid.appendChild(el);
       cells.set(c, el);
     }
@@ -487,6 +532,12 @@ export class UI {
     });
     modal.classList.remove('open');
     setTimeout(() => modal.remove(), 460 + flights.length * 35);
+  }
+
+  // Cierre inmediato del visor (p. ej. al jugar una carta desde él).
+  destroyHandViewer() {
+    document.getElementById('handModal')?.remove();
+    document.querySelectorAll('.flyCard').forEach((f) => f.remove());
   }
 
   // Clon volador de una carta (para las transiciones del visor).

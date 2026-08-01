@@ -526,7 +526,17 @@ body.show-log #log { display: block; }
   border-top: 2px solid var(--gold-d);
 }
 
-/* Visor de la mano (táctil): se abre tocando el fondo de la mano. */
+/* Asa tipo cajón sobre la mano (táctil): tócala o desliza hacia arriba. */
+#handHandle {
+  display: flex; align-items: center; justify-content: center;
+  padding: 3px 0 1px; cursor: pointer; user-select: none;
+  background: linear-gradient(180deg, transparent, rgba(15,49,79,.55));
+}
+#handHandle span {
+  width: 52px; height: 5px; border-radius: 3px;
+  background: var(--gold-d); opacity: .8; box-shadow: 0 0 6px rgba(245,197,66,.4);
+}
+/* Visor de la mano (táctil): desliza hacia arriba o toca el asa. */
 #handModal {
   position: fixed; inset: 0; background: rgba(4,10,18,0); z-index: 380;
   display: flex; flex-direction: column; align-items: center; padding: 12px;
@@ -548,8 +558,16 @@ body.show-log #log { display: block; }
   display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 10px; width: min(720px, 96vw);
 }
-#handModal .hmCard { cursor: zoom-in; }
-#handModal .hmCard img { width: 100%; border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.6); display: block; }
+#handModal .hmCard { cursor: zoom-in; border-radius: 10px; }
+#handModal .hmCard.hmPlayable {
+  outline: 3px solid var(--sel); outline-offset: -1px;
+  box-shadow: 0 0 16px rgba(86,199,255,.55); cursor: pointer;
+}
+#handModal .hmCard img {
+  width: 100%; aspect-ratio: 5/7; object-fit: cover;
+  border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.6); display: block;
+  background: var(--panel);   /* mantiene la forma mientras carga el arte */
+}
 #handModal .hmCard .ptext { font-size: .72rem; }
 #handModal .hmClose { margin: 14px 0 6px; }
 
