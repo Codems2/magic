@@ -122,7 +122,8 @@ sin ellas el juego funciona igual mostrando el texto de cada carta.
 
 Preparación (líder, 5 de mano con mulligan, vidas según el líder, 10 DON!!),
 turnos completos (Refresh / Draw / DON!! / Main / End con las excepciones del
-primer turno), economía de DON!! (colocar, pagar costes, **dar +1000**,
+primer turno: nadie ataca en su primer turno — regla 6-5-6-1 —, el jugador
+inicial no roba y coloca solo 1 DON!!), economía de DON!! (colocar, pagar costes, **dar +1000**,
 retorno en refresh, devolver al mazo), personajes (límite de 5), escenarios,
 y combate íntegro: atacar al líder o a personajes girados, **paso de bloqueo**
 (`[Blocker]`), **paso de counter** (descartes con valor de counter y eventos

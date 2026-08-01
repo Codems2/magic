@@ -74,8 +74,9 @@ export class CardInstance {
 
   canAttack(game) {
     if (this.rested) return false;
-    // Nadie puede atacar durante el primer turno de la partida.
-    if (game && game.turn <= 1) return false;
+    // Regla oficial 6-5-6-1: NINGÚN jugador puede batallar en su primer
+    // turno (turnos globales 1 y 2). El primer ataque llega en el turno 3.
+    if (game && game.turn <= 2) return false;
     // Congelado por un efecto: no puede atacar este turno.
     if (game && this._cannotAttackUntil === game.turn) return false;
     if (this.isLeader) return true;

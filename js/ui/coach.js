@@ -180,7 +180,7 @@ export class Coach {
       }
     }
     if (!anyAttack) {
-      if (game.turn <= 1) lines.push('Turno 1: nadie puede atacar. Baja tu curva y pasa.');
+      if (game.turn <= 2) lines.push('Primer turno: nadie puede atacar (regla oficial). Baja tu curva y pasa.');
       else if (!attackers.length) lines.push('Sin atacantes listos este turno: desarrolla el tablero.');
       else lines.push('Ningún ataque rentable ahora: mejor desarrolla y deja el tablero enderezado para defender.');
     } else {

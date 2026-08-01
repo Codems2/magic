@@ -508,7 +508,7 @@ async function rpsChooseOrder(ui) {
     if (win) {
       const first = await ui.dialog({
         title: `🏆 ¡Ganaste! ${OPTS[me]} contra ${OPTS[bot]}`,
-        body: 'Tú eliges. Recuerda: el PRIMERO no roba, coloca 1 DON!! y no puede atacar en su primer turno; el SEGUNDO roba, coloca 2 DON!! y sí puede atacar.',
+        body: 'Tú eliges. Recuerda: nadie puede atacar en su primer turno. El PRIMERO no roba y coloca 1 DON!!; el SEGUNDO roba y coloca 2 DON!! (y será el primero en poder atacar, en el turno 3).',
         buttons: [{ label: '🥇 Empiezo yo', value: true, primary: true }, { label: '🥈 Empieza el bot', value: false }],
       });
       return first ? 'first' : 'second';
