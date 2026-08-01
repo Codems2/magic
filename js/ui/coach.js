@@ -4,7 +4,7 @@
 // y costes opcionales. Funciona offline y online (ClientGame) y también sin
 // DOM (los tests headless leen `lastPlan` y los textos devueltos).
 
-import { BotController } from '../ai/bot.js';
+import { HardBot } from '../ai/hardbot.js';
 import { abilitiesOf } from '../engine/effects.js';
 
 // Conocimiento carta a carta del mazo: [prioridad extra, por qué es buena].
@@ -42,7 +42,8 @@ const endFaceUp = (p) => (p.life.length ? (lifeUpCard(p, 0) ?? lifeUpCard(p, p.l
 export class Coach {
   constructor(human) {
     this.human = human;
-    this.bot = new BotController('Coach');
+    // Piensa con el cerebro competitivo (letal, banca de DON, defensa).
+    this.bot = new HardBot('Coach');
     this.lastPlan = [];   // [{title, lines[]}] — la fuente del panel y de los tests
     this.el = null;
     this.mount();
@@ -139,6 +140,11 @@ export class Coach {
       return lines;
     }
     let don = p.donActive;
+
+    // 0) ¿Hay letal este turno? Lo primero es no dejarlo escapar.
+    if (this.bot.lethalPush?.(game)) {
+      lines.push('💀 <b>¡LETAL disponible!</b> Tienes golpes suficientes para quitarle todas las vidas y rematar: olvida el desarrollo, reparte DON!! y ataca al líder con TODO (de mayor a menor golpe).');
+    }
 
     // 1) Bajadas por prioridad del mazo (greedy sobre el DON disponible).
     for (const pl of this.rankPlays(game, p, opp)) {

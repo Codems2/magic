@@ -422,6 +422,11 @@ button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
 #previewModal img { max-width: min(92vw, 340px); max-height: 82vh; border-radius: 14px; box-shadow: 0 0 40px rgba(0,0,0,.8); }
 #previewModal .ptext { max-width: 92vw; max-height: 80vh; overflow-y: auto; }
 
+/* Selector de nivel del bot (pantalla de mazos). */
+#botLevelWrap { margin: 10px 0 4px; color: var(--dim); }
+#botLevelWrap label { margin-left: 10px; cursor: pointer; color: var(--ink); }
+#botLevelWrap input { accent-color: var(--gold); }
+
 /* ---- Coach ST-36 (panel lateral con el plan del turno) ---- */
 #coach {
   position: fixed; left: 12px; top: 60px; width: 272px; z-index: 45;

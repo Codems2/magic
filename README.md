@@ -19,6 +19,19 @@ Abre <http://localhost:8000>, elige tu mazo y el del bot, y a jugar.
 Funciona en escritorio y **móvil** (mantén pulsada una carta para verla en
 grande; el botón 📜 muestra u oculta el registro).
 
+### 🏆 Niveles del bot
+
+En la pantalla de mazos eliges el nivel del rival:
+
+- **🐣 Normal** (`js/ai/bot.js`): heurístico de una jugada — curva, ataques
+  con cuentas simples y defensa por reglas fijas.
+- **🏆 Competitivo** (`js/ai/hardbot.js`, por defecto): añade cálculo de
+  **letal** (detecta cuándo puede rematar y va all-in con el DON!! y el orden
+  de ataques correctos), disciplina de counters según el calendario de vidas,
+  banca de DON!! para sus eventos [Counter], secuencia de ataques por valor y
+  mulligan por calidad de curva. En arena espejo (mismo mazo, ambos asientos)
+  gana ~77% al normal: `node scripts/arena.mjs`.
+
 ### 🧭 Coach del ST-36
 
 Si juegas el **ST-36 (Eustass"Captain"Kid)** se activa solo un entrenador

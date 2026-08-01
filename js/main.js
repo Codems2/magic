@@ -2,6 +2,7 @@
 
 import { Game } from './engine/game.js';
 import { BotController } from './ai/bot.js';
+import { HardBot } from './ai/hardbot.js';
 import { UI } from './ui/ui.js';
 import { HumanController } from './ui/human.js';
 import { Coach } from './ui/coach.js';
@@ -77,8 +78,8 @@ function openMatPicker() {
 }
 
 // Bot con pausas escaladas por el selector de velocidad.
-function watchableBot() {
-  const bot = new BotController('Bot');
+function watchableBot(level = 'hard') {
+  const bot = level === 'hard' ? new HardBot('Bot') : new BotController('Bot');
   const delays = { mainAction: 650, chooseBlocker: 600, counterStep: 600, triggerDecision: 500 };
   for (const [method, delay] of Object.entries(delays)) {
     const orig = bot[method].bind(bot);
@@ -124,7 +125,15 @@ async function main() {
   renderGrid('myDecks', (s) => { mySlug = s; });
   renderGrid('botDecks', (s) => { botSlug = s; });
 
-  $('startBtn').onclick = () => startGame(decks[mySlug], decks[botSlug]);
+  // Nivel del bot (persistente): 🏆 Competitivo por defecto.
+  const savedLevel = localStorage.getItem('opBotLevel') ?? 'hard';
+  document.querySelectorAll('input[name="botLevel"]').forEach((r) => {
+    r.checked = r.value === savedLevel;
+    r.onchange = () => localStorage.setItem('opBotLevel', r.value);
+  });
+  const botLevel = () => document.querySelector('input[name="botLevel"]:checked')?.value ?? 'hard';
+
+  $('startBtn').onclick = () => startGame(decks[mySlug], decks[botSlug], null, botLevel());
   // Sandbox: no exige elegir mazos (usa ST-01/ST-02 si no marcaste ninguno).
   $('sandboxBtn').onclick = () => startGame(
     decks[mySlug ?? 'st-01'],
@@ -355,7 +364,7 @@ function sandboxSearchModal(catalog, game, human, ui) {
   input.focus();
 }
 
-async function startGame(myDeck, botDeck, sandboxOpts = null) {
+async function startGame(myDeck, botDeck, sandboxOpts = null, level = 'hard') {
   $('setup').classList.add('hidden');
   $('game').classList.remove('hidden');
 
@@ -367,9 +376,9 @@ async function startGame(myDeck, botDeck, sandboxOpts = null) {
   const configs = [
     { name: 'Tú', deck: myDeck, controller: human, isBot: false },
     {
-      name: `${botDeck.leader.name} (${sandbox ? 'Rival de pruebas' : 'Bot'})`,
+      name: `${botDeck.leader.name} (${sandbox ? 'Rival de pruebas' : level === 'hard' ? 'Bot 🏆' : 'Bot'})`,
       deck: botDeck,
-      controller: sandbox ? passiveRival() : watchableBot(),
+      controller: sandbox ? passiveRival() : watchableBot(level),
       isBot: true,
     },
   ];
