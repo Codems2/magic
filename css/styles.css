@@ -102,7 +102,7 @@ body[data-mat="custom"] #selfArea .mat {
   width: 100%; padding: 3px 0; font-size: .74rem; font-weight: 700; text-align: center;
   background: rgba(4,10,18,.72); color: var(--ink);
 }
-#matUrl {
+#matUrl, .matUrlIn {
   width: 100%; box-sizing: border-box; margin-top: 8px; padding: 8px 10px;
   border-radius: 8px; border: 1px solid var(--gold-d);
   background: rgba(0,0,0,.35); color: inherit; font: inherit; font-size: .85rem;
@@ -397,23 +397,6 @@ body.show-log #log { display: block; }
 /* Arte oficial de la carta DON!! sobre el respaldo CSS. */
 .donTok img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 2; }
 
-/* DON!! dados a un personaje/líder: asoman por debajo de la carta, como
-   cuando se meten debajo en la mesa. En el lado del rival asoman hacia
-   arriba (su "debajo" queda hacia su lado de la mesa). */
-.donUnder {
-  position: absolute; left: 12%; width: 76%; top: calc(100% - 6px);
-  z-index: -1; pointer-events: none; display: flex; flex-direction: column; gap: 2px;
-}
-.donUnderCard {
-  height: 15px; border-radius: 0 0 5px 5px; overflow: hidden; position: relative;
-  border: 1px solid #7a4c06; border-top: none;
-  background: radial-gradient(circle at 50% 10%, #fff3c4 0%, #f5c542 30%, #e8a71e 60%, #a8690b 100%);
-  box-shadow: 0 2px 5px rgba(0,0,0,.55);
-}
-.donUnderCard img { width: 100%; height: 44px; object-fit: cover; object-position: center top; display: block; }
-.mat.opp .donUnder { top: auto; bottom: calc(100% - 6px); flex-direction: column-reverse; }
-.mat.opp .donUnderCard { border-radius: 5px 5px 0 0; border-top: 1px solid #7a4c06; border-bottom: none; }
-
 /* ---- pilas laterales (reverso de carta pirata) ---- */
 .pile {
   position: relative; width: 60px; height: 84px; border-radius: 7px; flex-shrink: 0;
@@ -432,6 +415,16 @@ body.show-log #log { display: block; }
   width: 66px; height: 92px;
   background: radial-gradient(circle at 50% 40%, #8a1f2c, #4a0f16);
 }
+/* Fundas: tu imagen como dorso de TUS cartas (mazo y vidas boca abajo). */
+body.has-sleeve #selfArea .pile-deck {
+  background: var(--sleeveimg) center / cover no-repeat, linear-gradient(#0c2540, #0c2540);
+}
+body.has-sleeve #selfArea .lifeCardBack {
+  background: var(--sleeveimg) center / cover no-repeat, linear-gradient(#4a0f16, #4a0f16);
+  border-color: rgba(245,197,66,.4);
+}
+body.has-sleeve #selfArea .lifeCardBack::after { content: none; }
+
 /* Pila de vidas: cartas reales boca abajo, apiladas con ligero desfase */
 .lifeStack { position: relative; width: 66px; }
 .lifeCardBack {
@@ -559,16 +552,20 @@ body.show-log #log { display: block; }
 #fxLayer { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 60; display: none; }
 
 #hand {
-  display: flex; gap: 6px; padding: 9px 12px 13px; overflow-x: auto; min-height: 154px;
-  justify-content: safe center;   /* mano centrada; con muchas cartas, scroll */
+  display: flex; gap: 6px; padding: 9px 12px 13px; min-height: 154px; align-items: center;
   background: linear-gradient(180deg, rgba(15,49,79,.6), rgba(7,20,34,.9));
   border-top: 2px solid var(--gold-d);
+}
+/* Las cartas van en una tira interior con su propio scroll; así el botón
+   "Ver mano" queda SIEMPRE pegado a la derecha de la zona. */
+#handCards {
+  display: flex; gap: 6px; overflow-x: auto; flex: 1 1 auto; min-width: 0;
+  justify-content: safe center;   /* mano centrada; con muchas cartas, scroll */
 }
 
 /* Botón "Ver mano" a la derecha de la zona de la mano: abre el visor grande. */
 #verMano {
-  position: sticky; right: 6px; margin-left: auto; align-self: center;
-  flex: 0 0 auto; z-index: 5; padding: 8px 12px;
+  flex: 0 0 auto; margin-left: 8px; align-self: center; padding: 8px 12px;
   background: linear-gradient(180deg, rgba(20,58,92,.95), rgba(10,32,54,.95));
   border: 1px solid var(--gold-d); border-radius: 8px;
   color: var(--gold); font-weight: 700; font-size: .8rem;

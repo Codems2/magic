@@ -26,6 +26,75 @@ const MATS = [
 ];
 
 let DONS = null;   // artes de DON!! oficiales (data/cards/dons.json), carga perezosa
+async function loadDons() {
+  if (!DONS) {
+    try { DONS = await (await fetch('data/cards/dons.json', noCache)).json(); } catch { DONS = []; }
+  }
+  return DONS;
+}
+
+function applySleeve() {
+  const img = localStorage.getItem('opSleeveData') || localStorage.getItem('opSleeveUrl') || '';
+  document.body.classList.toggle('has-sleeve', !!img);
+  document.body.style.setProperty('--sleeveimg', img ? `url("${img}")` : 'none');
+}
+
+// Subidor de imagen reutilizable (tapete, fundas): botón de archivo +
+// quitar + URL, guardando en localStorage con reescalado en canvas.
+function imageUploader({ dataKey, urlKey, maxPx, onChange }) {
+  const box = document.createElement('div');
+  const row = document.createElement('div');
+  row.className = 'matUpRow';
+  const fileIn = document.createElement('input');
+  fileIn.type = 'file'; fileIn.accept = 'image/*'; fileIn.classList.add('hidden');
+  const fileBtn = document.createElement('button');
+  fileBtn.type = 'button'; fileBtn.textContent = '📁 Subir imagen';
+  fileBtn.onclick = () => fileIn.click();
+  const clearBtn = document.createElement('button');
+  clearBtn.type = 'button'; clearBtn.textContent = '🗑 Quitar imagen';
+  clearBtn.classList.toggle('hidden', !localStorage.getItem(dataKey));
+  row.append(fileBtn, fileIn, clearBtn);
+  box.appendChild(row);
+  fileIn.onchange = () => {
+    const f = fileIn.files?.[0];
+    if (!f) return;
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(img.src);
+      const k = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const cv = document.createElement('canvas');
+      cv.width = Math.max(1, Math.round(img.width * k));
+      cv.height = Math.max(1, Math.round(img.height * k));
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      let data = cv.toDataURL('image/jpeg', 0.85);
+      if (data.length > 3_500_000) data = cv.toDataURL('image/jpeg', 0.6);
+      try {
+        localStorage.setItem(dataKey, data);
+      } catch {
+        alert('No cabe esa imagen en el almacenamiento del navegador; prueba con una más pequeña.');
+        return;
+      }
+      clearBtn.classList.remove('hidden');
+      onChange();
+    };
+    img.onerror = () => alert('No he podido leer esa imagen.');
+    img.src = URL.createObjectURL(f);
+  };
+  clearBtn.onclick = () => {
+    localStorage.removeItem(dataKey);
+    fileIn.value = '';
+    clearBtn.classList.add('hidden');
+    onChange();
+  };
+  const url = document.createElement('input');
+  url.type = 'url';
+  url.className = 'matUrlIn';
+  url.placeholder = 'https://…/mi-imagen.jpg';
+  url.value = localStorage.getItem(urlKey) ?? '';
+  url.oninput = () => { localStorage.setItem(urlKey, url.value.trim()); onChange(); };
+  box.appendChild(url);
+  return box;
+}
 
 function applyMat() {
   const mat = localStorage.getItem('opMat') ?? 'altamar';
@@ -64,76 +133,30 @@ function openMatPicker() {
   const customBox = document.createElement('div');
   customBox.classList.toggle('hidden', current !== 'custom');
   customBox.innerHTML = '<p style="margin:0">Sube una imagen desde tu dispositivo, o pega una URL:</p>';
-  const row = document.createElement('div');
-  row.className = 'matUpRow';
-  const fileIn = document.createElement('input');
-  fileIn.type = 'file';
-  fileIn.accept = 'image/*';
-  fileIn.classList.add('hidden');
-  const fileBtn = document.createElement('button');
-  fileBtn.type = 'button';
-  fileBtn.textContent = '📁 Subir imagen';
-  fileBtn.onclick = () => fileIn.click();
-  const clearBtn = document.createElement('button');
-  clearBtn.type = 'button';
-  clearBtn.textContent = '🗑 Quitar imagen';
-  clearBtn.classList.toggle('hidden', !localStorage.getItem('opMatData'));
-  row.append(fileBtn, fileIn, clearBtn);
-  customBox.appendChild(row);
   // La miniatura del tema "Tu imagen" enseña lo que hay guardado.
   const refreshCustomSwatch = () => {
     const img = localStorage.getItem('opMatData') || localStorage.getItem('opMatUrl') || '';
     const sw = grid.querySelector('.matSwatch[data-mat="custom"]');
     if (sw) sw.style.background = img ? `url("${img}") center / cover` : '';
   };
-  fileIn.onchange = () => {
-    const f = fileIn.files?.[0];
-    if (!f) return;
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(img.src);
-      // Reescala en canvas: localStorage tiene poco sitio y de fondo no se
-      // nota nada por encima de 1920px.
-      const MAX = 1920;
-      const k = Math.min(1, MAX / Math.max(img.width, img.height));
-      const cv = document.createElement('canvas');
-      cv.width = Math.max(1, Math.round(img.width * k));
-      cv.height = Math.max(1, Math.round(img.height * k));
-      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-      let data = cv.toDataURL('image/jpeg', 0.85);
-      if (data.length > 3_500_000) data = cv.toDataURL('image/jpeg', 0.6);
-      try {
-        localStorage.setItem('opMatData', data);
-      } catch {
-        alert('No cabe esa imagen en el almacenamiento del navegador; prueba con una más pequeña.');
-        return;
+  customBox.appendChild(imageUploader({
+    dataKey: 'opMatData', urlKey: 'opMatUrl', maxPx: 1920,
+    onChange: () => {
+      if (localStorage.getItem('opMatData') || localStorage.getItem('opMatUrl')) {
+        localStorage.setItem('opMat', 'custom');
+        grid.querySelectorAll('.matSwatch').forEach((x) => x.classList.toggle('on', x.dataset.mat === 'custom'));
       }
-      localStorage.setItem('opMat', 'custom');
-      grid.querySelectorAll('.matSwatch').forEach((x) => x.classList.toggle('on', x.dataset.mat === 'custom'));
-      customBox.classList.remove('hidden');
-      clearBtn.classList.remove('hidden');
       refreshCustomSwatch();
       applyMat();
-    };
-    img.onerror = () => alert('No he podido leer esa imagen.');
-    img.src = URL.createObjectURL(f);
-  };
-  clearBtn.onclick = () => {
-    localStorage.removeItem('opMatData');
-    fileIn.value = '';
-    clearBtn.classList.add('hidden');
-    refreshCustomSwatch();
-    applyMat();
-  };
-  const input = document.createElement('input');
-  input.id = 'matUrl';
-  input.type = 'url';
-  input.placeholder = 'https://…/mi-tapete.jpg';
-  input.value = localStorage.getItem('opMatUrl') ?? '';
-  input.oninput = () => { localStorage.setItem('opMatUrl', input.value.trim()); refreshCustomSwatch(); applyMat(); };
-  customBox.appendChild(input);
+    },
+  }));
   dlg.appendChild(customBox);
   refreshCustomSwatch();
+  // ---- tus fundas: el dorso de tu mazo y tus vidas boca abajo ----
+  const slHead = document.createElement('p');
+  slHead.style.margin = '12px 0 0';
+  slHead.innerHTML = '🃏 <b>Tus fundas</b> — la imagen se pone como dorso de tu mazo y tus vidas:';
+  dlg.append(slHead, imageUploader({ dataKey: 'opSleeveData', urlKey: 'opSleeveUrl', maxPx: 800, onChange: applySleeve }));
   // ---- tu carta DON!!: arte clásico o cualquiera de los oficiales ----
   const donHead = document.createElement('p');
   donHead.style.margin = '12px 0 6px';
@@ -164,12 +187,10 @@ function openMatPicker() {
     mk('Clásico', null);
     for (const d of list) mk(d.name, d.image);
   };
-  if (DONS) renderDons(DONS);
-  else {
-    fetch('data/cards/dons.json', noCache).then((r) => r.json())
-      .then((list) => { DONS = list; renderDons(list); })
-      .catch(() => { donHead.remove(); donGrid.remove(); });
-  }
+  loadDons().then((list) => {
+    if (list.length) renderDons(list);
+    else { donHead.remove(); donGrid.remove(); }
+  });
   const close = document.createElement('button');
   close.textContent = 'Listo';
   close.onclick = () => modal.remove();
@@ -197,6 +218,7 @@ const noCache = { cache: 'no-cache' };
 
 async function main() {
   applyMat();
+  applySleeve();
   document.getElementById('matBtnSetup').onclick = openMatPicker;
   document.getElementById('matBtn').onclick = openMatPicker;
   const index = await (await fetch('data/decks/index.json', noCache)).json();
@@ -450,6 +472,8 @@ function showLobbyWait({ connecting = false, code = null, seat = 0, onCancel }) 
 function startOnline({ url, mode, code, name, deckSlug, deckSpec = null }) {
   const ui = new UI(ctrl);
   const human = new HumanController(ui);
+  // DON!! del rival: un arte aleatorio distinto en cada partida.
+  loadDons().then((list) => { if (list.length) ui.oppDonSrc = list[(Math.random() * list.length) | 0].image; });
   let started = false;
 
   showLobbyWait({ connecting: true, onCancel: () => conn?.close?.() });
@@ -590,7 +614,7 @@ function sandboxSearchModal(catalog, game, human, ui) {
 
 // Piedra, papel o tijera contra el bot; el ganador elige el orden.
 // Devuelve 'first' si el humano empieza, 'second' si empieza el bot.
-async function rpsChooseOrder(ui) {
+async function rpsChooseOrder(ui, botDeck = null) {
   const OPTS = ['✊ Piedra', '✋ Papel', '✌ Tijera'];
   while (true) {
     const me = await ui.dialog({
@@ -612,12 +636,21 @@ async function rpsChooseOrder(ui) {
       });
       return first ? 'first' : 'second';
     }
+    // El bot analiza su curva de costes (ponderada por copias): con curva
+    // agresiva le compensa el tempo de ir primero; con curva alta prefiere
+    // ir segundo (roba en su turno 1 y alcanza antes sus costes clave).
+    let tot = 0, nc = 0;
+    for (const c of botDeck?.cards ?? []) { const q = c.count ?? 1; tot += (c.cost ?? 0) * q; nc += q; }
+    const avg = nc ? tot / nc : 3;
+    const botFirst = avg < 3.6;
     await ui.dialog({
       title: `☠ Perdiste: ${OPTS[me]} contra ${OPTS[bot]}`,
-      body: 'El bot elige empezar PRIMERO.',
+      body: botFirst
+        ? `El bot analiza su mazo (coste medio ${avg.toFixed(1)}): curva agresiva, elige empezar PRIMERO.`
+        : `El bot analiza su mazo (coste medio ${avg.toFixed(1)}): curva alta, prefiere ir SEGUNDO y te cede el primer turno.`,
       buttons: [{ label: 'Vale', value: true, primary: true }],
     });
-    return 'second';
+    return botFirst ? 'second' : 'first';
   }
 }
 
@@ -627,6 +660,8 @@ async function startGame(myDeck, botDeck, sandboxOpts = null, level = 'search') 
 
   const ui = new UI(ctrl);
   const human = new HumanController(ui);
+  // DON!! del rival: un arte aleatorio distinto en cada partida.
+  loadDons().then((list) => { if (list.length) ui.oppDonSrc = list[(Math.random() * list.length) | 0].image; });
   const sandbox = !!sandboxOpts;
   const configs = [
     { name: 'Tú', deck: myDeck, controller: human, isBot: false },
@@ -638,7 +673,7 @@ async function startGame(myDeck, botDeck, sandboxOpts = null, level = 'search') 
     },
   ];
   // Quién empieza: piedra-papel-tijera (el ganador elige); en sandbox, tú.
-  if (!sandbox && (await rpsChooseOrder(ui)) === 'second') configs.reverse();
+  if (!sandbox && (await rpsChooseOrder(ui, botDeck)) === 'second') configs.reverse();
 
   const game = new Game(configs, {
     seed: (Math.random() * 2 ** 31) | 0,

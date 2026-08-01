@@ -289,8 +289,9 @@ export class UI {
     cost.className = 'zone costZone';
     cost.dataset.label = `Coste · DON!! ${p.donActive} activos / ${p.donRested} girados`;
     const totalDon = p.donActive + p.donRested;
-    // Tus DON!! usan el arte que elijas en 🎨; los del rival, el clásico.
-    const donSrc = (!isOpp && localStorage.getItem('opDonImg')) || DON_IMG;
+    // Tus DON!! usan el arte que elijas en 🎨; los del rival, uno aleatorio
+    // por partida (lo fija main.js en this.oppDonSrc).
+    const donSrc = isOpp ? (this.oppDonSrc || DON_IMG) : (localStorage.getItem('opDonImg') || DON_IMG);
     for (let i = 0; i < totalDon; i++) {
       const tok = document.createElement('div');
       tok.className = 'donTok' + (i >= p.donActive ? ' rested' : '');
@@ -388,7 +389,7 @@ export class UI {
       d.innerHTML = `<img src="${topCard.data.image}" alt="descarte">`;
     }
     if (kind === 'don' && !donImgFailed) {
-      const src = (!isOpp && localStorage.getItem('opDonImg')) || DON_IMG;
+      const src = isOpp ? (this.oppDonSrc || DON_IMG) : (localStorage.getItem('opDonImg') || DON_IMG);
       d.innerHTML = `<img src="${src}" alt="DON!!" loading="lazy" onerror="this.onerror=null;this.src='${DON_IMG}'">`;
     }
     d.innerHTML += `<span class="pileCount">${count}</span><span class="pileLabel">${label}</span>`;
@@ -402,11 +403,11 @@ export class UI {
   renderHand(me) {
     const cont = $('hand');
     cont.innerHTML = '';
-    document.getElementById('handHandle')?.remove();   // restos de la mecánica anterior
-    cont.ontouchstart = cont.ontouchmove = cont.ontouchend = null;
-    for (const c of me.hand) cont.appendChild(this.cardEl(c, { hand: true }));
-    // Botón "Ver mano" a la derecha de la zona de la mano: abre el visor
-    // grande (jugable). Sticky para que no se pierda con el scroll.
+    // Tira interior con scroll propio + botón fijo a la derecha de la zona.
+    const strip = document.createElement('div');
+    strip.id = 'handCards';
+    for (const c of me.hand) strip.appendChild(this.cardEl(c, { hand: true }));
+    cont.appendChild(strip);
     if (me.hand.length) {
       const btn = document.createElement('button');
       btn.id = 'verMano';
@@ -599,21 +600,7 @@ export class UI {
       if (card.zone !== 'hand') div.innerHTML += `<span class="pw${boosted ? ' boosted' : ''}">${p}</span>`;
       else div.innerHTML += `<span class="pw">${card.data.power ?? 0}</span>`;
     }
-    // DON!! dados: cartas DON de verdad asomando por debajo, como en la mesa.
-    if (card.givenDon > 0 && (card.zone === 'characters' || card.isLeader)) {
-      const donMine = card.owner === this.human?.player;
-      const donSrc = (donMine && localStorage.getItem('opDonImg')) || DON_IMG;
-      const shown = Math.min(card.givenDon, 4);
-      let under = `<div class="donUnder" title="${card.givenDon} DON!! dado(s)">`;
-      for (let i = 0; i < shown; i++) {
-        under += `<div class="donUnderCard"><img src="${donSrc}" alt="DON!!" loading="lazy" onerror="this.onerror=null;this.src='${DON_IMG}'"></div>`;
-      }
-      div.innerHTML += under + '</div>';
-      // Con más de 4, el resto se resume en el badge de siempre.
-      if (card.givenDon > shown) div.innerHTML += `<span class="donB">+${card.givenDon}</span>`;
-    } else if (card.givenDon > 0) {
-      div.innerHTML += `<span class="donB">+${card.givenDon}</span>`;
-    }
+    if (card.givenDon > 0) div.innerHTML += `<span class="donB">+${card.givenDon}</span>`;
     if (hand && card.counterValue) div.innerHTML += `<span class="cntB">C${card.counterValue}</span>`;
 
     // Indicadores didácticos (solo tus cartas).
