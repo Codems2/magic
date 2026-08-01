@@ -49,7 +49,14 @@ export class Player {
 export class Game {
   constructor(configs, { seed = 42, onLog = null, onAnimate = null, onNarrate = null, maxTurns = 60, sandbox = false } = {}) {
     resetIds();
-    this.rng = mulberry32(seed);
+    // RNG con estado visible: snapshot/restore (bot con búsqueda) lo necesita.
+    this.rngState = seed >>> 0;
+    this.rng = () => {
+      const a = (this.rngState = (this.rngState + 0x6d2b79f5) | 0);
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
     this.onLog = onLog;
     this.onAnimate = onAnimate;   // hook opcional para animaciones de la UI
     this.onNarrate = onNarrate;   // hook opcional: la UI narra las jugadas
@@ -363,12 +370,14 @@ export class Game {
   byId(id) { return this.cardsById.get(id) ?? null; }
 
   log(msg) {
+    if (this._mute) return;   // simulaciones internas del bot: sin ruido
     this.logLines.push(msg);
     if (this.onLog) this.onLog(msg);
   }
 
   // Narración estructurada de una jugada (la UI decide si mostrar cartel).
   async narrate(player, ev) {
+    if (this._mute) return;
     if (this.onNarrate) {
       await this.onNarrate({
         actor: player.name, isBot: player.isBot,
@@ -477,6 +486,12 @@ export class Game {
     if (this.over) return;
 
     // 5. End: habilidades [End of Your Turn] del jugador activo.
+    await this.endPhase(p);
+  }
+
+  // Fase final del turno (también la usa el bot con búsqueda para "imaginar"
+  // el cierre de su turno y el turno de respuesta del rival).
+  async endPhase(p) {
     this.phase = 'end';
     for (const c of [...p.board()]) {
       await this.runTaggedAbilities(c, 'endOfTurn');
@@ -1831,7 +1846,7 @@ export class Game {
     await this.restCard(attacker);
     this.log(`⚔ ${attacker.name} (${attacker.power(this)}) ataca a ${target.name} (${target.power(this)}).`);
     await this.narrate(p, { kind: 'attack', attacker: attacker.name, targetName: target.name, targetIsLeader: target.isLeader });
-    if (this.onAnimate) await this.onAnimate({ type: 'attack', attackerId: attacker.id, targetId: target.id });
+    if (this.onAnimate && !this._mute) await this.onAnimate({ type: 'attack', attackerId: attacker.id, targetId: target.id });
 
     // [When Attacking] (con condición [DON!! xN]); puede vetar bloqueadores.
     const battle = { noBlocker: null };
@@ -2102,6 +2117,103 @@ export class Game {
     p.hand.push(c);
     this.log(`🧪 ${p.name} añade ${c.name} a su mano (sandbox).`);
     return c;
+  }
+
+  // ---- snapshot / restore (bot con búsqueda) -----------------------------
+  // Copia y restaura TODO el estado mutable de la partida (cartas, zonas,
+  // DON!!, RNG, flags temporales) sin tocar los inmutables compartidos
+  // (data, script, controllers, callbacks). Permite al bot "imaginar" el
+  // resto del turno sobre el estado real y luego deshacerlo.
+
+  static _EXC_CARD = new Set(['id', 'data', 'owner', 'game', 'script']);
+  static _EXC_PLAYER = new Set(['deck', 'controller', 'leader', 'library', 'hand', 'characters', 'stage', 'life', 'trash']);
+
+  _cloneVal(v) {
+    if (v === null || typeof v !== 'object') return v;
+    if (v instanceof CardInstance) return { __cardRef: v.id };
+    if (v instanceof Set) return new Set([...v].map((x) => this._cloneVal(x)));
+    if (v instanceof Map) return new Map([...v.entries()].map(([k, x]) => [this._cloneVal(k), this._cloneVal(x)]));
+    if (Array.isArray(v)) return v.map((x) => this._cloneVal(x));
+    const o = {};
+    for (const [k, x] of Object.entries(v)) o[k] = this._cloneVal(x);
+    return o;
+  }
+
+  _thawVal(v) {
+    if (v === null || typeof v !== 'object') return v;
+    if (v.__cardRef !== undefined) return this.byId(v.__cardRef);
+    if (v instanceof Set) return new Set([...v].map((x) => this._thawVal(x)));
+    if (v instanceof Map) return new Map([...v.entries()].map(([k, x]) => [this._thawVal(k), this._thawVal(x)]));
+    if (Array.isArray(v)) return v.map((x) => this._thawVal(x));
+    const o = {};
+    for (const [k, x] of Object.entries(v)) o[k] = this._thawVal(x);
+    return o;
+  }
+
+  _snapObj(obj, exc) {
+    const o = {};
+    for (const k of Object.keys(obj)) {
+      if (exc.has(k)) continue;
+      const v = obj[k];
+      if (typeof v === 'function') continue;
+      o[k] = this._cloneVal(v);
+    }
+    return o;
+  }
+
+  _restoreObj(obj, snap, exc) {
+    // Borra flags añadidos después del snapshot y repone los guardados.
+    for (const k of Object.keys(obj)) {
+      if (exc.has(k) || typeof obj[k] === 'function') continue;
+      if (!(k in snap)) delete obj[k];
+    }
+    for (const [k, v] of Object.entries(snap)) obj[k] = this._thawVal(v);
+  }
+
+  snapshotState() {
+    return {
+      cards: [...this.cardsById.values()].map((c) => [c.id, this._snapObj(c, Game._EXC_CARD)]),
+      players: this.players.map((p) => ({
+        fields: this._snapObj(p, Game._EXC_PLAYER),
+        library: p.library.map((c) => c.id),
+        hand: p.hand.map((c) => c.id),
+        characters: p.characters.map((c) => c.id),
+        life: p.life.map((c) => c.id),
+        trash: p.trash.map((c) => c.id),
+        stageId: p.stage?.id ?? null,
+      })),
+      turn: this.turn, phase: this.phase, activeIdx: this.activeIdx,
+      over: this.over, winnerIdx: this.winner ? this.players.indexOf(this.winner) : null,
+      rngState: this.rngState,
+      pendingHandTrash: this._pendingHandTrash
+        ? [...this._pendingHandTrash.entries()].map(([p, n]) => [this.players.indexOf(p), n]) : null,
+      resolveDepth: this._resolveDepth ?? 0,
+    };
+  }
+
+  restoreState(s) {
+    for (const [id, snap] of s.cards) {
+      const c = this.byId(id);
+      if (c) this._restoreObj(c, snap, Game._EXC_CARD);
+    }
+    s.players.forEach((ps, i) => {
+      const p = this.players[i];
+      this._restoreObj(p, ps.fields, Game._EXC_PLAYER);
+      p.library = ps.library.map((id) => this.byId(id));
+      p.hand = ps.hand.map((id) => this.byId(id));
+      p.characters = ps.characters.map((id) => this.byId(id));
+      p.life = ps.life.map((id) => this.byId(id));
+      p.trash = ps.trash.map((id) => this.byId(id));
+      p.stage = ps.stageId != null ? this.byId(ps.stageId) : null;
+    });
+    this.turn = s.turn; this.phase = s.phase; this.activeIdx = s.activeIdx;
+    this.over = s.over;
+    this.winner = s.winnerIdx != null ? this.players[s.winnerIdx] : null;
+    this.rngState = s.rngState;
+    this._pendingHandTrash = s.pendingHandTrash
+      ? new Map(s.pendingHandTrash.map(([i, n]) => [this.players[i], n])) : undefined;
+    if (this._pendingHandTrash === undefined) delete this._pendingHandTrash;
+    this._resolveDepth = s.resolveDepth;
   }
 
   // Descriptor público y serializable de una carta, con lo que el cliente

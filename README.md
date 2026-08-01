@@ -25,12 +25,25 @@ En la pantalla de mazos eliges el nivel del rival:
 
 - **🐣 Normal** (`js/ai/bot.js`): heurístico de una jugada — curva, ataques
   con cuentas simples y defensa por reglas fijas.
-- **🏆 Competitivo** (`js/ai/hardbot.js`, por defecto): añade cálculo de
-  **letal** (detecta cuándo puede rematar y va all-in con el DON!! y el orden
-  de ataques correctos), disciplina de counters según el calendario de vidas,
+- **🏆 Competitivo** (`js/ai/hardbot.js`): añade cálculo de **letal**
+  (detecta cuándo puede rematar y va all-in con el DON!! y el orden de
+  ataques correctos), disciplina de counters según el calendario de vidas,
   banca de DON!! para sus eventos [Counter], secuencia de ataques por valor y
-  mulligan por calidad de curva. En arena espejo (mismo mazo, ambos asientos)
-  gana ~77% al normal: `node scripts/arena.mjs`.
+  mulligan por calidad de curva. Arena espejo: gana ~78% al normal
+  (`node scripts/arena.mjs 32 hard-normal`).
+- **🧠 Maestro** (`js/ai/searchbot.js`, por defecto): búsqueda por
+  simulación (PIMC) sobre el motor real. En cada decisión enumera sus
+  acciones legales y, para cada una, fotografía el estado
+  (`Game.snapshotState/restoreState`), **baraja lo que no ha visto** (mano y
+  mazo del rival, su propio mazo — se adapta al robo sin hacer trampas),
+  aplica la acción, termina el turno con una política rápida, cierra el
+  turno de verdad ([End of Your Turn] incluido) y simula el **turno de
+  respuesta del rival**; puntúa con vidas marginales (la última vale mucho
+  más que la quinta), tablero, mano y tempo de DON!!. Usa números
+  aleatorios comunes entre candidatas (misma "suerte" imaginada) para que
+  la comparación mida la jugada y no la varianza. Arena espejo: gana ~80%
+  al Competitivo (`node scripts/arena.mjs 64 search-hard`). Si algo falla
+  en simulación, degrada solo a Competitivo.
 
 ### 🧭 Coach del ST-36
 

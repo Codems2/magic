@@ -3,6 +3,7 @@
 import { Game } from './engine/game.js';
 import { BotController } from './ai/bot.js';
 import { HardBot } from './ai/hardbot.js';
+import { SearchBot } from './ai/searchbot.js';
 import { UI } from './ui/ui.js';
 import { HumanController } from './ui/human.js';
 import { Coach } from './ui/coach.js';
@@ -78,8 +79,10 @@ function openMatPicker() {
 }
 
 // Bot con pausas escaladas por el selector de velocidad.
-function watchableBot(level = 'hard') {
-  const bot = level === 'hard' ? new HardBot('Bot') : new BotController('Bot');
+function watchableBot(level = 'search') {
+  const bot = level === 'search' ? new SearchBot('Bot')
+    : level === 'hard' ? new HardBot('Bot')
+    : new BotController('Bot');
   const delays = { mainAction: 650, chooseBlocker: 600, counterStep: 600, triggerDecision: 500 };
   for (const [method, delay] of Object.entries(delays)) {
     const orig = bot[method].bind(bot);
@@ -206,12 +209,12 @@ async function main() {
   updateSlot('bot');
 
   // Nivel del bot (persistente): 🏆 Competitivo por defecto.
-  const savedLevel = localStorage.getItem('opBotLevel') ?? 'hard';
+  const savedLevel = localStorage.getItem('opBotLevel') ?? 'search';
   document.querySelectorAll('input[name="botLevel"]').forEach((r) => {
     r.checked = r.value === savedLevel;
     r.onchange = () => localStorage.setItem('opBotLevel', r.value);
   });
-  const botLevel = () => document.querySelector('input[name="botLevel"]:checked')?.value ?? 'hard';
+  const botLevel = () => document.querySelector('input[name="botLevel"]:checked')?.value ?? 'search';
 
   $('startBtn').onclick = () => startGame(decks[mySlug], decks[botSlug], null, botLevel());
   // Sandbox: no exige elegir mazos (usa ST-01/ST-02 si no marcaste ninguno).
@@ -444,7 +447,7 @@ function sandboxSearchModal(catalog, game, human, ui) {
   input.focus();
 }
 
-async function startGame(myDeck, botDeck, sandboxOpts = null, level = 'hard') {
+async function startGame(myDeck, botDeck, sandboxOpts = null, level = 'search') {
   $('setup').classList.add('hidden');
   $('game').classList.remove('hidden');
 
@@ -456,7 +459,7 @@ async function startGame(myDeck, botDeck, sandboxOpts = null, level = 'hard') {
   const configs = [
     { name: 'Tú', deck: myDeck, controller: human, isBot: false },
     {
-      name: `${botDeck.leader.name} (${sandbox ? 'Rival de pruebas' : level === 'hard' ? 'Bot 🏆' : 'Bot'})`,
+      name: `${botDeck.leader.name} (${sandbox ? 'Rival de pruebas' : level === 'search' ? 'Bot 🧠' : level === 'hard' ? 'Bot 🏆' : 'Bot'})`,
       deck: botDeck,
       controller: sandbox ? passiveRival() : watchableBot(level),
       isBot: true,
