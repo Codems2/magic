@@ -544,6 +544,13 @@ async function startGame(myDeck, botDeck, sandboxOpts = null, level = 'search') 
     $('sandboxBar').classList.remove('hidden');
     $('sbAddCard').onclick = () => sandboxSearchModal(catalog, game, human, ui);
     $('sbDraw').onclick = () => { game.draw(human.player, 1); if (ui.pickState) human.player.hand.forEach((c) => ui.pickState.cards.add(c.id)); ui.render(); };
+    // El RIVAL roba: para probar efectos que miran/descartan/devuelven su mano.
+    $('sbOppDraw').onclick = () => {
+      const rival = game.players.find((p) => p !== human.player);
+      game.draw(rival, 1);
+      game.log(`🧪 El rival roba 1 (mano: ${rival.hand.length}).`);
+      ui.render();
+    };
     $('sbDon').onclick = () => { human.player.donActive += 2; ui.render(); };
     $('sbLife').onclick = () => {
       const p = human.player;
