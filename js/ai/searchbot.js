@@ -80,10 +80,13 @@ export class SearchBot extends HardBot {
       if (p.donActive >= 1) add({ type: 'giveDon', cardId: atk.id, n: 1 });
       if (p.donActive >= 2) add({ type: 'giveDon', cardId: atk.id, n: 2 });
       // Un ataque cuyo poder no llega al del objetivo no entra: solo merece
-      // simularse si el atacante tiene un [When Attacking] utilizable (puede
-      // subir poder o generar valor al declarar).
-      const pump = abilitiesOf(atk, 'whenAttacking').some((ab) => (ab.donX ?? 0) <= atk.givenDon);
-      const worthIt = (tPower) => atk.power(game) >= tPower || pump;
+      // simularse si el [When Attacking] del atacante lo hace conectar
+      // (auto-buff suficiente) o da valor aunque el golpe falle (robar, KO...).
+      const wa = abilitiesOf(atk, 'whenAttacking').filter((ab) => (ab.donX ?? 0) <= atk.givenDon);
+      const pumpPower = wa.reduce((n, ab) => n + ab.ops.reduce((m, o) =>
+        m + (o.op === 'selfGrant' ? (o.changes ?? []).filter((ch) => ch.stat === 'power').reduce((k, ch) => k + ch.delta, 0) : 0), 0), 0);
+      const sideValue = wa.some((ab) => ab.ops.some((o) => o.op !== 'selfGrant'));
+      const worthIt = (tPower) => atk.power(game) + Math.max(0, pumpPower) >= tPower || sideValue;
       if (worthIt(opp.leader.power(game))) add({ type: 'attack', attackerId: atk.id, targetId: 'leader' });
       const canHitActive = atk.script?.abilities?.some((ab) => ab.ops.some((o) => o.op === 'canAttackActive'));
       for (const t of opp.characters.filter((c) => c.rested || canHitActive)) {
