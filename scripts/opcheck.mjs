@@ -15,6 +15,7 @@ const MARKERS = new Set([
   'canAttackActive', 'battleAttrBuff', 'negate', 'koBattled', 'lifeReorder',
   'lifeScryEither', 'peekReorder', 'staticSelfPower', 'auraWhileRested',
   'unrestAfterCharBattle', 'trashFaceUpLife', 'playedThisTurn',
+  'redirectAttack', 'grantToLast',
 ]);
 
 export function snap(g) {

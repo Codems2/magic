@@ -232,5 +232,13 @@
   "color": "Green Red",
   "image": "https://optcgapi.com/media/static/Card_Images/ST30-001_LM5IDx5.jpg",
   "quantitiesExact": false
+ },
+ {
+  "slug": "st-36",
+  "id": "ST-36",
+  "name": "Starter Deck 36: YELLOW Eustass\"Captain\"Kid",
+  "leader": "Eustass\"Captain\"Kid",
+  "color": "Yellow",
+  "image": "https://tcgplayer-cdn.tcgplayer.com/product/706356_400w.jpg"
  }
 ]

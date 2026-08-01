@@ -30,6 +30,9 @@ export class BotController {
       case 'playFree':
         // Pon en juego el personaje más fuerte disponible.
         return cands.sort((a, b) => (b.data.power ?? 0) - (a.data.power ?? 0))[0]?.id ?? null;
+      case 'redirect':
+        // Redirige el ataque al muro más gordo.
+        return own.sort((a, b) => (b.data.power ?? 0) - (a.data.power ?? 0))[0]?.id ?? null;
       case 'toLife':
         // A la Vida: la carta menos útil de la mano.
         return own.sort((a, b) => this.handValue(a) - this.handValue(b))[0]?.id ?? null;

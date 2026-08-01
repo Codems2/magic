@@ -102,6 +102,7 @@ export class Game {
     if (f.power && !cmp(card.data.power ?? 0, f.power)) return false;
     if (f.baseCost && !cmp(card.data.cost ?? 0, f.baseCost)) return false;
     if (f.cost && !cmp(card.data.cost ?? 0, f.cost)) return false;
+    if (f.costRange && ((card.data.cost ?? 0) < f.costRange.lo || (card.data.cost ?? 0) > f.costRange.hi)) return false;
     return true;
   }
 
@@ -218,6 +219,7 @@ export class Game {
     if (f.power && !cmp(card.power(this), f.power)) return false;
     if (f.baseCost && !cmp(card.data.cost ?? 0, f.baseCost)) return false;
     if (f.cost && !cmp(card.cost, f.cost)) return false;
+    if (f.costRange && (card.cost < f.costRange.lo || card.cost > f.costRange.hi)) return false;
     return true;
   }
 
@@ -254,6 +256,7 @@ export class Game {
       case 'playedThisTurn': return src?.enteredTurn === this.turn;
       case 'didPlay': return !!ctx.didPlay;
       case 'not': return !this.evalCond(cond.a, ctx);
+      case 'totalLife': return p.life.length + opp.life.length <= cond.v;
       case 'oppMoreDon': return (opp.donActive + opp.donRested) > (p.donActive + p.donRested);
       case 'restedByEffect': return !!p._restedByEffectTurn && p._restedByEffectTurn === this.turn;
       default: return false;
@@ -276,6 +279,8 @@ export class Game {
   // ¿Puede esta carta ser KO en este contexto? Consulta protecciones estáticas
   // ("cannot be KO'd in battle / by effects / by leaders").
   canBeKOd(card, { byEffect = false, byLeaderBattle = false } = {}) {
+    // "None of your Characters can be KO'd during this turn" (efecto global).
+    if (card.owner._noKOTurn === this.turn) return false;
     for (const ab of card.script?.abilities ?? []) {
       if (ab.when !== 'static' && ab.when !== 'onPlay') continue;
       if (ab.donX && card.givenDon < ab.donX) continue;
@@ -495,6 +500,7 @@ export class Game {
     if (cost.lifeToHand > p.life.length) return false;
     if (cost.trashToBottom > p.trash.length) return false;
     if (cost.turnLifeDown && p.life.length < cost.turnLifeDown) return false;
+    if (cost.turnLifeUp && p.life.length < cost.turnLifeUp) return false;
     if (cost.restSelf && source.rested) return false;
     if (cost.trashHandFilter && p.hand.filter((c) => this.matchesFilter(c, cost.trashHandFilter)).length < cost.trashHand) return false;
     // "rest N of your [X] cards" puede referirse a personajes, escenario o líder.
@@ -615,9 +621,13 @@ export class Game {
       }
     }
     if (cost.revealHand) {
-      this.log(`${p.name} revela ${cost.revealHand.n} carta(s) de su mano como coste.`);
+      // Recuerda QUÉ se reveló: algunos efectos actúan sobre esas cartas.
+      const pool = p.hand.filter((c) => this.matchesFilter(c, cost.revealHand.filter)).slice(0, cost.revealHand.n);
+      ctx.revealedIds = pool.map((c) => c.id);
+      this.log(`${p.name} revela como coste: ${pool.map((c) => c.name).join(', ') || 'nada'}.`);
     }
-    if (cost.turnLifeDown) { /* No modelamos Vida boca arriba/abajo: sin efecto visible. */ }
+    if (cost.turnLifeDown) this.log(`${p.name} gira ${cost.turnLifeDown} carta(s) de su Vida boca abajo.`);
+    if (cost.turnLifeUp) this.log(`${p.name} gira ${cost.turnLifeUp} carta(s) de su Vida boca arriba.`);
     if (cost.restSelf) source.rested = true;
     if (cost.trashSelf) this.trashCard(source);
   }
@@ -720,10 +730,12 @@ export class Game {
       if (this.opProbe) this.opProbe(op, ctx);
       switch (op.op) {
         case 'giveRestedDon': {
-          const give = Math.min(op.n, ctx.source.isLeader || true ? p.donRested : p.donRested);
+          const give = Math.min(op.n, p.donRested);
           if (give <= 0) break;
+          // "to your Leader" (sin personajes): el único destino es el líder.
+          const cands = op.leaderOnly ? [p.leader] : p.board();
           const targetId = await p.controller.chooseTarget(this, {
-            purpose: 'giveDon', candidateIds: p.board().map((c) => c.id), optional: true,
+            purpose: 'giveDon', candidateIds: cands.map((c) => c.id), optional: true,
           });
           const t = this.byId(targetId);
           if (t && t.owner === p) {
@@ -856,6 +868,16 @@ export class Game {
             }
           }
           if (anyKO) await this.fireOnCharKO();
+          // "...and add this card to your hand" (la propia carta del efecto).
+          if (op.thenSelfToHand && ctx.source && ctx.source.owner === p) {
+            const c = ctx.source;
+            for (const z of [p.trash, p.characters, p.life]) {
+              const i = z.indexOf(c); if (i !== -1) z.splice(i, 1);
+            }
+            c.zone = 'hand';
+            p.hand.push(c);
+            this.log(`${p.name} añade ${c.name} a su mano.`);
+          }
           break;
         }
         case 'bounce': case 'tuckBottom': {
@@ -907,7 +929,36 @@ export class Game {
               purpose: 'unrest', candidateIds: cands.map((c) => c.id), optional: true,
             });
             const t = this.byId(targetId);
-            if (t && cands.includes(t)) { t.rested = false; this.log(`${t.name} se endereza.`); }
+            if (t && cands.includes(t)) {
+              t.rested = false;
+              ctx.lastTargetId = t.id;   // "That Character gains..." apunta aquí
+              this.log(`${t.name} se endereza.`);
+            }
+          }
+          break;
+        }
+        case 'grantToLast': {
+          const t = this.byId(ctx.lastTargetId);
+          if (!t) break;
+          const expireTurn = op.dur === 'next' ? this.turn + 1 : this.turn;
+          const inBattle = op.dur === 'battle';
+          for (const ch of op.changes) t.addMod({ stat: ch.stat, delta: ch.delta, expireTurn, battle: inBattle });
+          for (const kw of op.kws) t.addMod({ stat: 'kw', kw, expireTurn, battle: inBattle });
+          this.log(`${t.name} gana ${op.changes.map((c) => `${c.delta >= 0 ? '+' : ''}${c.delta} ${c.stat === 'power' ? 'poder' : 'coste'}`).concat(op.kws.map((k) => `[${k}]`)).join(' y ')}.`);
+          break;
+        }
+        case 'redirectAttack': {
+          if (!ctx.battle) break;
+          const cands = [p.leader, ...p.characters].filter(Boolean)
+            .filter((c) => this.matchesFilter(c, op.filter));
+          if (!cands.length) break;
+          const id = await p.controller.chooseTarget(this, {
+            purpose: 'redirect', candidateIds: cands.map((c) => c.id), optional: true,
+          });
+          const t = this.byId(id);
+          if (t && cands.includes(t)) {
+            ctx.battle.redirectTo = t.id;
+            this.log(`🔁 El objetivo del ataque pasa a ser ${t.name}.`);
           }
           break;
         }
@@ -1057,6 +1108,7 @@ export class Game {
           const f = op.filter ?? (op.type ? { types: [op.type] } : {});
           const matches = (c) => {
             if (f.names && !f.names.some((nm) => c.name.toLowerCase().includes(nm.toLowerCase()))) return false;
+            if (f.notName && c.name.toLowerCase().includes(f.notName.toLowerCase())) return false;
             if (f.types && !f.types.some((t) => (c.data.subTypes ?? []).some((s) => s.toLowerCase().includes(t.toLowerCase())))) return false;
             if (f.cardType && c.type !== f.cardType) return false;
             if (f.power !== undefined && (c.data.power ?? -1) !== f.power) return false;
@@ -1252,6 +1304,56 @@ export class Game {
           break;
         }
         case 'lifeReorder': { this.log(`${p.name} mira y reordena sus cartas de Vida.`); break; }
+        case 'trashOwnLife': {
+          for (let i = 0; i < op.n && p.life.length; i++) {
+            const c = p.life.shift();
+            c.zone = 'trash';
+            p.trash.push(c);
+            this.log(`${p.name} trashea la carta superior de su Vida (${c.name}). Vidas: ${p.life.length}.`);
+          }
+          break;
+        }
+        case 'cannotKOAll': {
+          p._noKOTurn = this.turn;
+          this.log(`🛡 Los personajes de ${p.name} no pueden ser KO este turno.`);
+          break;
+        }
+        case 'revealedToDeckTop': {
+          for (const id of ctx.revealedIds ?? []) {
+            const c = this.byId(id);
+            if (c && c.zone === 'hand' && c.owner === p) {
+              p.hand.splice(p.hand.indexOf(c), 1);
+              c.zone = 'deck';
+              p.library.unshift(c);
+              this.log(`${p.name} pone ${c.name} (revelada) en lo alto de su mazo.`);
+            }
+          }
+          break;
+        }
+        case 'handToDeck': {
+          const ids = await p.controller.discardFromHand(this, op.n, { min: Math.min(op.n, p.hand.length) });
+          for (const id of (ids ?? []).slice(0, op.n)) {
+            const c = this.byId(id);
+            if (c && c.zone === 'hand' && c.owner === p) {
+              p.hand.splice(p.hand.indexOf(c), 1);
+              c.zone = 'deck';
+              if (op.top) p.library.unshift(c); else p.library.push(c);
+              this.log(`${p.name} pone 1 carta de su mano ${op.top ? 'en lo alto' : 'al fondo'} del mazo.`);
+            }
+          }
+          break;
+        }
+        case 'lifeScryOpp': {
+          if (opp.life.length) {
+            const toBottom = await p.controller.chooseOption(this, {
+              prompt: `Carta superior de la Vida de ${opp.name}: ¿al fondo?`,
+              options: ['Dejar arriba', 'Al fondo'],
+            });
+            if (toBottom === 1) opp.life.push(opp.life.shift());
+            this.log(`${p.name} escruta la Vida de ${opp.name}.`);
+          }
+          break;
+        }
         case 'lifeScryEither': {
           const side = await p.controller.chooseOption(this, { prompt: '¿Mirar tu Vida o la del rival?', options: ['Tu Vida', 'La del rival'] });
           const who = side === 1 ? opp : p;
@@ -1556,6 +1658,14 @@ export class Game {
     // [On Your Opponent's Attack]: habilidades del DEFENSOR al declararse el ataque.
     await this.fireOnBoard(opp, 'onOppAttack', { battle });
     if (this.over) return;
+    // Redirección (ST36-005 Kid): el defensor cambia el objetivo del ataque.
+    if (battle.redirectTo) {
+      const r = this.byId(battle.redirectTo);
+      if (r && r.owner === opp && (r === opp.leader || opp.characters.includes(r))) {
+        target = r;
+        this.log(`⚔ El ataque ahora va contra ${target.name} (${target.power(this)}).`);
+      }
+    }
 
     // Paso de bloqueo (respetando vetos de la batalla y del turno).
     let blockers = opp.characters.filter((c) => c.hasBlocker && !c.rested && c !== target);

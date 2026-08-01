@@ -25,11 +25,18 @@ const n = (w) => (/^\d+$/.test(w) ? parseInt(w, 10) : NUM[w?.toLowerCase()] ?? 1
 // Criterio de búsqueda de una carta (por nombre, tipo/subtipo, poder o coste).
 function parseFilter(text) {
   const f = {};
-  const l = text.toLowerCase();
   let m;
+  // "other than [X]" excluye ANTES de recoger nombres requeridos.
+  if ((m = text.match(/other than \[([^\]]+)\]/i))) {
+    f.notName = m[1];
+    text = text.replace(m[0], ' ');
+  }
   // Nombres entre corchetes: [Sabo], [Ace], or [Luffy].
   const names = [...text.matchAll(/\[([^\]]+)\]/g)].map((x) => x[1]).filter((x) => !/^(don!!|blocker|rush)/i.test(x));
   if (names.length) f.names = names;
+  // Fuera los [nombres] antes de mirar subtipos (comillas internas de nombres).
+  text = text.replace(/\[[^\]]+\]/g, ' ');
+  const l = text.toLowerCase();
   // Subtipos entre comillas o llaves.
   const types = [...text.matchAll(/["“]([^"”]+)["”]|\{([^}]+)\}/g)].map((x) => x[1] ?? x[2]);
   if (types.length) f.types = types;
@@ -53,9 +60,12 @@ function parseTargetFilter(text) {
     f.notName = m[1];
     text = text.replace(m[0], ' ');
   }
-  const l = text.toLowerCase();
   const names = [...text.matchAll(/\[([^\]]+)\]/g)].map((x) => x[1]).filter((x) => !/^(don!!|blocker|rush|double attack|banish|trigger)/i.test(x));
   if (names.length) f.names = names;
+  // Quita los nombres [X] antes de buscar subtipos: las comillas DENTRO de un
+  // nombre (Eustass"Captain"Kid) no son un subtipo.
+  text = text.replace(/\[[^\]]+\]/g, ' ');
+  const l = text.toLowerCase();
   const types = [...text.matchAll(/["“]([^"”]+)["”]|\{([^}]+)\}/g)].map((x) => x[1] ?? x[2]);
   if (types.length) f.types = types;
   const cols = COLORS.filter((c) => new RegExp(`\\b${c}\\b`).test(l));
@@ -63,6 +73,7 @@ function parseTargetFilter(text) {
   if ((m = l.match(/with (\d+) base power(?: or (less|more))?/))) f.basePower = { v: parseInt(m[1], 10), dir: m[2] ?? 'eq' };
   else if ((m = l.match(/with (\d+) power(?: or (less|more))?/))) f.power = { v: parseInt(m[1], 10), dir: m[2] ?? 'eq' };
   if ((m = l.match(/with a base cost of (\d+)(?: or (less|more))?/))) f.baseCost = { v: parseInt(m[1], 10), dir: m[2] ?? 'eq' };
+  else if ((m = l.match(/with a cost of (\d+) to (\d+)/))) f.costRange = { lo: parseInt(m[1], 10), hi: parseInt(m[2], 10) };
   else if ((m = l.match(/with a cost of (\d+)(?: or (less|more))?/))) f.cost = { v: parseInt(m[1], 10), dir: m[2] ?? 'eq' };
   return f;
 }
@@ -147,6 +158,11 @@ function parseKO(s) {
   let m;
   if (/^ko this (character|card)$/.test(l)) return { op: 'ko', scope: 'self' };
   if (/^return this (character|card) to the owner'?s hand$/.test(l)) return { op: 'bounceSelf' };
+  // "KO ... and add this card to your hand" (Zoro OP12-113 como [Trigger]).
+  if ((m = s.match(/^(.*)\s+and add this card to your hand$/i))) {
+    const inner = parseKO(m[1]);
+    if (inner) return { ...inner, thenSelfToHand: true };
+  }
   // "KO all Characters with ..." (obligatorio, ambos bandos).
   if ((m = l.match(/^ko all characters?\b(.*)$/))) {
     return { op: 'ko', scope: 'all', all: true, targets: 99, filter: parseTargetFilter(m[1]) };
@@ -183,12 +199,23 @@ function parseCondition(text) {
   const l = text.replace(/^if\s+/i, '').trim().toLowerCase();
   const raw = text.replace(/^if\s+/i, '').trim();
   let m;
-  // Conjunción "A and B" → condición combinada.
-  if ((m = l.match(/^(.*?) and (you have .*|your opponent has .*)$/)) && /^(your leader|you have|your opponent)/.test(m[1])) {
-    const a = parseCondition('if ' + m[1]);
-    const b = parseCondition('if ' + m[2]);
-    if (a && b) return { t: 'and', a, b };
+  // Conjunción "A and B" → prueba cada posible punto de corte en " and ".
+  {
+    let idx = -1;
+    while ((idx = raw.indexOf(' and ', idx + 1)) !== -1) {
+      const a = parseConditionSingle(raw.slice(0, idx));
+      const b = parseCondition('if ' + raw.slice(idx + 5));
+      if (a && b) return { t: 'and', a, b };
+    }
   }
+  return parseConditionSingle(raw);
+}
+
+// Una condición atómica (sin conjunciones).
+function parseConditionSingle(raw) {
+  const l = raw.trim().toLowerCase();
+  let m;
+  if ((m = l.match(/^you and your opponent have a total of (\d+) or less life cards?/))) return { t: 'totalLife', dir: 'less', v: +m[1] };
   if (/^the number of your life cards is equal to or less than the number of your opponent'?s life/.test(l)) return { t: 'lifeLEOpp' };
   if (/^you have (fewer|less) life cards than your opponent/.test(l)) return { t: 'lifeLTOpp' };
   if ((m = l.match(/^you have (\d+) or (less|more) life cards?/))) return { t: 'youLife', dir: m[2], v: +m[1] };
@@ -320,6 +347,11 @@ function parseOps(text, unknown) {
     ops.push({ op: 'lifeScryEither' });
     text = text.replace(/look at up to 1 card from the top of your or your opponent'?s life cards,? and place it at the top or bottom of the life cards\.?/i, '');
   }
+  // Variante solo-rival: mirar su carta de Vida superior y decidir si al fondo.
+  if ((mm = text.match(/look at up to 1 card from the top of your opponent'?s life cards,? and place it at the top or bottom of the life cards\.?/i))) {
+    ops.push({ op: 'lifeScryOpp' });
+    text = text.replace(mm[0], '');
+  }
   if ((mm = text.match(/add up to (\d+) cards? from your hand to the top of your life cards?/i))) {
     ops.push({ op: 'handToLife', filter: {} });
     text = text.replace(mm[0], '');
@@ -426,8 +458,9 @@ function parseOps(text, unknown) {
     let m;
 
     // — DON —
-    if ((m = l.match(/^give (?:this leader or 1 of your characters|up to (\d+) rested don!! cards?(?: to your leader or 1 of your characters)?)(?: up to (\d+) rested don!! cards?)?/))) {
-      ops.push({ op: 'giveRestedDon', n: n(m[1] ?? m[2] ?? 1) });
+    if ((m = l.match(/^give (?:this leader or 1 of your characters|up to (\d+) rested don!! cards?( to your leader(?: or 1 of your characters)?)?)(?: up to (\d+) rested don!! cards?)?/))) {
+      const leaderOnly = !!m[2] && !/or 1 of your characters/.test(m[2]);
+      ops.push({ op: 'giveRestedDon', n: n(m[1] ?? m[3] ?? 1), leaderOnly });
       continue;
     }
     if ((m = l.match(/^add (?:up to )?(\d+) don!! cards? from your don!! deck and (set (?:it|them) as active|rest (?:it|them))/))) {
@@ -539,6 +572,19 @@ function parseOps(text, unknown) {
       ops.push({ op: 'unrestSelf' });
       continue;
     }
+    // "That Character gains <grant> [dur]": aplica al último objetivo elegido.
+    if ((m = s.match(/^that character gains (.+?)(?:\s+(during this turn|during this battle|until the end of your opponent'?s next turn|until the start of your next turn|until the end of (?:your |this )?turn))?$/i))) {
+      const grant = parseGrant(m[1]);
+      if (grant.changes.length || grant.kws.length) {
+        ops.push({ op: 'grantToLast', changes: grant.changes, kws: grant.kws, dur: durOf((m[2] ?? s).toLowerCase()) });
+        continue;
+      }
+    }
+    // "Change the target of the attack to your <filtro>": redirigir el ataque.
+    if ((m = s.match(/^change the target of the attack to your (.+)$/i))) {
+      ops.push({ op: 'redirectAttack', filter: parseTargetFilter(m[1]) });
+      continue;
+    }
     if ((m = l.match(/^trash up to (\d+) of your opponent'?s life cards?/))) {
       ops.push({ op: 'trashOppLife', n: n(m[1]) });
       continue;
@@ -589,6 +635,9 @@ function parseOps(text, unknown) {
     // — cartas —
     if ((m = l.match(/^draw (\d+) cards?(?: and trash (\d+) cards? from your hand)?(?: if you have (\d+) or less cards in your hand)?/))) {
       ops.push({ op: 'draw', n: n(m[1]), trash: m[2] ? n(m[2]) : 0, ifHandMax: m[3] ? parseInt(m[3], 10) : null });
+      // "Draw 1 card and/,(...) <otro efecto>": no tragarse el resto de la frase.
+      const rest = s.slice(m[0].length).replace(/^\s*(?:and|,)\s*/i, '').trim();
+      if (rest) ops.push(...parseOps(rest, unknown));
       continue;
     }
     // "trash N card(s) from your hand and draw M cards" (orden inverso).
@@ -597,6 +646,26 @@ function parseOps(text, unknown) {
       continue;
     }
     if (/^trash (\d+) cards? from your hand$/.test(l)) { ops.push({ op: 'selfDiscard', n: n(l.match(/\d+/)[0]) }); continue; }
+    // Efecto (no coste): trashea N cartas de lo alto de TU Vida.
+    if ((m = l.match(/^trash (\d+) cards? from the top of your life cards?$/))) {
+      ops.push({ op: 'trashOwnLife', n: n(m[1]) });
+      continue;
+    }
+    // "none of your Characters can be KO'd during this turn".
+    if (/^none of your characters can be ko'?d during this turn$/.test(l)) {
+      ops.push({ op: 'cannotKOAll' });
+      continue;
+    }
+    // La carta revelada como coste va a lo alto del mazo (ST22-001).
+    if (/^place the revealed cards? at the top of your deck$/.test(l)) {
+      ops.push({ op: 'revealedToDeckTop' });
+      continue;
+    }
+    // "place N card(s) from your hand at the top/bottom of your deck".
+    if ((m = l.match(/^place (\d+) cards? from your hand at the (top|bottom) of your deck$/))) {
+      ops.push({ op: 'handToDeck', n: n(m[1]), top: m[2] === 'top' });
+      continue;
+    }
     if ((m = l.match(/^look at (\d+) cards? from the top of your deck; reveal up to 1 (?:"([^"]+)"|\{([^}]+)\}) type card and add it to your hand/))) {
       ops.push({ op: 'tutorTop', n: n(m[1]), type: m[2] ?? m[3] });
       continue;
@@ -715,7 +784,7 @@ function parseOps(text, unknown) {
 // ---- costes internos ("(2)", "DON!! -1", "trash 1 card...", "rest this") --
 
 // Marcadores que identifican un COSTE (antes del ':' de "coste: efecto").
-const COST_MARKER = /\(\d+\)|don!!\s*[-]?\d+|trash (?:\d+|any number of|this)|rest this|rest \d+ of your|return (?:\d+|any number of|\d+ or more|\d+ total)|add \d+ cards? from (?:the top|the top or bottom) of your life cards? to your hand|place \d+ cards? from your trash|add \d+ of your characters?[^:]*to the top[^:]*your life|turn \d+ of your face-up life|reveal \d+ /i;
+const COST_MARKER = /\(\d+\)|don!!\s*[-]?\d+|trash (?:\d+|any number of|this)|rest this|rest \d+ of your|return (?:\d+|any number of|\d+ or more|\d+ total)|add \d+ cards? from (?:the top|the top or bottom) of your life cards? to your hand|place \d+ cards? from your trash|add \d+ of your characters?[^:]*to the top[^:]*your life|turn \d+ (?:of your face-up life|cards? from the top)|reveal \d+ /i;
 
 function parseCost(text) {
   const cost = {
@@ -746,6 +815,12 @@ function parseCost(text) {
   if ((m = l.match(/place (\d+) cards? from your trash at the bottom of your deck/))) cost.trashToBottom = n(m[1]);
   if ((m = text.match(/add (\d+) of your (.+?) to the top of your life cards?/i))) cost.charToLife = { n: n(m[1]), filter: parseTargetFilter(m[2]) };
   if ((m = l.match(/turn (\d+) of your face-up life cards? face-down/))) cost.turnLifeDown = n(m[1]);
+  // "turn N card(s) from the top (or bottom) of your Life cards face-up/-down"
+  // (ST-36: el estado boca arriba/abajo no se modela, pero exige tener Vida).
+  else if ((m = l.match(/turn (\d+) cards? from the top(?: or bottom)? of your life cards? face-(up|down)/))) {
+    if (m[2] === 'up') cost.turnLifeUp = n(m[1]);
+    else cost.turnLifeDown = n(m[1]);
+  }
   if ((m = text.match(/reveal (\d+) (.+?) from your hand/i))) cost.revealHand = { n: n(m[1]), filter: parseTargetFilter(m[2]) };
   if (/rest this (?:card|stage|character)/.test(l)) cost.restSelf = true;
   if (/trash this character/.test(l)) cost.trashSelf = true;
@@ -915,6 +990,8 @@ export function opsValue(ops) {
       case 'trashAnyNow': v += 0.5; break;
       case 'selfDiscard': v -= op.n * 0.3; break;
       case 'cannotKO': v += 1.2; break;
+      case 'grantToLast': v += 0.8; break;
+      case 'redirectAttack': v += 1.2; break;
       case 'canAttackActive': v += 0.5; break;
       case 'noBlockerGroup': v += 1; break;
       case 'playFromZone': case 'playSelf': v += 2.5; break;
