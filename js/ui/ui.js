@@ -23,6 +23,12 @@ export class UI {
     $('log').innerHTML = '';
     const t = $('logToggle');
     if (t) t.onclick = () => document.body.classList.toggle('show-log');
+    // El tablero SIEMPRE cabe en pantalla: re-escala al cambiar el viewport.
+    if (!this._fitBound) {
+      this._fitBound = true;
+      window.addEventListener('resize', () => this.fitBoard());
+      window.visualViewport?.addEventListener('resize', () => this.fitBoard());
+    }
     // Selector de velocidad del bot.
     const sel = $('speedSel');
     if (sel) {
@@ -191,6 +197,32 @@ export class UI {
     this.renderSide($('oppArea'), opp, true);
     this.renderSide($('selfArea'), me, false);
     this.renderHand(me);
+
+    // Tras pintar, garantiza que TODO el tablero cabe en el viewport.
+    if (!this._fitReq) {
+      this._fitReq = requestAnimationFrame(() => {
+        this._fitReq = null;
+        this.fitBoard();
+      });
+    }
+  }
+
+  // Autoescalado del tablero: mide su tamaño natural y, si no cabe en el
+  // hueco disponible (alto o ancho), lo encoge con transform: scale(). Así
+  // la partida entera es visible sin scroll en cualquier dispositivo.
+  fitBoard() {
+    const t = $('table');
+    if (!t || t.offsetParent === null) return;   // pantalla de juego oculta
+    t.style.transform = 'none';
+    const rect = t.getBoundingClientRect();
+    const viewportH = window.visualViewport?.height ?? window.innerHeight;
+    const availH = viewportH - rect.top - 2;
+    const availW = t.parentElement?.clientWidth || window.innerWidth;
+    const naturalH = t.scrollHeight;
+    const naturalW = t.scrollWidth;
+    if (naturalH <= 0 || availH <= 0) return;
+    const s = Math.min(1, availH / naturalH, availW / Math.max(1, naturalW));
+    if (s < 0.995) t.style.transform = `scale(${s.toFixed(4)})`;
   }
 
   donText(p) {

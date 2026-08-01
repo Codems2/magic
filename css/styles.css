@@ -108,15 +108,18 @@ body[data-mat="custom"] {
 .matSwatch[data-mat="custom"] { background: linear-gradient(135deg, #123, #345), repeating-linear-gradient(45deg, rgba(255,255,255,.08) 0 8px, transparent 8px 16px); }
 
 /* ---- pantalla de configuración ---- */
-#setup { max-width: 1040px; margin: 0 auto; padding: 40px 18px 60px; text-align: center; }
+#setup {
+  max-width: 1040px; margin: 0 auto; text-align: center;
+  padding: clamp(10px, 3vh, 40px) 18px clamp(14px, 4vh, 60px);
+}
 #setup h1 {
-  font-family: 'Pirata One', cursive; font-size: 3.2rem; letter-spacing: 1px;
+  font-family: 'Pirata One', cursive; font-size: clamp(1.7rem, 4.2vw, 3.2rem); letter-spacing: 1px;
   color: var(--gold);
   text-shadow: 0 2px 0 var(--red-d), 0 3px 10px rgba(0,0,0,.6);
 }
-#setup .subtitle { color: var(--dim); margin: 4px 0 26px; font-size: 1.02rem; }
+#setup .subtitle { color: var(--dim); margin: 4px 0 clamp(8px, 2.4vh, 26px); font-size: clamp(.85rem, 1.3vw, 1.02rem); }
 #setup h2 {
-  font-family: 'Cinzel', serif; margin: 22px 0 12px; font-size: 1.15rem; color: var(--ink);
+  font-family: 'Cinzel', serif; margin: clamp(8px, 2vh, 22px) 0 clamp(6px, 1.4vh, 12px); font-size: 1.15rem; color: var(--ink);
   position: relative; display: inline-block; padding: 0 22px;
 }
 #setup h2::before, #setup h2::after {
@@ -124,7 +127,7 @@ body[data-mat="custom"] {
 }
 #setup h2::before { left: 0; } #setup h2::after { right: 0; }
 /* Selección compacta: dos huecos (tú / bot) que abren el buscador de mazos. */
-#deckSlots { display: flex; align-items: center; justify-content: center; gap: 26px; margin: 18px 0 6px; flex-wrap: wrap; }
+#deckSlots { display: flex; align-items: center; justify-content: center; gap: clamp(12px, 3vw, 26px); margin: clamp(6px, 1.6vh, 18px) 0 6px; flex-wrap: wrap; }
 .deckSlot { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .slotLabel { font-family: 'Cinzel', serif; font-weight: 800; color: var(--gold); letter-spacing: .4px; }
 .slotCard {
@@ -146,6 +149,33 @@ body[data-mat="custom"] {
   border: 1px solid var(--gold-d); border-radius: 8px; padding: 5px 10px; cursor: pointer; font-size: .82rem;
 }
 .slotQuick button:hover { border-color: var(--gold); }
+
+/* Móvil estrecho: los dos huecos caben en una fila y todo se compacta. */
+@media (max-width: 480px) {
+  .slotCard { width: 112px; min-height: 158px; padding: 5px; }
+  .slotCard .slotName { font-size: .72rem; }
+  .slotCard .slotMeta { font-size: .64rem; }
+  .slotCard .slotEmpty { font-size: .85rem; }
+  .vsBadge { font-size: 1.1rem; }
+  #deckSlots { gap: 10px; }
+  .slotQuick button { padding: 4px 8px; font-size: .74rem; }
+  #botLevelWrap { font-size: .82rem; }
+  #botLevelWrap label { margin-left: 6px; }
+  #startRow button { padding: 7px 10px; font-size: .85rem; }
+  #setup .subtitle { display: none; }
+  #onlinePanel input, #onlinePanel button { font-size: .85rem; }
+}
+
+/* Pantallas bajas: la portada entera debe caber sin scroll. */
+@media (max-height: 820px) {
+  .slotCard { width: 128px; min-height: 182px; }
+  .slotCard .slotName { font-size: .8rem; }
+  .vsBadge { font-size: 1.25rem; }
+}
+@media (max-height: 680px) {
+  .slotCard { width: 104px; min-height: 150px; }
+  #setup .subtitle { display: none; }
+}
 
 /* Modal buscador de mazos. */
 #deckModal {
@@ -187,7 +217,11 @@ button.primary:hover:not(:disabled) { transform: translateY(-2px); }
 button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
 
 /* ---- partida ---- */
-#game { display: flex; flex-direction: column; min-height: 100vh; }
+#game {
+  display: flex; flex-direction: column;
+  height: 100vh; height: 100dvh;   /* dvh: respeta las barras del móvil */
+  overflow: hidden;
+}
 #topbar {
   display: flex; align-items: center; gap: 12px; padding: 8px 14px; min-height: 50px; z-index: 20;
   position: sticky; top: 0;
@@ -203,7 +237,7 @@ button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
 }
 #promptButtons button:hover { border-color: var(--gold); }
 #promptButtons button.warn { border-color: var(--red); }
-#logToggle { display: none; background: var(--panel2); color: var(--ink); border: 1px solid var(--gold-d); border-radius: 7px; padding: 7px 11px; cursor: pointer; }
+#logToggle { background: var(--panel2); color: var(--ink); border: 1px solid var(--gold-d); border-radius: 7px; padding: 7px 11px; cursor: pointer; }
 #speedSel { display: inline-flex; gap: 0; border: 1px solid var(--gold-d); border-radius: 8px; overflow: hidden; }
 #speedSel button { background: var(--panel); color: var(--dim); border: 0; border-radius: 0; padding: 6px 9px; cursor: pointer; font-size: .95rem; }
 #speedSel button.on { background: linear-gradient(180deg, var(--gold), var(--gold-d)); color: #241a02; }
@@ -224,8 +258,9 @@ button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
 #banner .bWho { color: var(--red); font-weight: 800; font-family: 'Cinzel', serif; }
 
 #table {
-  flex: 1; display: flex; flex-direction: column; overflow: visible;
+  flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: visible;
   width: 100%; max-width: 1340px; margin: 0 auto;   /* centrado en pantalla grande */
+  transform-origin: top center;   /* el autoescalado (ui.fitBoard) encoge desde arriba */
 }
 .side { padding: 6px 12px; }
 #oppArea { background: linear-gradient(180deg, rgba(183,31,44,.12), transparent 70%); }
@@ -243,14 +278,15 @@ button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
   content: '☠ LÍNEA DE BATALLA ☠'; font-family: 'Cinzel', serif;
   color: #241a02; font-size: .72rem; font-weight: 800; letter-spacing: 3px;
 }
-/* En escritorio el historial vive DEBAJO de la mano (no tapa al rival). */
+/* Historial: panel flotante (botón 📜) — no roba altura al tablero. */
 #log {
-  width: calc(100% - 20px); max-width: 1340px; margin: 6px auto 10px;
-  flex: 0 0 auto; max-height: 15vh; min-height: 56px;
-  background: rgba(9,26,42,.95); border: 1px solid var(--gold-d); border-radius: 12px;
+  display: none; position: fixed; right: 10px; bottom: 10px; z-index: 56;
+  width: min(440px, 94vw); max-height: 44vh; min-height: 56px;
+  background: rgba(9,26,42,.97); border: 1px solid var(--gold-d); border-radius: 12px;
   padding: 9px 12px; overflow-y: auto; font-size: .78rem; color: #cdd8e6; line-height: 1.45;
   box-shadow: 0 8px 26px rgba(0,0,0,.5);
 }
+body.show-log #log { display: block; }
 #log .trn { color: var(--gold); font-weight: 700; }
 
 /* ---- tapete ---- */
@@ -483,7 +519,7 @@ button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
 #previewModal img { max-width: min(92vw, 340px); max-height: 82vh; border-radius: 14px; box-shadow: 0 0 40px rgba(0,0,0,.8); }
 #previewModal .ptext { max-width: 92vw; max-height: 80vh; overflow-y: auto; }
 
-#startRow { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 18px 0 30px; flex-wrap: wrap; }
+#startRow { display: flex; gap: 10px; justify-content: center; align-items: center; margin: clamp(8px, 2vh, 18px) 0 clamp(10px, 3vh, 30px); flex-wrap: wrap; }
 
 /* Selector de nivel del bot (pantalla de mazos). */
 #botLevelWrap { margin: 10px 0 4px; color: var(--dim); }
@@ -568,8 +604,7 @@ button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
 /* Con el panel desplegado, el tablero y el registro se apartan a la derecha
    para que el coach nunca tape la pila de Vidas ni la mano. */
 @media (min-width: 1101px) {
-  body.coach-open #table,
-  body.coach-open #log { margin-left: max(296px, calc((100vw - 1340px) / 2)); margin-right: 12px; }
+  body.coach-open #table { margin-left: max(296px, calc((100vw - 1340px) / 2)); margin-right: 12px; }
 }
 @media (max-width: 1100px) {
   /* En pantallas estrechas el panel no debe tapar el tablero: queda plegado
@@ -601,13 +636,10 @@ button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
   #setup h1 { font-size: 2.3rem; }
   #topbar { flex-wrap: wrap; gap: 6px; }
   #promptText { flex-basis: 100%; order: 3; font-size: .9rem; }
-  #logToggle { display: inline-block; }
   #speedSel { margin-left: auto; }
   #banner { top: 96px; padding: 10px 16px; }
   #banner .bText { font-size: .95rem; }
-  #log { display: none; position: fixed; inset: 58px 8px auto 8px; width: auto; max-height: 50vh; }
-  body.show-log #log { display: block; }
-  #table { overflow-y: auto; }
+  #log { inset: 58px 8px auto 8px; width: auto; max-height: 50vh; bottom: auto; }
   #oppArea, #selfArea { overflow-x: auto; }
   .mat { gap: 6px; }
   /* En móvil la fila casi llena el ancho: identidad en flujo normal. */
