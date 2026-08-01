@@ -599,7 +599,21 @@ export class UI {
       if (card.zone !== 'hand') div.innerHTML += `<span class="pw${boosted ? ' boosted' : ''}">${p}</span>`;
       else div.innerHTML += `<span class="pw">${card.data.power ?? 0}</span>`;
     }
-    if (card.givenDon > 0) div.innerHTML += `<span class="donB">+${card.givenDon}</span>`;
+    // DON!! dados: cartas DON de verdad asomando por debajo, como en la mesa.
+    if (card.givenDon > 0 && (card.zone === 'characters' || card.isLeader)) {
+      const donMine = card.owner === this.human?.player;
+      const donSrc = (donMine && localStorage.getItem('opDonImg')) || DON_IMG;
+      const shown = Math.min(card.givenDon, 4);
+      let under = `<div class="donUnder" title="${card.givenDon} DON!! dado(s)">`;
+      for (let i = 0; i < shown; i++) {
+        under += `<div class="donUnderCard"><img src="${donSrc}" alt="DON!!" loading="lazy" onerror="this.onerror=null;this.src='${DON_IMG}'"></div>`;
+      }
+      div.innerHTML += under + '</div>';
+      // Con más de 4, el resto se resume en el badge de siempre.
+      if (card.givenDon > shown) div.innerHTML += `<span class="donB">+${card.givenDon}</span>`;
+    } else if (card.givenDon > 0) {
+      div.innerHTML += `<span class="donB">+${card.givenDon}</span>`;
+    }
     if (hand && card.counterValue) div.innerHTML += `<span class="cntB">C${card.counterValue}</span>`;
 
     // Indicadores didácticos (solo tus cartas).

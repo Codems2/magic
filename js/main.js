@@ -6,7 +6,6 @@ import { HardBot } from './ai/hardbot.js';
 import { SearchBot } from './ai/searchbot.js';
 import { UI } from './ui/ui.js';
 import { HumanController } from './ui/human.js';
-import { Coach } from './ui/coach.js';
 import { openDeckBuilder, loadSpecs, materializeDeck } from './ui/builder.js';
 import { connectOnline } from './net/client.js';
 
@@ -451,7 +450,6 @@ function showLobbyWait({ connecting = false, code = null, seat = 0, onCancel }) 
 function startOnline({ url, mode, code, name, deckSlug, deckSpec = null }) {
   const ui = new UI(ctrl);
   const human = new HumanController(ui);
-  if (deckSlug === 'st-36') human.coach = new Coach(human);
   let started = false;
 
   showLobbyWait({ connecting: true, onCancel: () => conn?.close?.() });
@@ -629,8 +627,6 @@ async function startGame(myDeck, botDeck, sandboxOpts = null, level = 'search') 
 
   const ui = new UI(ctrl);
   const human = new HumanController(ui);
-  // Coach del ST-36: consejos en cada decisión cuando juegas el mazo de Kid.
-  if (myDeck.slug === 'st-36') human.coach = new Coach(human);
   const sandbox = !!sandboxOpts;
   const configs = [
     { name: 'Tú', deck: myDeck, controller: human, isBot: false },
