@@ -281,7 +281,7 @@ function parseConditionSingle(raw) {
   if ((m = raw.match(/^your leader has the (?:\{([^}]+)\}|["“]([^"”]+)["”]|\[([^\]]+)\]) type/i)) || (m = raw.match(/^your leader'?s type includes ["“]([^"”]+)["”]/i))) return { t: 'leaderType', type: m[1] ?? m[2] ?? m[3] ?? m[4] };
   if ((m = l.match(/^you have (\d+) or (less|more) characters?$/))) return { t: 'youHaveMatch', count: +m[1], dir: m[2], filter: {} };
   if (/^your leader is multicolored/.test(l)) return { t: 'leaderMulticolor' };
-  if ((m = l.match(/^there is a character with a cost of (\d+)/))) return { t: 'boardCost', v: +m[1] };
+  if ((m = l.match(/^there is a character with a cost of (\d+)(?: or (more|less))?/))) return { t: 'boardCost', v: +m[1], dir: m[2] ?? 'eq' };
   if ((m = l.match(/^you have (\d+) or (less|more) don!! cards? on your field or (\d+) or more don!! cards? on your field/))) return { t: 'don', any: [{ dir: m[2], v: +m[1] }, { dir: 'more', v: +m[3] }] };
   if ((m = l.match(/^you have (\d+) or (\d+) or more don!! cards? on your field/))) return { t: 'don', any: [{ dir: 'eq', v: +m[1] }, { dir: 'more', v: +m[2] }] };
   if ((m = l.match(/^you have (\d+) or (less|more) don!! cards? on your field/))) return { t: 'don', any: [{ dir: m[2], v: +m[1] }] };
@@ -720,6 +720,12 @@ function parseOps(text, unknown) {
       if (/active/i.test(m[2])) f.activeOnly = true;
       if (/rested/i.test(m[2])) f.restedOnly = true;
       ops.push({ op: 'cannotAttack', targets: n(m[1]), filter: f, dur: /during this turn/i.test(m[4]) ? 'turn' : 'next' });
+      continue;
+    }
+    // "If your opponent's Leader has the "X" attribute, this leader gains
+    // +N power." — estática por atributo rival (líder Mihawk OP14-020).
+    if ((m = s.match(/^if your opponent'?s leader has the ["“]([^"”]+)["”] attribute,?\s*this (?:leader|character) gains \+(\d+) power\.?$/i))) {
+      ops.push({ op: 'ifCond', cond: { t: 'oppLeaderAttr', attr: m[1] }, ops: [{ op: 'selfGrant', changes: [{ stat: 'power', delta: parseInt(m[2], 10) }], kws: [], per: null, dur: 'turn', static: true }] });
       continue;
     }
     // "Up to N of your opponent's Characters ... cannot activate [Blocker]
@@ -1323,7 +1329,7 @@ function parseCost(text) {
   else if ((m = text.match(/trash (\d+) (.+? cards?) (with .+?) from your hand/i))) { cost.trashHand = n(m[1]); cost.trashHandFilter = parseTargetFilter(m[2] + ' ' + m[3]); }
   else if ((m = l.match(/trash (\d+) cards? from your hand/))) cost.trashHand = n(m[1]);
   if ((m = l.match(/add (\d+) cards? from (the top or bottom|the top) of your life cards? to your hand/))) { cost.lifeToHand = n(m[1]); cost.lifeToHandPick = m[2] === 'the top or bottom'; }
-  if ((m = text.match(/rest (\d+) of your (.+?) cards?(?::|$)/i)) && /rest \d+ of your/i.test(text) && !/don!!/i.test(m[2])) cost.restOwn = { n: n(m[1]), filter: parseTargetFilter(m[2]) };
+  if ((m = text.match(/rest (\d+) of your (?:(.+?) )?cards?(?::|$)/i)) && /rest \d+ of your/i.test(text) && !/don!!/i.test(m[2] ?? '')) cost.restOwn = { n: n(m[1]), filter: m[2] ? parseTargetFilter(m[2]) : {} };
   if ((m = text.match(/return (\d+) of your (.+?) to the owner'?s hand/i))) cost.bounceOwn = { n: n(m[1]), filter: parseTargetFilter(m[2]) };
   if (/place this (?:character|card) at the bottom of the owner'?s deck/.test(l)) cost.tuckSelf = true;
   if ((m = l.match(/give your (?:\d+ )?active leader [+-]?(\d+) power during this turn/))) cost.leaderPowerDown = n(m[1]);

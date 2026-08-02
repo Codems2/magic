@@ -162,6 +162,7 @@ export class HumanController {
       redirect: 'recibir el ataque en su lugar',
       makeRoom: 'descartar para hacer sitio (área de personajes llena)',
       sealBlocker: 'no podrá activar [Blocker] este turno',
+      restCost: 'girar como coste de la habilidad',
     };
     const label = LABELS[purpose] ?? purpose;
     // Cartas en zonas ocultas (descarte, mazo, Vida) no están pintadas en el

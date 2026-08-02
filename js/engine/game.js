@@ -278,7 +278,9 @@ export class Game {
       case 'leaderName': return p.leader.name.toLowerCase().includes(cond.name.toLowerCase());
       case 'leaderType': return (p.leader.data.subTypes ?? []).some((s) => s.toLowerCase().includes(cond.type.toLowerCase()));
       case 'leaderMulticolor': return (p.leader.color ?? '').includes('/');
-      case 'boardCost': return [...p.characters, ...opp.characters].some((c) => c.cost === cond.v);
+      case 'boardCost': return [...p.characters, ...opp.characters].some((c) =>
+        cond.dir === 'more' ? c.cost >= cond.v : cond.dir === 'less' ? c.cost <= cond.v : c.cost === cond.v);
+      case 'oppLeaderAttr': return (this.opponentOf(p).leader?.data.attribute ?? '').includes(cond.attr);
       case 'oppHasChar': return opp.characters.some((c) => this.matchesFilter(c, cond.filter));
       case 'oppRested': {
         let val = opp.characters.filter((c) => c.rested).length;
@@ -807,8 +809,19 @@ export class Game {
     if (cost.restOwn) {
       const pool = [...p.characters, p.stage, p.leader].filter(Boolean)
         .filter((c2) => !c2.rested && this.matchesFilter(c2, cost.restOwn.filter));
-      for (const c of pool.slice(0, cost.restOwn.n)) {
-        c.rested = true; this.log(`${p.name} gira ${c.name} como coste.`);
+      for (let i = 0; i < cost.restOwn.n && pool.length; i++) {
+        let pick = pool[0];
+        // El humano elige QUÉ carta gira (el líder también cuenta como carta).
+        if (!p.isBot && pool.length > 1) {
+          const id = await p.controller.chooseTarget(this, {
+            purpose: 'restCost', candidateIds: pool.map((c) => c.id), optional: false,
+          });
+          const t = this.byId(id);
+          if (t && pool.includes(t)) pick = t;
+        }
+        pool.splice(pool.indexOf(pick), 1);
+        pick.rested = true;
+        this.log(`${p.name} gira ${pick.name} como coste.`);
       }
     }
     if (cost.bounceOwn) {
