@@ -132,8 +132,28 @@ export function openDeckBuilder({ catalog, onChanged }) {
       };
       mk('✏', () => edit(structuredClone(spec)), 'Editar');
       mk('⧉', () => { const c = structuredClone(spec); c.slug = `custom-${Date.now()}`; c.name += ' (copia)'; saveSpecs([...specs, c]); home(); }, 'Duplicar');
-      mk('📤', () => { navigator.clipboard?.writeText(JSON.stringify(spec)); alert('Mazo copiado al portapapeles (JSON). Compártelo o guárdalo.'); }, 'Exportar');
-      mk('🗑', () => { if (confirm(`¿Borrar "${spec.name}"?`)) { saveSpecs(specs.filter((x) => x.slug !== spec.slug)); home(); } }, 'Borrar');
+      const exp = mk('📤', () => {
+        navigator.clipboard?.writeText(JSON.stringify(spec));
+        exp.textContent = '✅';
+        setTimeout(() => { exp.textContent = '📤'; }, 1200);
+      }, 'Exportar: copia el mazo (JSON) al portapapeles');
+      // Borrado en dos toques (sin confirm() nativo: los webviews lo bloquean).
+      const del = mk('🗑', () => {
+        if (del.dataset.armed) {
+          saveSpecs(loadSpecs().filter((x) => x.slug !== spec.slug));
+          home();
+          return;
+        }
+        del.dataset.armed = '1';
+        del.textContent = '¿Borrar?';
+        del.classList.add('bDanger');
+        setTimeout(() => {
+          if (!document.contains(del)) return;
+          delete del.dataset.armed;
+          del.textContent = '🗑';
+          del.classList.remove('bDanger');
+        }, 3000);
+      }, 'Borrar (toca dos veces)');
       list.appendChild(row);
     }
     if (!specs.length) list.innerHTML = '<p class="bEmpty">Aún no tienes mazos custom.</p>';

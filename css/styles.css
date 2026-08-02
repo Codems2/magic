@@ -642,6 +642,7 @@ body.has-sleeve #selfArea .lifeCardBack::after { content: none; }
   background: rgba(0,0,0,.35); color: inherit; font: .85rem/1.5 ui-monospace, monospace;
 }
 .bImpInfo { margin: 10px 0; font-size: .88rem; line-height: 1.6; }
+.bDanger { border-color: var(--red) !important; color: var(--red); font-weight: 700; }
 .bImpInfo code, .builderDialog code { background: rgba(0,0,0,.4); border-radius: 4px; padding: 0 4px; }
 .builderDialog h2 { text-align: center; }
 .bDeckList { margin: 10px 0; }
