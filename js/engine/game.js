@@ -174,7 +174,8 @@ export class Game {
       }
     };
     walk(card, true);
-    for (const other of p.board()) if (other !== card) walk(other, false);
+    // El escenario también proyecta auras estáticas sobre el tablero.
+    for (const other of [...p.board(), p.stage].filter(Boolean)) if (other !== card) walk(other, false);
   }
 
   staticPowerFor(card) {
@@ -510,9 +511,10 @@ export class Game {
     }
     this.log(`— Turno ${this.turn}: ${p.name} (vidas ${p.life.length}·${this.opponentOf(p).life.length}, mano ${p.hand.length}) —`);
 
-    // 1. Refresh: los DON dados vuelven al área de coste; endereza todo.
+    // 1. Refresh: los DON dados vuelven al área de coste; endereza todo —
+    // líder, personajes Y escenario (regla 6-2-4).
     this.phase = 'refresh';
-    for (const c of p.board()) {
+    for (const c of [...p.board(), p.stage].filter(Boolean)) {
       p.donActive += c.givenDon;
       c.givenDon = 0;
       // Congelado: permanece girado este refresco y se libera el marcador.
@@ -560,13 +562,13 @@ export class Game {
   // el cierre de su turno y el turno de respuesta del rival).
   async endPhase(p) {
     this.phase = 'end';
-    for (const c of [...p.board()]) {
+    for (const c of [...p.board(), p.stage].filter(Boolean)) {
       await this.runTaggedAbilities(c, 'endOfTurn');
       if (this.over) return;
     }
     for (const q of this.players) {
       for (const c of q.board()) { c.cleanupEndOfTurn(); c.expireMods(this.turn); }
-      if (q.stage) q.stage.expireMods(this.turn);
+      if (q.stage) { q.stage.cleanupEndOfTurn(); q.stage.expireMods(this.turn); }
     }
     this.activeIdx = 1 - this.activeIdx;
   }
