@@ -628,6 +628,14 @@ body.has-sleeve #selfArea .lifeCardBack::after { content: none; }
   display: flex; align-items: center; justify-content: center; padding: 10px;
 }
 .builderDialog { width: min(1100px, 97vw); text-align: left; }
+/* Importador de listas */
+.bImpTa {
+  width: 100%; box-sizing: border-box; min-height: 220px; resize: vertical;
+  padding: 10px; border-radius: 8px; border: 1px solid var(--gold-d);
+  background: rgba(0,0,0,.35); color: inherit; font: .85rem/1.5 ui-monospace, monospace;
+}
+.bImpInfo { margin: 10px 0; font-size: .88rem; line-height: 1.6; }
+.bImpInfo code, .builderDialog code { background: rgba(0,0,0,.4); border-radius: 4px; padding: 0 4px; }
 .builderDialog h2 { text-align: center; }
 .bDeckList { margin: 10px 0; }
 .bDeckRow {

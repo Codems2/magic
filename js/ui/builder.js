@@ -31,6 +31,55 @@ export function materializeDeck(spec, byId) {
 
 export const deckSize = (spec) => Object.values(spec.cards ?? {}).reduce((a, b) => a + b, 0);
 
+// Lista de mazo en texto → spec. Acepta el JSON exportado por la app y los
+// formatos habituales de la comunidad, línea a línea:
+//   "4xOP01-016" · "4x OP01-016" · "4 OP01-016 Nami" · "OP01-016 x4" ·
+//   "OP01-016" (1 copia) · "Leader: OP01-001" · comentarios con // o #.
+// El líder es cualquier línea cuyo ID sea una carta de tipo Leader.
+export function parseDeckList(txt, byId) {
+  txt = (txt ?? '').trim();
+  // ¿JSON exportado?
+  try {
+    const j = JSON.parse(txt);
+    if (j && typeof j === 'object' && j.cards && !Array.isArray(j)) {
+      return { spec: { slug: `custom-${Date.now()}`, name: String(j.name ?? 'Importado').slice(0, 40), leader: j.leader ?? null, cards: { ...j.cards } }, unknown: [], extraLeaders: [] };
+    }
+  } catch { /* no era JSON: sigue como lista de texto */ }
+
+  const ID_RE = /^([A-Z]{1,4}\d{0,2}-\d{2,3})\b/i;
+  const cards = {};
+  let leader = null;
+  const unknown = [], extraLeaders = [];
+  for (const raw of txt.split(/\r?\n/)) {
+    let line = raw.trim();
+    if (!line || /^(\/\/|#)/.test(line)) continue;
+    line = line.replace(/^leader:?\s*/i, '');
+    // Copias delante ("4xOP01-016", "4 OP01-016"): se separan ANTES de leer
+    // el ID para que la "x" no se pegue a él.
+    let n = 1;
+    const pre = line.match(/^(\d+)\s*[x×]?\s*/i);
+    if (pre) { n = parseInt(pre[1], 10) || 1; line = line.slice(pre[0].length); }
+    const idM = line.match(ID_RE);
+    if (!idM) { unknown.push(raw.trim()); continue; }
+    const id = idM[1].toUpperCase();
+    const c = byId.get(id);
+    if (!c) { unknown.push(raw.trim()); continue; }
+    // Copias detrás ("OP01-016 x4") si no venían delante.
+    if (!pre) {
+      const after = line.slice(idM[0].length).match(/^\s*[x×]\s*(\d+)/i);
+      if (after) n = parseInt(after[1], 10) || 1;
+    }
+    if (c.type === 'Leader') {
+      if (!leader) leader = id;
+      else if (leader !== id) extraLeaders.push(id);
+      continue;
+    }
+    cards[id] = Math.min(4, (cards[id] ?? 0) + n);
+  }
+  const name = leader ? `${byId.get(leader).name} (importado)` : 'Importado';
+  return { spec: { slug: `custom-${Date.now()}`, name: name.slice(0, 40), leader, cards }, unknown, extraLeaders };
+}
+
 export function specProblems(spec, byId) {
   const out = [];
   const leader = byId.get(spec.leader);
@@ -95,25 +144,67 @@ export function openDeckBuilder({ catalog, onChanged }) {
     newBtn.onclick = () => edit({ slug: `custom-${Date.now()}`, name: 'Mi mazo', leader: null, cards: {} });
     dlg.appendChild(newBtn);
     const impBtn = document.createElement('button');
-    impBtn.textContent = '📥 Importar';
-    impBtn.onclick = () => {
-      const txt = prompt('Pega aquí el JSON de un mazo exportado:');
-      if (!txt) return;
-      try {
-        const spec = JSON.parse(txt);
-        if (!spec.cards || (spec.leader && !byId.get(spec.leader))) throw new Error('formato');
-        spec.slug = `custom-${Date.now()}`;
-        spec.name = String(spec.name ?? 'Importado').slice(0, 40);
-        saveSpecs([...loadSpecs(), spec]);
-        home();
-      } catch { alert('Ese texto no es un mazo válido.'); }
-    };
+    impBtn.textContent = '📥 Importar lista';
+    impBtn.onclick = () => importer();
     dlg.appendChild(impBtn);
     const closeBtn = document.createElement('button');
     closeBtn.textContent = 'Cerrar';
     closeBtn.onclick = close;
     dlg.appendChild(closeBtn);
     modal.appendChild(dlg);
+  };
+
+  // -- vista 1b: importador de listas --
+  const importer = () => {
+    modal.innerHTML = '';
+    const dlg = document.createElement('div');
+    dlg.className = 'dialog builderDialog';
+    dlg.innerHTML = `<h2>📥 Importar mazo</h2>
+      <p>Pega una lista en cualquier formato habitual — <code>4xOP01-016</code>,
+      <code>4 OP01-016 Nami</code>, <code>OP01-016 x4</code>, una carta por línea
+      (el líder se detecta solo) — o el JSON exportado desde esta app.</p>`;
+    const ta = document.createElement('textarea');
+    ta.className = 'bImpTa';
+    ta.placeholder = '1xOP01-001\n4xOP01-016\n4xOP01-025\n…';
+    dlg.appendChild(ta);
+    const info = document.createElement('div');
+    info.className = 'bImpInfo';
+    dlg.appendChild(info);
+    let parsed = null;
+    const analyze = () => {
+      if (!ta.value.trim()) { info.innerHTML = ''; parsed = null; saveBtn.disabled = true; return; }
+      parsed = parseDeckList(ta.value, byId);
+      const { spec, unknown, extraLeaders } = parsed;
+      const L = spec.leader ? byId.get(spec.leader) : null;
+      const probs = specProblems(spec, byId);
+      const lines = [];
+      lines.push(L ? `👑 Líder: <b>${L.name}</b> (${spec.leader})` : '👑 <b>Sin líder</b>: añade una línea con su ID.');
+      lines.push(`🃏 ${deckSize(spec)}/50 cartas en ${Object.keys(spec.cards).length} distintas.`);
+      if (extraLeaders.length) lines.push(`⚠ Líderes de más ignorados: ${extraLeaders.join(', ')}.`);
+      if (unknown.length) lines.push(`⚠ ${unknown.length} línea(s) sin reconocer: <i>${unknown.slice(0, 3).join(' · ').slice(0, 90)}${unknown.length > 3 ? '…' : ''}</i>`);
+      for (const p of probs) lines.push(`⚠ ${p}`);
+      if (!probs.length && L && !unknown.length) lines.push('✅ Lista válida y lista para jugar.');
+      info.innerHTML = lines.map((x) => `<div>${x}</div>`).join('');
+      saveBtn.disabled = !L || deckSize(spec) === 0;
+    };
+    ta.oninput = analyze;
+    const row = document.createElement('div');
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'primary';
+    saveBtn.textContent = '💾 Guardar mazo';
+    saveBtn.disabled = true;
+    saveBtn.onclick = () => {
+      if (!parsed?.spec.leader) return;
+      saveSpecs([...loadSpecs(), parsed.spec]);
+      home();
+    };
+    const backBtn = document.createElement('button');
+    backBtn.textContent = '← Volver';
+    backBtn.onclick = home;
+    row.append(saveBtn, backBtn);
+    dlg.appendChild(row);
+    modal.appendChild(dlg);
+    ta.focus();
   };
 
   // -- vista 2: editor --
