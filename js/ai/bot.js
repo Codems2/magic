@@ -9,6 +9,22 @@ import { abilitiesOf, opsValue } from '../engine/effects.js';
 export const vetoedPlay = (game, p, c) =>
   p._noPlayCostGE?.turn === game.turn && (c.data.cost ?? 0) >= p._noPlayCostGE.v;
 
+// Poder que un [Counter] añade al DEFENSOR de esta batalla: además del op
+// clásico powerUp, los eventos modernos parsean como buff ("Your Leader
+// gains +3000 power during this battle") — contarlos a 0 hacía que los bots
+// renunciaran a defensas ganables.
+export function counterPowerOf(ab, targetIsLeader = true) {
+  let n = 0;
+  for (const o of ab?.ops ?? []) {
+    if (o.op === 'powerUp') n += o.n;
+    else if (o.op === 'buff' && o.side === 'own') {
+      const scopeOk = o.scope === 'leaderChar' || (targetIsLeader ? o.scope === 'leader' : o.scope === 'char');
+      if (scopeOk) n += (o.changes ?? []).filter((ch) => ch.stat === 'power' && ch.delta > 0).reduce((a, ch) => a + ch.delta, 0);
+    }
+  }
+  return n;
+}
+
 export class BotController {
   constructor(name) {
     this.name = name;
@@ -328,7 +344,7 @@ export class BotController {
       const ab = abilitiesOf(ev, 'counter')[0];
       if (!ab) continue;
       if (ev.cost > p.donActive || !game.canPayAbilityCost(p, ev, ab.cost)) continue;
-      const evBonus = ab.ops.filter((o) => o.op === 'powerUp').reduce((n, o) => n + o.n, 0);
+      const evBonus = counterPowerOf(ab, isLeader);
       if (bonus > deficit) break;
       if (evBonus > 0 || opsValue(ab.ops) >= 1.5) {
         eventIds.push(ev.id);

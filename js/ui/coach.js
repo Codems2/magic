@@ -5,6 +5,7 @@
 // DOM (los tests headless leen `lastPlan` y los textos devueltos).
 
 import { HardBot } from '../ai/hardbot.js';
+import { counterPowerOf } from '../ai/bot.js';
 import { abilitiesOf } from '../engine/effects.js';
 
 // Conocimiento carta a carta del mazo: [prioridad extra, por qué es buena].
@@ -315,7 +316,7 @@ export class Coach {
     }
     let bonus = 0;
     for (const c of chosen) {
-      if (c.isEvent) bonus += (abilitiesOf(c, 'counter')[0]?.ops ?? []).filter((o) => o.op === 'powerUp').reduce((n, o) => n + o.n, 0);
+      if (c.isEvent) bonus += counterPowerOf(abilitiesOf(c, 'counter')[0], targetId === 'leader');
       else bonus += c.counterValue;
     }
     const list = chosen.map((c) => `<b>${c.name}</b> (${c.isEvent ? 'evento' : `+${c.counterValue}`})`).join(' + ');
