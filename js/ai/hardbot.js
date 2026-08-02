@@ -11,7 +11,7 @@
 // Sigue siendo un heurístico (no hay búsqueda de árbol), pero juega "a no
 // perder": las líneas que un jugador competitivo no perdona.
 
-import { BotController } from './bot.js';
+import { BotController, vetoedPlay } from './bot.js';
 import { abilitiesOf, opsValue } from '../engine/effects.js';
 
 const SEARCHER_RX = /look at \d+ cards? from the top of your deck/i;
@@ -271,7 +271,7 @@ export class HardBot extends BotController {
     const reserve = this.donReserve(game);
     const budget = Math.max(0, p.donActive - (opp.life.length <= 2 ? 0 : Math.min(reserve, 2)));
     const playable = p.hand
-      .filter((c) => c.isCharacter && c.cost <= budget)
+      .filter((c) => c.isCharacter && c.cost <= budget && !vetoedPlay(game, p, c))
       .map((c) => {
         let v = c.cost * 1.0 + (c.data.power ?? 0) / 4000;
         for (const ab of c.script?.abilities ?? []) if (ab.when === 'onPlay' || ab.when === 'static') v += opsValue(ab.ops) * 0.4;

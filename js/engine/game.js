@@ -583,10 +583,19 @@ export class Game {
   }
 
   async mainPhase(p) {
-    let guard = 0;
+    let guard = 0, lastKey = '', reps = 0;
     while (!this.over && guard++ < 100) {
       const action = await p.controller.mainAction(this);
       if (!action || action.type === 'pass') return;
+      // Cortafuegos: un bot que repite la misma acción sin efecto (veto,
+      // rechazo silencioso...) no debe congelar la partida.
+      const key = JSON.stringify(action);
+      reps = key === lastKey ? reps + 1 : 0;
+      lastKey = key;
+      if (reps >= 5 && p.isBot) {
+        this.log(`(!) ${p.name} insiste en una acción sin efecto: fin de su fase principal.`);
+        return;
+      }
       try {
         await this.performAction(p, action);
       } catch (err) {

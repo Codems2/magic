@@ -16,6 +16,7 @@
 // sí TODAS las consecuencias reales de sus propias líneas de juego este turno.
 
 import { HardBot } from './hardbot.js';
+import { vetoedPlay } from './bot.js';
 import { opsValue, abilitiesOf } from '../engine/effects.js';
 
 export class SearchBot extends HardBot {
@@ -53,7 +54,7 @@ export class SearchBot extends HardBot {
     add({ type: 'pass' });
     // Bajadas.
     const weakest = p.characters.slice().sort((a, b) => (a.data.power ?? 0) - (b.data.power ?? 0))[0];
-    for (const c of p.hand.filter((c) => c.isCharacter && c.cost <= p.donActive)) {
+    for (const c of p.hand.filter((c) => c.isCharacter && c.cost <= p.donActive && !vetoedPlay(game, p, c))) {
       const a = { type: 'playCharacter', cardId: c.id };
       if (p.characters.length >= 5) a.trashId = weakest?.id;
       add(a);

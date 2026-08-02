@@ -3,6 +3,12 @@
 
 import { abilitiesOf, opsValue } from '../engine/effects.js';
 
+// Veto de "you cannot play character cards this turn" (líder Mihawk OP14-020
+// y similares): los bots no deben proponer bajadas que el motor rechazará —
+// si lo hacen, repiten la misma acción inútil hasta agotar el turno.
+export const vetoedPlay = (game, p, c) =>
+  p._noPlayCostGE?.turn === game.turn && (c.data.cost ?? 0) >= p._noPlayCostGE.v;
+
 export class BotController {
   constructor(name) {
     this.name = name;
@@ -122,7 +128,7 @@ export class BotController {
 
     // 1. Jugar el personaje más caro pagable (curva).
     const playable = p.hand
-      .filter((c) => c.isCharacter && c.cost <= p.donActive)
+      .filter((c) => c.isCharacter && c.cost <= p.donActive && !vetoedPlay(game, p, c))
       .sort((a, b) => b.cost - a.cost || (b.data.power ?? 0) - (a.data.power ?? 0));
     if (playable.length) {
       const card = playable[0];
