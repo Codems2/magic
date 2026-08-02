@@ -2239,6 +2239,21 @@ export class Game {
           }
           break;
         }
+        case 'sealBlocker': {
+          // Sella el [Blocker] de hasta N personajes rivales este turno.
+          const cands = opp.characters.filter((c) => c.hasBlocker && this.matchesFilter(c, op.filter));
+          for (let i = 0; i < (op.targets ?? 1) && cands.length; i++) {
+            const id = await p.controller.chooseTarget(this, {
+              purpose: 'sealBlocker', candidateIds: cands.map((c) => c.id), optional: true,
+            });
+            const t = this.byId(id);
+            if (!t || !cands.includes(t)) break;
+            cands.splice(cands.indexOf(t), 1);
+            t._blockerSealedTurn = this.turn;
+            this.log(`🚫 ${t.name} no puede activar [Blocker] este turno.`);
+          }
+          break;
+        }
         case 'noBlocker': {
           if (ctx.battle) ctx.battle.noBlocker = { minPower: op.minPower, maxCost: op.maxCost ?? null };
           break;
@@ -2446,7 +2461,8 @@ export class Game {
     }
 
     // Paso de bloqueo (respetando vetos de la batalla y del turno).
-    let blockers = opp.characters.filter((c) => c.hasBlocker && !c.rested && c !== target);
+    let blockers = opp.characters.filter((c) => c.hasBlocker && !c.rested && c !== target &&
+      c._blockerSealedTurn !== this.turn);
     if (attacker._noBlockerTurn === this.turn) blockers = [];
     if (battle.noBlocker) {
       if (battle.noBlocker.maxCost != null) blockers = blockers.filter((c) => c.cost > battle.noBlocker.maxCost);

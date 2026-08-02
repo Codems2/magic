@@ -722,7 +722,14 @@ function parseOps(text, unknown) {
       ops.push({ op: 'cannotAttack', targets: n(m[1]), filter: f, dur: /during this turn/i.test(m[4]) ? 'turn' : 'next' });
       continue;
     }
-    // "up to N of your opponent's ... cannot activate [Blocker] during this turn".
+    // "Up to N of your opponent's Characters ... cannot activate [Blocker]
+    // during this turn" (Hina OP12-051): sella el [Blocker] del objetivo
+    // elegido, fuera de batalla.
+    if ((m = s.match(/^up to (\d+) of your opponent'?s characters?\b(.*?) cannot activate \[blocker\](?: during this turn)?\.?$/i))) {
+      ops.push({ op: 'sealBlocker', targets: n(m[1]), filter: parseTargetFilter(m[2]) });
+      continue;
+    }
+    // "your opponent's characters cannot activate [Blocker]" (grupo, en batalla).
     if (/cannot activate (?:up to \d+ )?\[blocker\]/.test(l) && /opponent/.test(l)) {
       ops.push({ op: 'noBlockerGroup' });
       continue;
@@ -1594,7 +1601,7 @@ export function opsValue(ops) {
       case 'canAttackActive': v += 0.5; break;
       case 'noBlockerGroup': v += 1; break;
       case 'playFromZone': case 'playSelf': v += 2.5; break;
-      case 'noBlocker': case 'grantNoBlocker': v += 1; break;
+      case 'noBlocker': case 'grantNoBlocker': case 'sealBlocker': v += 1; break;
       case 'gainKeyword': v += 1; break;
       case 'auraWhileRested': v += 2; break;
       case 'runAbility': v += 2; break;

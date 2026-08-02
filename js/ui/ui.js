@@ -406,6 +406,9 @@ export class UI {
     // Tira interior con scroll propio + botón fijo a la derecha de la zona.
     const strip = document.createElement('div');
     strip.id = 'handCards';
+    // Respaldo inline: aunque el navegador sirva un styles.css cacheado sin
+    // la regla #handCards, la mano nunca debe apilarse en vertical.
+    strip.style.cssText = 'display:flex;flex-direction:row;gap:6px;overflow-x:auto;flex:1 1 auto;min-width:0';
     for (const c of me.hand) strip.appendChild(this.cardEl(c, { hand: true }));
     cont.appendChild(strip);
     if (me.hand.length) {

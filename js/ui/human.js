@@ -161,6 +161,7 @@ export class HumanController {
       playFree: 'poner en juego gratis', trashLifeTarget: 'descartar de tu Vida',
       redirect: 'recibir el ataque en su lugar',
       makeRoom: 'descartar para hacer sitio (área de personajes llena)',
+      sealBlocker: 'no podrá activar [Blocker] este turno',
     };
     const label = LABELS[purpose] ?? purpose;
     // Cartas en zonas ocultas (descarte, mazo, Vida) no están pintadas en el

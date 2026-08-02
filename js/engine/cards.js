@@ -51,13 +51,25 @@ export class CardInstance {
   hasKeyword(kw) {
     // "Negate the effect of ...": sin keywords (ni impresas) este turno.
     if (this._negatedUntil !== undefined && this._negatedUntil === this.game?.turn) return false;
-    if (this.text.includes(`[${kw}]`)) return true;
+    if (this.hasPrintedKeyword(kw)) return true;
     if (this._tempKw?.has(kw)) return true;
     if (this.mods.some((m) => m.stat === 'kw' && m.kw === kw)) return true;
     // Concedida por una estática (propia o de grupo), p. ej. "gains [Blocker]".
     if (this.zone !== 'deck' && this.zone !== 'life' && this.game?.staticKeyword?.(this, kw)) return true;
     return false;
   }
+  // Keyword IMPRESA: el tag cuenta solo al inicio del texto o tras el final
+  // de una frase u otro tag/paréntesis. Una MENCIÓN dentro de una frase
+  // ("cannot activate [Blocker]", "K.O. up to 1 [Blocker] Character",
+  // "gains [Rush]") no convierte a la carta en bloqueadora/rusher (caso
+  // Hina OP12-051).
+  hasPrintedKeyword(kw) {
+    const text = this.text;
+    if (!text.includes(`[${kw}]`)) return false;
+    const esc = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(?:^|[.!:•)\\n]\\s*|\\]\\s*)\\[${esc}\\]`).test(text);
+  }
+
   get hasRush() { return this.hasKeyword('Rush'); }
   get hasBlocker() { return this.hasKeyword('Blocker'); }
   get hasDoubleAttack() { return this.hasKeyword('Double Attack'); }
