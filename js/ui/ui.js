@@ -604,6 +604,16 @@ export class UI {
       else div.innerHTML += `<span class="pw">${card.data.power ?? 0}</span>`;
     }
     if (card.givenDon > 0) div.innerHTML += `<span class="donB">+${card.givenDon}</span>`;
+    // Marcadores de veto: ⛔ no puede atacar · 🚫 no puede activar [Blocker].
+    if (card.zone === 'characters' || card.isLeader) {
+      const t = this.game?.turn ?? 0;
+      const noAtk = card.noAttack ?? (t > 0 && (card._cannotAttackUntil ?? 0) >= t);
+      const noBlk = card.noBlock ?? (t > 0 && card._blockerSealedTurn === t);
+      if (noAtk || noBlk) {
+        const tip = [noAtk ? 'No puede atacar' : '', noBlk ? 'No puede activar [Blocker]' : ''].filter(Boolean).join(' · ');
+        div.innerHTML += `<span class="stB" title="${tip}">${noAtk ? '⛔' : ''}${noBlk ? '🚫' : ''}</span>`;
+      }
+    }
     if (hand && card.counterValue) div.innerHTML += `<span class="cntB">C${card.counterValue}</span>`;
 
     // Indicadores didácticos (solo tus cartas).

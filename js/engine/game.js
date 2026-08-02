@@ -2869,6 +2869,9 @@ export class Game {
       zone: c.zone, ownerIdx: this.players.indexOf(c.owner),
       subTypes: c.data.subTypes ?? [],
       hasBlocker: c.hasBlocker, hasRush: c.hasRush,
+      // Marcadores visibles: vetos de ataque/bloqueo activos.
+      noAttack: onField && (c._cannotAttackUntil ?? 0) >= this.turn,
+      noBlock: onField && c._blockerSealedTurn === this.turn,
     };
     if (forOwner && onField) {
       d.canAttack = c.canAttack(this);

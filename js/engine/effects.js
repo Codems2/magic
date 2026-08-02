@@ -1056,8 +1056,9 @@ function parseOps(text, unknown) {
     }
     if ((m = l.match(/^draw (\d+) cards?(?: and trash (\d+) cards? from your hand)?(?: if you have (\d+) or less cards in your hand)?/))) {
       ops.push({ op: 'draw', n: n(m[1]), trash: m[2] ? n(m[2]) : 0, ifHandMax: m[3] ? parseInt(m[3], 10) : null });
-      // "Draw 1 card and/,(...) <otro efecto>": no tragarse el resto de la frase.
-      const rest = s.slice(m[0].length).replace(/^\s*(?:and|,)\s*/i, '').trim();
+      // "Draw 1 card and/,(...) <otro efecto>": no tragarse el resto de la
+      // frase. El conector puede ser ", and" (coma Y and: quita ambos).
+      const rest = s.slice(m[0].length).replace(/^\s*(?:,\s*)?(?:and\s+)?/i, '').trim();
       if (rest) ops.push(...parseOps(rest, unknown));
       continue;
     }

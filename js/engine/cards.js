@@ -89,8 +89,8 @@ export class CardInstance {
     // Regla oficial 6-5-6-1: NINGÚN jugador puede batallar en su primer
     // turno (turnos globales 1 y 2). El primer ataque llega en el turno 3.
     if (game && game.turn <= 2) return false;
-    // Congelado por un efecto: no puede atacar este turno.
-    if (game && this._cannotAttackUntil === game.turn) return false;
+    // Vetado por un efecto: no puede atacar hasta que expire el marcador.
+    if (game && (this._cannotAttackUntil ?? 0) >= game.turn) return false;
     if (this.isLeader) return true;
     if (!this.isCharacter || this.zone !== 'characters') return false;
     const rush = this.hasRush || this._tempKw?.has('Rush') || game?.staticKeyword?.(this, 'Rush');
