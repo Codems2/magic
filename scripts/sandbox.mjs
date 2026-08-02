@@ -338,6 +338,9 @@ async function testCard(entry) {
       putOnBoard(g, inst);
       const ab = abilitiesOf(inst, 'onKO')[0];
       if (ab?.donX) inst.givenDon = ab.donX;
+      // "[Opponent's Turn] [On K.O.]": el KO por efecto rival ocurre en el
+      // turno del rival — el escenario debe reflejarlo.
+      if (ab?.oppTurn) g.activeIdx = 1;
       satisfyCost(g, g.players[0], ab);
       const p2 = g.players[1];
       results.push(await runScenario('onKO', g, opsOf(inst, 'onKO'), async () => {

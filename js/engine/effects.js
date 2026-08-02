@@ -26,10 +26,26 @@ const n = (w) => (/^\d+$/.test(w) ? parseInt(w, 10) : NUM[w?.toLowerCase()] ?? 1
 function parseFilter(text) {
   const f = {};
   let m;
+  // Alternativa '"X" attribute card or <color> Event' (Perona OP12-034):
+  // vale cualquiera de las dos ramas.
+  if ((m = text.match(/^["“]([^"”]+)["”] attribute card or (red|green|blue|purple|black|yellow) events?$/i))) {
+    return { anyOf: [{ attr: m[1] }, { colors: [m[2].toLowerCase()], cardType: 'Event' }] };
+  }
   // "other than [X]" excluye ANTES de recoger nombres requeridos.
   if ((m = text.match(/other than \[([^\]]+)\]/i))) {
     f.notName = m[1];
     text = text.replace(m[0], ' ');
+  }
+  // '"X" attribute': atributo, no subtipo (fuera antes de leer comillas).
+  if ((m = text.match(/["“]([^"”]+)["”] attribute/))) {
+    f.attr = m[1];
+    text = text.replace(m[0], ' ');
+  }
+  // "[X] type": subtipo entre corchetes, no un nombre (Otama OP07-022).
+  const brTypes = [...text.matchAll(/\[([^\]]+)\]\s+type/gi)].map((x) => x[1].replace(/\u00A0/g, ' '));
+  if (brTypes.length) {
+    f.types = brTypes;
+    text = text.replace(/\[([^\]]+)\]\s+type/gi, ' ');
   }
   // Nombres entre corchetes: [Sabo], [Ace], or [Luffy].
   if (/\[trigger\]/i.test(text) || /\b(?:with|and) a trigger\b/i.test(text)) f.hasTrigger = true;
@@ -38,9 +54,12 @@ function parseFilter(text) {
   // Fuera los [nombres] antes de mirar subtipos (comillas internas de nombres).
   text = text.replace(/\[[^\]]+\]/g, ' ');
   const l = text.toLowerCase();
+  // Colores sueltos ("green ... card").
+  const cols = ['red', 'blue', 'green', 'purple', 'black', 'yellow'].filter((c) => new RegExp('\\b' + c + '\\b').test(l));
+  if (cols.length) f.colors = cols;
   // Subtipos entre comillas o llaves.
   const types = [...text.matchAll(/["“]([^"”]+)["”]|\{([^}]+)\}/g)].map((x) => x[1] ?? x[2]);
-  if (types.length) f.types = types;
+  if (types.length) f.types = [...(f.types ?? []), ...types];
   if ((m = l.match(/with (\d+) power(?: or less)?/))) f.power = parseInt(m[1], 10);
   if ((m = l.match(/with a cost of (\d+) or less/))) f.maxCost = parseInt(m[1], 10);
   if (/no base effect/.test(l)) f.noEffect = true;
@@ -243,6 +262,8 @@ function parseConditionSingle(raw) {
   // "your Leader has the attribute" (el icono se perdió en la fuente): se
   // interpreta como "el mismo atributo que ESTA carta".
   if (/^your leader has the attribute$/.test(l)) return { t: 'leaderAttrSelf' };
+  // Atributo explícito: 'your Leader has the "Slash" attribute'.
+  if ((m = raw.match(/^your leader has the ["“]([^"”]+)["”] attribute$/i))) return { t: 'leaderAttr', attr: m[1] };
   if (/^a card in your hand (?:is|was) trashed by an effect/.test(l)) return { t: 'handTrashedThisTurn' };
   if (/^the number of your life cards is equal to or less than the number of your opponent'?s life/.test(l)) return { t: 'lifeLEOpp' };
   if (/^you have (fewer|less) life cards than your opponent/.test(l)) return { t: 'lifeLTOpp' };
@@ -710,8 +731,9 @@ function parseOps(text, unknown) {
       continue;
     }
     // Congelar: no se endereza en la próxima fase de refresco del rival.
-    if ((m = s.match(/^(?:up to (\d+) of your opponent'?s )?(?:rested )?characters?\b.*?will not become active in (?:your opponent'?s |the )?next refresh phase/i))) {
-      ops.push({ op: 'freeze', targets: m[1] ? n(m[1]) : 1, filter: parseTargetFilter(s) });
+    // "rested Character or DON!! cards": exige girados y permite congelar DON.
+    if ((m = s.match(/^(?:up to (\d+) of your opponent'?s )?(rested )?characters?( or don!! cards?)?\b(.*?) will not become active in (?:your opponent'?s |the )?next refresh phase/i))) {
+      ops.push({ op: 'freeze', targets: m[1] ? n(m[1]) : 1, filter: parseTargetFilter(m[4] ?? ''), restedOnly: !!m[2], includeDon: !!m[3] });
       continue;
     }
     // No pueden atacar hasta el próximo turno del rival.
@@ -1329,7 +1351,11 @@ function parseCost(text) {
   else if ((m = text.match(/trash (\d+) (.+? cards?) (with .+?) from your hand/i))) { cost.trashHand = n(m[1]); cost.trashHandFilter = parseTargetFilter(m[2] + ' ' + m[3]); }
   else if ((m = l.match(/trash (\d+) cards? from your hand/))) cost.trashHand = n(m[1]);
   if ((m = l.match(/add (\d+) cards? from (the top or bottom|the top) of your life cards? to your hand/))) { cost.lifeToHand = n(m[1]); cost.lifeToHandPick = m[2] === 'the top or bottom'; }
-  if ((m = text.match(/rest (\d+) of your (?:(.+?) )?cards?(?::|$)/i)) && /rest \d+ of your/i.test(text) && !/don!!/i.test(m[2] ?? '')) cost.restOwn = { n: n(m[1]), filter: m[2] ? parseTargetFilter(m[2]) : {} };
+  if ((m = text.match(/rest (\d+) of your (?:(.+?) )?(cards?|characters?)(?::|$)/i)) && /rest \d+ of your/i.test(text) && !/don!!/i.test(m[2] ?? '')) {
+    const f = m[2] ? parseTargetFilter(m[2]) : {};
+    if (/character/i.test(m[3])) f.cardType = 'Character';   // "rest 2 of your Characters"
+    cost.restOwn = { n: n(m[1]), filter: f };
+  }
   if ((m = text.match(/return (\d+) of your (.+?) to the owner'?s hand/i))) cost.bounceOwn = { n: n(m[1]), filter: parseTargetFilter(m[2]) };
   if (/place this (?:character|card) at the bottom of the owner'?s deck/.test(l)) cost.tuckSelf = true;
   if ((m = l.match(/give your (?:\d+ )?active leader [+-]?(\d+) power during this turn/))) cost.leaderPowerDown = n(m[1]);
@@ -1374,7 +1400,10 @@ export function buildScript(card) {
     .replace(/This card has been officially errata'd\.?/i, '')
     .replace(/This product page is for[\s\S]*$/i, '')
     .trim();
-  // 2. Quita recordatorios "(texto...)" pero conserva costes numéricos "(2)".
+  // 2. Los atributos "(Slash)" van entre paréntesis en la fuente: NO son
+  //    recordatorios — se protegen como "Slash" antes de la limpieza.
+  text = text.replace(/\((Slash|Strike|Ranged|Special|Wisdom)\)/g, '"$1"');
+  //    Quita recordatorios "(texto...)" pero conserva costes numéricos "(2)".
   text = text.replace(/\((?=[^)]*[a-z])[^)]*\)/gi, ' ').replace(/\s+/g, ' ').trim();
   if (!text || text === 'NULL') return script;
   // Alias de nombre: "Also treat this card's name as [X] ..." — afecta a los

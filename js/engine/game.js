@@ -100,6 +100,9 @@ export class Game {
   // Filtro sin poder dinámico (evita recursión con staticPowerFor).
   matchesFilterStatic(card, f) {
     if (!f) return true;
+    if (f.anyOf) return f.anyOf.some((sub) => this.matchesFilterStatic(card, sub));
+    if (f.attr && !((card.data.attribute ?? '').includes(f.attr))) return false;
+    if (f.cardType && card.type !== f.cardType) return false;
     const cmp = (val, spec) => spec.dir === 'less' ? val <= spec.v : spec.dir === 'more' ? val >= spec.v : val === spec.v;
     if (f.names && !f.names.some((nm) => card.name.toLowerCase().includes(nm.toLowerCase()) ||
       (card.script?.aliases ?? []).some((a) => a.toLowerCase().includes(nm.toLowerCase())))) return false;
@@ -243,6 +246,9 @@ export class Game {
   // ¿La carta cumple un filtro de objetivo (color/subtipo/nombre/poder/coste)?
   matchesFilter(card, f) {
     if (!f) return true;
+    if (f.anyOf) return f.anyOf.some((sub) => this.matchesFilter(card, sub));
+    if (f.attr && !((card.data.attribute ?? '').includes(f.attr))) return false;
+    if (f.cardType && card.type !== f.cardType) return false;
     const cmp = (val, spec) => spec.dir === 'less' ? val <= spec.v : spec.dir === 'more' ? val >= spec.v : val === spec.v;
     if (f.names && !f.names.some((nm) => card.name.toLowerCase().includes(nm.toLowerCase()) ||
       (card.script?.aliases ?? []).some((a) => a.toLowerCase().includes(nm.toLowerCase())))) return false;
@@ -281,6 +287,7 @@ export class Game {
       case 'boardCost': return [...p.characters, ...opp.characters].some((c) =>
         cond.dir === 'more' ? c.cost >= cond.v : cond.dir === 'less' ? c.cost <= cond.v : c.cost === cond.v);
       case 'oppLeaderAttr': return (this.opponentOf(p).leader?.data.attribute ?? '').includes(cond.attr);
+      case 'leaderAttr': return (p.leader?.data.attribute ?? '').includes(cond.attr);
       case 'oppHasChar': return opp.characters.some((c) => this.matchesFilter(c, cond.filter));
       case 'oppRested': {
         let val = opp.characters.filter((c) => c.rested).length;
@@ -960,6 +967,9 @@ export class Game {
   async runTaggedAbilities(card, when, ctx = {}) {
     if (card._negatedUntil === this.turn) return;   // "negate the effect of ..."
     for (const ab of abilitiesOf(card, when)) {
+      // [Your Turn] / [Opponent's Turn]: la habilidad solo vive en ese turno.
+      if (ab.yourTurn && this.activePlayer !== card.owner) continue;
+      if (ab.oppTurn && this.activePlayer === card.owner) continue;
       // "When this Character is KO'd by your opponent's effect": solo por efecto.
       if (ab.koByOppEffect && !ctx.byEffect) continue;
       // "When you play a <filtro> Character": la carta jugada debe cumplirlo.
@@ -1298,9 +1308,31 @@ export class Game {
               opp.leader._frozenUntil = this.turn + 1; left--;
               this.log(`❄ ${opp.leader.name} (líder) no se enderezará en el próximo refresco.`);
             }
-            for (const c of opp.characters.filter((x) => x.rested && !x._frozenUntil).slice(0, left)) {
-              c._frozenUntil = this.turn + 1;
-              this.log(`❄ ${c.name} no se enderezará en el próximo refresco.`);
+            while (left > 0) {
+              const cands = opp.characters.filter((x) => x.rested && !x._frozenUntil && this.matchesFilter(x, op.filter));
+              const donOk = op.includeDon && opp.donRested > (opp._donFrozenNext ?? 0);
+              if (!cands.length && !donOk) break;
+              // "Character or DON!!": si hay ambas opciones, el humano elige.
+              let mode = cands.length ? 0 : 1;
+              if (cands.length && donOk && !p.isBot) {
+                mode = await p.controller.chooseOption(this, {
+                  prompt: '❄ ¿Qué congelar (no se enderezará en su refresco)?',
+                  options: ['Un personaje girado', '1 DON!! girado', 'Nada'],
+                });
+              }
+              if (mode === 2) break;
+              if (mode === 0) {
+                const id = await p.controller.chooseTarget(this, {
+                  purpose: 'freeze', candidateIds: cands.map((c) => c.id), optional: true,
+                });
+                const t = this.byId(id);
+                if (!t || !cands.includes(t)) break;
+                t._frozenUntil = this.turn + 1; left--;
+                this.log(`❄ ${t.name} no se enderezará en el próximo refresco.`);
+              } else {
+                opp._donFrozenNext = (opp._donFrozenNext ?? 0) + 1; left--;
+                this.log(`❄ 1 DON!! girado de ${opp.name} no se enderezará en su refresco.`);
+              }
             }
             break;
           }
@@ -1416,15 +1448,18 @@ export class Game {
           const seen = p.library.splice(0, Math.min(op.n, p.library.length));
           if (!seen.length) break;
           const f = op.filter ?? (op.type ? { types: [op.type] } : {});
-          const matches = (c) => {
-            if (f.names && !f.names.some((nm) => c.name.toLowerCase().includes(nm.toLowerCase()))) return false;
-            if (f.notName && c.name.toLowerCase().includes(f.notName.toLowerCase())) return false;
-            if (f.types && !f.types.some((t) => (c.data.subTypes ?? []).some((s) => s.toLowerCase().includes(t.toLowerCase())))) return false;
-            if (f.cardType && c.type !== f.cardType) return false;
-            if (f.power !== undefined && (c.data.power ?? -1) !== f.power) return false;
-            if (f.maxCost !== undefined && c.cost > f.maxCost) return false;
+          const matchesOne = (c, ff) => {
+            if (ff.names && !ff.names.some((nm) => c.name.toLowerCase().includes(nm.toLowerCase()))) return false;
+            if (ff.notName && c.name.toLowerCase().includes(ff.notName.toLowerCase())) return false;
+            if (ff.types && !ff.types.some((t) => (c.data.subTypes ?? []).some((s) => s.toLowerCase().includes(t.toLowerCase())))) return false;
+            if (ff.cardType && c.type !== ff.cardType) return false;
+            if (ff.colors && !ff.colors.some((col) => (c.color ?? '').toLowerCase().includes(col))) return false;
+            if (ff.attr && !((c.data.attribute ?? '').includes(ff.attr))) return false;
+            if (ff.power !== undefined && (c.data.power ?? -1) !== ff.power) return false;
+            if (ff.maxCost !== undefined && c.cost > ff.maxCost) return false;
             return true;
           };
+          const matches = (c) => f.anyOf ? f.anyOf.some((sub) => matchesOne(c, sub)) : matchesOne(c, f);
           const pickable = seen.filter(matches);
           this.log(`${p.name} mira ${seen.length} carta(s): ${seen.map((c) => c.name).join(', ')}.`);
           // El jugador ve TODAS las reveladas y elige 1 de entre las que cumplen.
@@ -1768,15 +1803,32 @@ export class Game {
           break;
         }
         case 'restOppMixed': {
+          // "Rest up to a total of N of your opponent's Characters or DON!!":
+          // el jugador elige el reparto; respeta "cannot be rested".
           let left = op.n;
-          for (const c of opp.characters.filter((x) => !x.rested)) {
-            if (left <= 0) break;
-            await this.restCard(c); left--;
-            this.log(`${c.name} queda girado.`);
+          while (left > 0) {
+            const cands = opp.characters.filter((x) => !x.rested && !(x._noRestUntil >= this.turn) && !this.cardHasStatic(x, 'cannotRestOpp'));
+            const donOk = opp.donActive > 0;
+            if (!cands.length && !donOk) break;
+            let mode = cands.length ? 0 : 1;
+            if (cands.length && donOk && !p.isBot) {
+              mode = await p.controller.chooseOption(this, {
+                prompt: `¿Qué girar del rival? (quedan ${left})`,
+                options: ['Un personaje', '1 DON!! activo', 'Nada'],
+              });
+            }
+            if (mode === 2) break;
+            if (mode === 0) {
+              const id = await p.controller.chooseTarget(this, { purpose: 'rest', candidateIds: cands.map((c) => c.id), optional: true });
+              const t = this.byId(id);
+              if (!t || !cands.includes(t)) break;
+              await this.restCard(t); left--;
+              this.log(`${t.name} queda girado.`);
+            } else {
+              opp.donActive -= 1; opp.donRested += 1; left--;
+              this.log(`${opp.name} gira 1 DON!!.`);
+            }
           }
-          const donRest = Math.min(left, opp.donActive);
-          opp.donActive -= donRest; opp.donRested += donRest;
-          if (donRest) this.log(`${opp.name} gira ${donRest} DON!!.`);
           break;
         }
         case 'restAllOpp': {

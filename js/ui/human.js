@@ -163,6 +163,7 @@ export class HumanController {
       makeRoom: 'descartar para hacer sitio (área de personajes llena)',
       sealBlocker: 'no podrá activar [Blocker] este turno',
       restCost: 'girar como coste de la habilidad',
+      freeze: 'no se enderezará en su próximo refresco',
     };
     const label = LABELS[purpose] ?? purpose;
     // Cartas en zonas ocultas (descarte, mazo, Vida) no están pintadas en el

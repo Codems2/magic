@@ -34,7 +34,7 @@ export class BotController {
         return worst.id;
       }
       case 'ko': case 'bounce': case 'tuckBottom': case 'rest':
-      case 'powerDown': case 'costDown': case 'sealBlocker':
+      case 'powerDown': case 'costDown': case 'sealBlocker': case 'freeze':
         // Al enemigo más peligroso (mayor poder + habilidades).
         return enemy.sort((a, b) => (b.power(game) ?? 0) - (a.power(game) ?? 0))[0]?.id ?? enemy[0]?.id ?? null;
       case 'playFree':
