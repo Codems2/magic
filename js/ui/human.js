@@ -2,6 +2,7 @@
 // Implementa la misma interfaz que BotController (y que el futuro RemoteController).
 
 import { abilitiesOf } from '../engine/effects.js';
+import { counterPowerOf } from '../ai/bot.js';
 
 export class HumanController {
   constructor(ui) {
@@ -116,11 +117,22 @@ export class HumanController {
   async counterStep(game, { attackerId, targetId, attackPower, targetPower }) {
     const p = this.player;
     const counters = p.hand.filter((c) => c.counterValue > 0);
-    const events = p.hand.filter((c) => c.isEvent && abilitiesOf(c, 'counter')[0] &&
+    const counterEvents = p.hand.filter((c) => c.isEvent && abilitiesOf(c, 'counter')[0]);
+    const events = counterEvents.filter((c) =>
       c.cost <= p.donActive && game.canPayAbilityCost(p, c, abilitiesOf(c, 'counter')[0].cost));
-    if (!counters.length && !events.length) return { discardIds: [], eventIds: [] };
-
     const targetName = targetId === 'leader' ? 'tu líder' : game.byId(targetId)?.name;
+    // Sin NADA con counter en mano: no hay paso que enseñar.
+    if (!counters.length && !counterEvents.length) return { discardIds: [], eventIds: [] };
+    // Tienes eventos [Counter] pero no puedes pagarlos: el paso SE VE igual,
+    // que no parezca que el juego se saltó tu defensa.
+    if (!counters.length && !events.length) {
+      await this.ui.dialog({
+        title: '✋ Paso de counter',
+        body: `${game.byId(attackerId).name} (${attackPower}) golpea a ${targetName} (${targetPower}). Tienes ${counterEvents.length} evento(s) [Counter] en mano, pero no puedes pagarlos: te quedan ${p.donActive} DON!! activos. Consejo: guarda DON!! sin gastar en tu turno para poder defenderte.`,
+        buttons: [{ label: 'Encajar el golpe', value: true, primary: true }],
+      });
+      return { discardIds: [], eventIds: [] };
+    }
     const ids = [...new Set([...counters, ...events].map((c) => c.id))];
     const tip = this.coach ? await this.coach.adviseCounter(game, { attackerId, targetId, attackPower, targetPower }) : '';
     const chosen = await this.ui.chooseCards({
@@ -132,7 +144,7 @@ export class HumanController {
         let bonus = 0;
         for (const id of sel) {
           const c = game.byId(id);
-          if (c.isEvent) bonus += (abilitiesOf(c, 'counter')[0]?.ops ?? []).filter((o) => o.op === 'powerUp').reduce((n, o) => n + o.n, 0);
+          if (c.isEvent) bonus += counterPowerOf(abilitiesOf(c, 'counter')[0], targetId === 'leader');
           else bonus += c.counterValue;
         }
         // En OPTCG el atacante gana los empates: el ataque solo se frena si la
